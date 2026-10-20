@@ -1,0 +1,31 @@
+# Local manuscripts, credentials and generated runtime state
+/data/
+/restored-workspaces/
+/.runtime/
+/.tmp/
+/.env
+/.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+*.db
+*.db-wal
+*.db-shm
+*.sqlite*
+secrets.json
+
+# Tooling and builds
+**/.venv/
+**/__pycache__/
+**/.pytest_cache/
+**/.ruff_cache/
+**/.mypy_cache/
+**/*.egg-info/
+**/node_modules/
+frontend/dist/
+frontend/test-results/
+frontend/playwright-report/
+**/*.tsbuildinfo
+coverage/
+*.log

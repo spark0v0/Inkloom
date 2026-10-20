@@ -1,0 +1,115 @@
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { Archive, ArrowDown, ArrowRight, BookOpen, CaretRight, Clock, Export, GearSix, List, MagnifyingGlass, Notebook, PenNib, TreeStructure, X } from '@phosphor-icons/react'
+import { api, downloadFile, errorText, npath } from './lib/api'
+import type { Evidence, Novel } from './lib/api'
+import { readRoute, routeHash } from './lib/route'
+import type { Route } from './lib/route'
+import { Badge, Button, Empty, Field, Loading, Modal, Notice } from './components/ui'
+import { EvidenceModal } from './components/EvidenceModal'
+import { LibraryPage, openNovel } from './features/LibraryPage'
+const EditorPage = lazy(() => import('./features/EditorPage').then(m => ({ default: m.EditorPage })))
+const StoryPage = lazy(() => import('./features/StoryPage').then(m => ({ default: m.StoryPage })))
+const PlanningPage = lazy(() => import('./features/PlanningPage').then(m => ({ default: m.PlanningPage })))
+const JobsPage = lazy(() => import('./features/JobsPage').then(m => ({ default: m.JobsPage })))
+const SettingsPage = lazy(() => import('./features/SettingsPage').then(m => ({ default: m.SettingsPage })))
+const BackupPage = lazy(() => import('./features/BackupPage').then(m => ({ default: m.BackupPage })))
+
+const pageNames = { library: '我的作品', write: '创作空间', bible: '故事档案', plot: '剧情规划', jobs: '生成任务', settings: '模型设置', backup: '工作区备份' }
+
+export default function App() {
+  const [route, setRoute] = useState<Route>(readRoute)
+  const routeRef = useRef(route)
+  routeRef.current = route
+  const [lastNovel, setLastNovel] = useState(route.novelId)
+  const [menu, setMenu] = useState(false)
+  const [query, setQuery] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
+  const [evidence, setEvidence] = useState<Evidence | null>(null)
+  const [navigationError, setNavigationError] = useState('')
+  const guard = useRef<(() => Promise<unknown>) | null>(null)
+  const health = useQuery({ queryKey: ['health'], queryFn: api.health, retry: 1, refetchInterval: 15000 })
+  const novelId = route.novelId || lastNovel
+  const novel = useQuery({ queryKey: ['novel', novelId], queryFn: () => api.novel(novelId!), enabled: !!novelId && !!health.data })
+  const chapters = useQuery({ queryKey: ['chapters', route.novelId], queryFn: () => api.chapters(route.novelId!), enabled: !!route.novelId && route.page === 'write' && !!health.data })
+  const chapter = useQuery({ queryKey: ['chapter', route.novelId, route.chapterId], queryFn: () => api.chapter(route.novelId!, route.chapterId!), enabled: !!route.novelId && !!route.chapterId && route.page === 'write' && !!health.data })
+  const providers = useQuery({ queryKey: ['providers'], queryFn: api.providers, enabled: !!health.data })
+  const roles = useQuery({ queryKey: ['roles'], queryFn: api.roles, enabled: !!health.data })
+  const registerGuard = useCallback((callback: (() => Promise<unknown>) | null) => { guard.current = callback }, [])
+  const navigate = useCallback(async (next: Route) => {
+    try {
+      await guard.current?.()
+      setNavigationError(''); setMenu(false)
+      routeRef.current = next; setRoute(next)
+      if (next.novelId) setLastNovel(next.novelId)
+      if (location.hash !== routeHash(next)) location.hash = routeHash(next)
+    } catch (error) { setNavigationError(errorText(error)); throw error }
+  }, [])
+  const safeNavigate = (next: Route) => { void navigate(next).catch(() => undefined) }
+  useEffect(() => {
+    const change = () => {
+      const next = readRoute()
+      if (routeHash(next) === routeHash(routeRef.current)) return
+      void navigate(next).catch(() => { history.replaceState(null, '', routeHash(routeRef.current)) })
+    }
+    const shortcut = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k' && !event.isComposing) { event.preventDefault(); setSearchOpen(true) }
+    }
+    window.addEventListener('hashchange', change); window.addEventListener('keydown', shortcut)
+    return () => { window.removeEventListener('hashchange', change); window.removeEventListener('keydown', shortcut) }
+  }, [navigate])
+  useEffect(() => {
+    if (route.page === 'write' && route.novelId && !route.chapterId && novel.data) void openNovel(novel.data, navigate).catch(e => setNavigationError(errorText(e)))
+  }, [route, novel.data, navigate])
+
+  function goBook(page: 'write' | 'bible' | 'plot') {
+    if (!novel.data) { safeNavigate({ page: 'library' }); return }
+    if (page === 'write' && route.chapterId && route.novelId === novelId) safeNavigate({ page, novelId, chapterId: route.chapterId })
+    else if (page === 'write') void openNovel(novel.data, navigate).catch(e => setNavigationError(errorText(e)))
+    else safeNavigate({ page, novelId })
+  }
+  const sidebar = <>
+    <button className="brand" onClick={() => safeNavigate({ page: 'library' })} aria-label="叙事工坊，我的作品"><span className="brand-mark"><PenNib size={22} weight="fill" /></span><span><strong>叙事工坊</strong><small>STORY WORKSHOP</small></span></button>
+    <div className="sidebar-main"><button className={`nav-item library-nav ${route.page === 'library' ? 'active' : ''}`} onClick={() => safeNavigate({ page: 'library' })}><BookOpen size={19} />我的作品</button><div className="nav-section-label">{novel.data ? '当前作品' : '创作工作台'}</div>{novel.data && <button className="current-book" onClick={() => goBook('write')}><span className="mini-book">{Array.from(novel.data.title)[0]}</span><span><strong>{novel.data.title}</strong><small>{novel.data.is_demo ? '示例作品' : novel.data.genre || '创作中'}</small></span><CaretRight size={14} /></button>}<nav aria-label="创作导航"><button className={`nav-item ${route.page === 'write' ? 'active' : ''}`} onClick={() => goBook('write')}><PenNib size={19} />创作空间</button><button className={`nav-item ${route.page === 'bible' ? 'active' : ''}`} onClick={() => goBook('bible')}><Notebook size={19} />故事档案</button><button className={`nav-item ${route.page === 'plot' ? 'active' : ''}`} onClick={() => goBook('plot')}><TreeStructure size={19} />剧情规划</button><button className={`nav-item ${route.page === 'jobs' ? 'active' : ''}`} onClick={() => safeNavigate({ page: 'jobs', novelId: route.novelId })}><Clock size={19} />生成任务</button></nav></div>
+    <div className="sidebar-bottom"><button className={`nav-item ${route.page === 'settings' ? 'active' : ''}`} onClick={() => safeNavigate({ page: 'settings' })}><GearSix size={19} />模型设置</button><button className={`nav-item ${route.page === 'backup' ? 'active' : ''}`} onClick={() => safeNavigate({ page: 'backup' })}><Archive size={19} />工作区备份</button><div className="local-status"><span className={`connection-dot ${health.isError ? 'offline' : ''}`} /><span>{health.isError ? '工作区连接中断' : '本地工作区'}</span><span className="version-label">v0.1</span></div></div>
+  </>
+  let content
+  if (!health.data) content = health.error ? <div className="connection-error"><Empty icon={<BookOpen size={38} />} title="暂时无法连接本地工作区" action={<Button variant="primary" onClick={() => void health.refetch()}>重新连接</Button>}>请确认本机服务正在运行。已有草稿的恢复副本会保留在当前浏览器。</Empty><Notice>{errorText(health.error)}</Notice></div> : <Loading label="正在打开本地工作区…" />
+  else if (route.page === 'library') content = <LibraryPage navigate={navigate} query={query} />
+  else if (route.page === 'settings') content = <SettingsPage />
+  else if (route.page === 'backup') content = <BackupPage health={health.data} />
+  else if (route.page === 'jobs') content = <JobsPage novelId={route.novelId} onEvidence={setEvidence} />
+  else if (novel.error || chapter.error || chapters.error || providers.error || roles.error) content = <div className="content-page"><Notice>{errorText(novel.error || chapter.error || chapters.error || providers.error || roles.error)}</Notice><Button onClick={() => safeNavigate({ page: 'library' })}>返回作品</Button></div>
+  else if (!novel.data || (route.page === 'write' && (!chapter.data || !chapters.data || !providers.data || !roles.data))) content = novelId ? <Loading /> : <Empty icon={<BookOpen size={34} />} title="先选择一部作品" action={<Button onClick={() => safeNavigate({ page: 'library' })}>打开我的作品</Button>}>人物、规划与正文都属于各自的故事。</Empty>
+  else if (route.page === 'bible') content = <StoryPage key={novel.data.id} novel={novel.data} onEvidence={setEvidence} />
+  else if (route.page === 'plot') content = <PlanningPage key={novel.data.id} novel={novel.data} />
+  else content = <EditorPage key={`${health.data.workspace_id}:${chapter.data!.id}`} novel={novel.data} chapter={chapter.data!} chapters={chapters.data!} workspaceId={health.data.workspace_id} providers={providers.data!} roles={roles.data!} navigate={navigate} onEvidence={setEvidence} registerGuard={registerGuard} />
+  return <div className="app-shell"><a className="skip-link" href="#main-content" onClick={event => { event.preventDefault(); document.getElementById("main-content")?.focus() }}>跳到主要内容</a><aside className="primary-sidebar">{sidebar}</aside><div className="app-main"><header className="app-header"><div className="header-breadcrumb"><button className="icon-button mobile-menu-toggle" aria-label="打开主菜单" onClick={() => setMenu(true)}><List size={21} /></button><span className="header-label">{route.novelId ? '我的作品' : '工作台'}</span>{route.novelId && <><CaretRight size={13} /><strong>{novel.data?.title || '作品'}</strong>{novel.data?.is_demo && <Badge>示例</Badge>}</>}<CaretRight size={13} /><span>{pageNames[route.page]}</span></div><div className="header-actions">{route.page === 'library' ? <label className="header-search"><MagnifyingGlass size={17} /><input aria-label="搜索作品" placeholder="搜索作品…" value={query} onChange={e => setQuery(e.target.value)} /><kbd>Ctrl K</kbd><button aria-label="打开搜索" onClick={() => setSearchOpen(true)} className="sr-only">搜索</button></label> : <button className="header-search search-button" aria-label="搜索已确认原文" onClick={() => setSearchOpen(true)}><MagnifyingGlass size={17} /><span>搜索已确认原文…</span><kbd>Ctrl K</kbd></button>}{route.page === 'library' && <button className="icon-button mobile-library-search" aria-label="搜索作品" onClick={() => setSearchOpen(true)}><MagnifyingGlass size={19} /></button>}{route.novelId && <Button aria-label="导出" className="export-trigger" onClick={() => setExportOpen(true)}><Export size={17} /><span>导出</span></Button>}<span className="author-avatar" title="本机作者">作</span></div></header>{navigationError && <Notice>尚未切换页面：{navigationError}<button className="inline-link" onClick={() => setNavigationError('')}>收起</button></Notice>}<main id="main-content" tabIndex={-1}><Suspense fallback={<Loading />}>{content}</Suspense></main></div>
+    <Modal open={menu} onOpenChange={setMenu} title="叙事工坊" description="作品、档案与工作区工具。" className="navigation-modal"><div className="mobile-sidebar-content">{sidebar}</div></Modal>
+    <EvidenceModal evidence={evidence} onClose={() => setEvidence(null)} />
+    {searchOpen && <SearchDialog novel={route.page === 'library' ? undefined : novel.data} onClose={() => setSearchOpen(false)} onEvidence={setEvidence} onLibrarySearch={value => { setQuery(value); setSearchOpen(false); safeNavigate({ page: 'library' }) }} />}
+    {exportOpen && novel.data && <ExportDialog novel={novel.data} onClose={() => setExportOpen(false)} flush={() => guard.current?.() ?? Promise.resolve()} />}
+  </div>
+}
+
+function SearchDialog({ novel, onClose, onEvidence, onLibrarySearch }: { novel?: Novel; onClose: () => void; onEvidence: (e: Evidence) => void; onLibrarySearch: (text: string) => void }) {
+  const [query, setQuery] = useState('')
+  const [debounced, setDebounced] = useState('')
+  useEffect(() => { const timeout = setTimeout(() => setDebounced(query.trim()), 250); return () => clearTimeout(timeout) }, [query])
+  const results = useQuery({ queryKey: ['search', novel?.id, debounced], queryFn: () => api.search(novel!.id, debounced), enabled: !!novel && !!debounced })
+  return <Modal open onOpenChange={value => !value && onClose()} title={novel ? `搜索《${novel.title}》` : '搜索我的作品'} description={novel ? '仅搜索当前作品已确认且仍有效的原文，支持中文短词。' : '按书名、题材和故事方向搜索。'} wide><div className="search-dialog-input"><MagnifyingGlass size={22} /><input autoFocus aria-label="输入搜索内容" maxLength={200} placeholder={novel ? '人物名、一句话，或两字短词…' : '书名或故事方向…'} value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing && !novel) onLibrarySearch(query) }} />{query && <button className="icon-button" aria-label="清空搜索" onClick={() => setQuery('')}><X size={17} /></button>}</div>{novel ? <div className="search-results">{results.isFetching ? <Loading label="正在搜索已确认原文…" /> : results.error ? <Notice>{errorText(results.error)}</Notice> : debounced && !results.data?.length ? <Empty icon={<MagnifyingGlass size={28} />} title="没有找到有效原文">未确认或已经失效的正文不会进入这里。</Empty> : results.data?.map(({ source }) => <button className="search-result" key={source.source_id} onClick={() => onEvidence({ ...source, quote: source.text })}><span>{source.chapter_title}<ArrowRight size={16} /></span><p>{source.text}</p></button>)}</div> : <div className="modal-actions"><Button variant="primary" onClick={() => onLibrarySearch(query)}>搜索作品<ArrowRight size={17} /></Button></div>}</Modal>
+}
+
+function ExportDialog({ novel, onClose, flush }: { novel: Novel; onClose: () => void; flush: () => Promise<unknown> }) {
+  const [format, setFormat] = useState('md')
+  const [confirmed, setConfirmed] = useState(false)
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  async function download() {
+    setBusy(true)
+    try { await flush(); await downloadFile(`${npath(novel.id)}/export?format=${format}&confirmed=${confirmed}`, `${novel.title}${confirmed ? '-已确认' : ''}.${format}`); onClose() }
+    catch (e) { setError(errorText(e)) } finally { setBusy(false) }
+  }
+  return <Modal open onOpenChange={value => !value && onClose()} title="导出作品" description="导出章节标题与正文；完整版本、档案和记录请使用工作区备份。"><div className="form-stack"><Field label="格式"><select value={format} onChange={e => setFormat(e.target.value)}><option value="md">Markdown（.md）</option><option value="txt">纯文本（.txt）</option></select></Field><Field label="正文范围"><select value={confirmed ? 'confirmed' : 'working'} onChange={e => setConfirmed(e.target.value === 'confirmed')}><option value="working">所有章节的当前工作稿</option><option value="confirmed">仅仍有效的已确认版本</option></select></Field>{confirmed && <Notice tone="neutral">待重新确认章节不包括在导出中。当前有 {novel.accepted_count} 章可导出。</Notice>}{error && <Notice>{error}</Notice>}<div className="modal-actions"><Button onClick={onClose}>取消</Button><Button variant="primary" onClick={() => void download()} disabled={busy}><ArrowDown size={17} />下载正文</Button></div></div></Modal>
+}

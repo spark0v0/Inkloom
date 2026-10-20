@@ -1,0 +1,10 @@
+[
+  { "label": "空白", "text": " \t\r\n　", "count": 0 },
+  { "label": "中文标点", "text": "林舟 来了。\n", "count": 5 },
+  { "label": "中英与补充平面", "text": "AI 写作 😀", "count": 5 },
+  { "label": "组合 emoji 按码点统计", "text": "👩‍💻", "count": 3 },
+  { "label": "家庭 emoji", "text": "👨‍👩‍👧‍👦", "count": 7 },
+  { "label": "Unicode White Space", "text": "甲\u0085乙\u00a0丙\u2003丁", "count": 4 },
+  { "label": "字节序标记不是 White Space", "text": "\ufeff甲", "count": 2 },
+  { "label": "组合音标", "text": "é", "count": 2 }
+]

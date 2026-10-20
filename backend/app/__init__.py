@@ -1,0 +1,1 @@
+"""Story Workshop local application."""

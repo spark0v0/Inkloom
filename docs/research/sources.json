@@ -1,0 +1,263 @@
+{
+  "schema_version": 1,
+  "researched_on": "2026-10-20",
+  "timezone": "Asia/Shanghai",
+  "scope_note": "Public-document research only. No competitor installed, executed, benchmarked, or security-audited. HEAD and pushed_at are different metadata, not quality or activity scores.",
+  "repositories": [
+    {
+      "id": "R01",
+      "repository": "YILING0013/AI_NovelGenerator",
+      "url": "https://github.com/YILING0013/AI_NovelGenerator",
+      "default_branch": "main",
+      "head_sha": "a61674fad4dd6c4c5fa9a2ad2f12b667109e628a",
+      "head_committed_at_utc": "2026-10-16T13:00:41Z",
+      "repository_pushed_at_utc": "2026-10-16T13:01:24Z",
+      "archived": false,
+      "is_fork": false,
+      "readme_url": "https://github.com/YILING0013/AI_NovelGenerator/blob/a61674fad4dd6c4c5fa9a2ad2f12b667109e628a/README.md",
+      "license_url": "https://github.com/YILING0013/AI_NovelGenerator/blob/a61674fad4dd6c4c5fa9a2ad2f12b667109e628a/LICENSE",
+      "github_license_identifier": "AGPL-3.0",
+      "license_text_checked": false,
+      "license_note": "GitHub metadata identifier, not a legal analysis of possible reuse.",
+      "review_scope": [
+        "public_readme",
+        "repository_metadata"
+      ]
+    },
+    {
+      "id": "R02",
+      "repository": "xiamuceer-j/MuMuAINovel",
+      "url": "https://github.com/xiamuceer-j/MuMuAINovel",
+      "default_branch": "main",
+      "head_sha": "743e5abec18beb8d73426527e6579538053bc6fd",
+      "head_committed_at_utc": "2026-10-16T01:45:22Z",
+      "repository_pushed_at_utc": "2026-10-16T01:50:25Z",
+      "archived": false,
+      "is_fork": false,
+      "readme_url": "https://github.com/xiamuceer-j/MuMuAINovel/blob/743e5abec18beb8d73426527e6579538053bc6fd/README.md",
+      "license_url": "https://github.com/xiamuceer-j/MuMuAINovel/blob/743e5abec18beb8d73426527e6579538053bc6fd/LICENSE",
+      "github_license_identifier": "GPL-3.0",
+      "license_text_checked": false,
+      "license_note": "GitHub metadata identifier, not a legal analysis of possible reuse.",
+      "review_scope": [
+        "public_readme",
+        "repository_metadata"
+      ]
+    },
+    {
+      "id": "R03",
+      "repository": "RhythmicWave/NovelForge",
+      "url": "https://github.com/RhythmicWave/NovelForge",
+      "default_branch": "main",
+      "head_sha": "a485814411546b3980df0a1696a0fb6a043d56ce",
+      "head_committed_at_utc": "2026-09-23T04:53:48Z",
+      "repository_pushed_at_utc": "2026-09-23T04:58:53Z",
+      "archived": false,
+      "is_fork": false,
+      "readme_url": "https://github.com/RhythmicWave/NovelForge/blob/a485814411546b3980df0a1696a0fb6a043d56ce/README.md",
+      "license_url": "https://github.com/RhythmicWave/NovelForge/blob/a485814411546b3980df0a1696a0fb6a043d56ce/LICENSE",
+      "github_license_identifier": "AGPL-3.0",
+      "license_text_checked": false,
+      "license_note": "GitHub metadata identifier, not a legal analysis of possible reuse.",
+      "review_scope": [
+        "public_readme",
+        "repository_metadata"
+      ]
+    },
+    {
+      "id": "R04",
+      "repository": "Narcooo/inkos",
+      "url": "https://github.com/Narcooo/inkos",
+      "default_branch": "master",
+      "head_sha": "56aa33b04a27c45cc7a91f3d018187a77aec54ea",
+      "head_committed_at_utc": "2026-10-18T17:56:54Z",
+      "repository_pushed_at_utc": "2026-10-18T17:57:01Z",
+      "archived": false,
+      "is_fork": false,
+      "readme_url": "https://github.com/Narcooo/inkos/blob/56aa33b04a27c45cc7a91f3d018187a77aec54ea/README.md",
+      "license_url": "https://github.com/Narcooo/inkos/blob/56aa33b04a27c45cc7a91f3d018187a77aec54ea/LICENSE",
+      "github_license_identifier": "AGPL-3.0",
+      "license_text_checked": true,
+      "license_note": "GitHub metadata identifier, not a legal analysis of possible reuse.",
+      "review_scope": [
+        "public_readme",
+        "repository_metadata",
+        "release_notes_v1.8.0"
+      ]
+    },
+    {
+      "id": "R05",
+      "repository": "xiaoxiaoxiaotao/novel-bot",
+      "url": "https://github.com/xiaoxiaoxiaotao/novel-bot",
+      "default_branch": "master",
+      "head_sha": "7aa790ed8b3424eb173d7677d6f33e8c8c426a03",
+      "head_committed_at_utc": "2026-02-16T08:25:59Z",
+      "repository_pushed_at_utc": "2026-02-16T08:26:35Z",
+      "archived": false,
+      "is_fork": false,
+      "readme_url": "https://github.com/xiaoxiaoxiaotao/novel-bot/blob/7aa790ed8b3424eb173d7677d6f33e8c8c426a03/README.md",
+      "license_url": "https://github.com/xiaoxiaoxiaotao/novel-bot/blob/7aa790ed8b3424eb173d7677d6f33e8c8c426a03/LICENSE",
+      "github_license_identifier": "MIT",
+      "license_text_checked": false,
+      "license_note": "GitHub metadata identifier, not a legal analysis of possible reuse.",
+      "review_scope": [
+        "public_readme",
+        "repository_metadata"
+      ]
+    },
+    {
+      "id": "R06",
+      "repository": "ShadowLoveElysia/ElyHa",
+      "url": "https://github.com/ShadowLoveElysia/ElyHa",
+      "default_branch": "main",
+      "head_sha": "bccbe56e997703c004b7fce1f53caafe82b78af6",
+      "head_committed_at_utc": "2026-03-24T10:14:08Z",
+      "repository_pushed_at_utc": "2026-04-02T14:56:59Z",
+      "archived": false,
+      "is_fork": false,
+      "readme_url": "https://github.com/ShadowLoveElysia/ElyHa/blob/bccbe56e997703c004b7fce1f53caafe82b78af6/README.md",
+      "license_url": "https://github.com/ShadowLoveElysia/ElyHa/blob/bccbe56e997703c004b7fce1f53caafe82b78af6/LICENSE",
+      "github_license_identifier": "AGPL-3.0",
+      "license_text_checked": true,
+      "license_note": "README says GPLv3; inspected LICENSE and GitHub metadata say AGPL-3.0.",
+      "review_scope": [
+        "public_readme",
+        "repository_metadata"
+      ]
+    },
+    {
+      "id": "R07",
+      "repository": "Xiaoyangy/novel-studio",
+      "url": "https://github.com/Xiaoyangy/novel-studio",
+      "default_branch": "main",
+      "head_sha": "ed04a106f665f456246af3c4414ba62992a2a1d1",
+      "head_committed_at_utc": "2026-09-23T11:35:35Z",
+      "repository_pushed_at_utc": "2026-09-23T11:35:41Z",
+      "archived": false,
+      "is_fork": false,
+      "readme_url": "https://github.com/Xiaoyangy/novel-studio/blob/ed04a106f665f456246af3c4414ba62992a2a1d1/README.md",
+      "license_url": "https://github.com/Xiaoyangy/novel-studio/blob/ed04a106f665f456246af3c4414ba62992a2a1d1/LICENSE",
+      "github_license_identifier": "Apache-2.0",
+      "license_text_checked": false,
+      "license_note": "GitHub metadata identifier, not a legal analysis of possible reuse.",
+      "review_scope": [
+        "public_readme",
+        "repository_metadata"
+      ]
+    },
+    {
+      "id": "R08",
+      "repository": "MangoLion/plotbunni",
+      "url": "https://github.com/MangoLion/plotbunni",
+      "default_branch": "main",
+      "head_sha": "5620cd091c7074365980f457dfce95f02e5fa45f",
+      "head_committed_at_utc": "2026-04-19T15:50:48Z",
+      "repository_pushed_at_utc": "2026-04-19T15:50:51Z",
+      "archived": false,
+      "is_fork": false,
+      "readme_url": "https://github.com/MangoLion/plotbunni/blob/5620cd091c7074365980f457dfce95f02e5fa45f/README.md",
+      "license_url": "https://github.com/MangoLion/plotbunni/blob/5620cd091c7074365980f457dfce95f02e5fa45f/LICENSE",
+      "github_license_identifier": "MIT",
+      "license_text_checked": false,
+      "license_note": "GitHub metadata identifier, not a legal analysis of possible reuse.",
+      "review_scope": [
+        "public_readme",
+        "repository_metadata"
+      ]
+    },
+    {
+      "id": "R09",
+      "repository": "KazKozDev/NovelGenerator",
+      "url": "https://github.com/KazKozDev/NovelGenerator",
+      "default_branch": "main",
+      "head_sha": "aa5d7b5303a32439535ed85219efca35579c9845",
+      "head_committed_at_utc": "2026-10-09T13:21:02Z",
+      "repository_pushed_at_utc": "2026-10-09T13:22:29Z",
+      "archived": false,
+      "is_fork": false,
+      "readme_url": "https://github.com/KazKozDev/NovelGenerator/blob/aa5d7b5303a32439535ed85219efca35579c9845/README.md",
+      "license_url": "https://github.com/KazKozDev/NovelGenerator/blob/aa5d7b5303a32439535ed85219efca35579c9845/LICENSE",
+      "github_license_identifier": "NOASSERTION",
+      "license_text_checked": true,
+      "license_note": "Inspected LICENSE begins Business Source License 1.1; NOASSERTION is GitHub metadata, not a permissive license.",
+      "review_scope": [
+        "public_readme",
+        "repository_metadata"
+      ]
+    }
+  ],
+  "discussions": [
+    {
+      "id": "L01",
+      "url": "https://linux.do/t/topic/1781907",
+      "title": "〖AI小说〗有什么围绕着交互式写作设计的工具吗",
+      "published_date": "2026-03-19",
+      "evidence_type": "community_anecdote_not_benchmark"
+    },
+    {
+      "id": "L02",
+      "url": "https://linux.do/t/topic/2829519",
+      "title": "ai写小说大家觉得有什么好想法与工具吗？",
+      "published_date": "2026-08-29",
+      "evidence_type": "community_anecdote_not_benchmark"
+    },
+    {
+      "id": "L03",
+      "url": "https://linux.do/t/topic/2010099",
+      "title": "想请教各位佬友，AI写小说总会出现前文未提及的剧情，这种是上下文不够长导致的吗，是否有较好的解决方案呢？",
+      "published_date": "2026-04-20",
+      "evidence_type": "community_anecdote_not_benchmark"
+    },
+    {
+      "id": "L04",
+      "url": "https://linux.do/t/topic/1710448",
+      "title": "搓了个节点式Ai Agent小说辅助创作工具 听听各位看法",
+      "published_date": "2026-03-08",
+      "evidence_type": "community_anecdote_not_benchmark"
+    },
+    {
+      "id": "L05",
+      "url": "https://linux.do/t/topic/656775",
+      "title": "Plot Bunni-开源小说写作助手",
+      "published_date": "2025-05-17",
+      "evidence_type": "community_anecdote_not_benchmark"
+    },
+    {
+      "id": "L06",
+      "url": "https://linux.do/t/topic/2193391",
+      "title": "关于ai写小说。",
+      "published_date": "2026-05-17",
+      "evidence_type": "community_anecdote_not_benchmark"
+    }
+  ],
+  "technical_sources": [
+    {
+      "id": "T01",
+      "title": "SQLite FTS5 and Trigram Tokenizer",
+      "url": "https://www.sqlite.org/fts5.html#the_trigram_tokenizer"
+    },
+    {
+      "id": "T02",
+      "title": "SQLite Online Backup API",
+      "url": "https://www.sqlite.org/backup.html"
+    },
+    {
+      "id": "T03",
+      "title": "FastAPI Background Tasks",
+      "url": "https://fastapi.tiangolo.com/tutorial/background-tasks/"
+    },
+    {
+      "id": "T04",
+      "title": "Web Content Accessibility Guidelines 2.2",
+      "url": "https://www.w3.org/TR/WCAG22/"
+    }
+  ],
+  "release_sources": [
+    {
+      "repository": "Narcooo/inkos",
+      "url": "https://github.com/Narcooo/inkos/releases/tag/v1.8.0",
+      "version": "v1.8.0",
+      "note": "Release evidence; distinct from researched development branch."
+    }
+  ]
+}

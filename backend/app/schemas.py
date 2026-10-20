@@ -1,0 +1,462 @@
+"""Public v1 contract; frontend declarations are generated from this OpenAPI schema."""
+
+from __future__ import annotations
+
+from typing import Any, Literal
+
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
+
+
+class Schema(BaseModel):
+    model_config = ConfigDict(extra="forbid", from_attributes=True, allow_inf_nan=False)
+
+
+class NovelInput(Schema):
+    title: str = Field(min_length=1, max_length=160)
+    genre: str = Field(default="", max_length=80)
+    premise: str = Field(default="", max_length=12000)
+    style: str = Field(default="", max_length=8000)
+
+
+class NovelPatch(Schema):
+    title: str | None = Field(default=None, min_length=1, max_length=160)
+    genre: str | None = Field(default=None, max_length=80)
+    premise: str | None = Field(default=None, max_length=12000)
+    style: str | None = Field(default=None, max_length=8000)
+    archived: bool | None = None
+
+
+class NovelOut(Schema):
+    id: str
+    title: str
+    genre: str
+    premise: str
+    style: str
+    is_demo: bool
+    archived: bool
+    settings_revision: int
+    canon_revision: int
+    dirty_from_order: int | None
+    chapter_count: int
+    accepted_count: int
+    total_chars: int
+    created_at: str
+    updated_at: str
+
+
+class ParagraphOut(Schema):
+    paragraph_id: str
+    ordinal: int
+    text: str
+
+
+class VersionOut(Schema):
+    id: str
+    chapter_id: str
+    parent_id: str | None
+    text: str
+    editor_doc: dict[str, Any]
+    paragraphs: list[ParagraphOut]
+    content_hash: str
+    char_count: int
+    created_at: str
+
+
+class VersionSummary(Schema):
+    id: str
+    parent_id: str | None
+    char_count: int
+    content_hash: str
+    created_at: str
+
+
+class ChapterInput(Schema):
+    title: str = Field(default="新章节", min_length=1, max_length=240)
+    volume: str = Field(default="第一卷", max_length=160)
+    goal: str = Field(default="", max_length=8000)
+
+
+class ChapterPatch(Schema):
+    title: str | None = Field(default=None, min_length=1, max_length=240)
+    volume: str | None = Field(default=None, max_length=160)
+    goal: str | None = Field(default=None, max_length=8000)
+
+
+class ChapterSummary(Schema):
+    id: str
+    novel_id: str
+    title: str
+    volume: str
+    position: int
+    goal: str
+    working_version_id: str
+    accepted_version_id: str | None
+    review_state: str
+    char_count: int
+    updated_at: str
+
+
+class ChapterOut(ChapterSummary):
+    version: VersionOut
+
+
+class SaveInput(Schema):
+    base_version_id: str
+    operation_id: str = Field(min_length=8, max_length=160)
+    text: str = Field(max_length=200000)
+    editor_doc: dict[str, Any] | None = None
+
+
+class EntityInput(Schema):
+    kind: Literal["character", "world", "thread", "timeline"]
+    name: str = Field(min_length=1, max_length=160)
+    summary: str = Field(default="", max_length=4000)
+    body: str = Field(default="", max_length=16000)
+    aliases: list[str] = Field(default_factory=list, max_length=50)
+    status: Literal["author", "proposed"] = "author"
+
+
+class EntityOut(EntityInput):
+    id: str
+    novel_id: str
+    updated_at: str
+
+
+class PlanInput(Schema):
+    title: str = Field(min_length=1, max_length=240)
+    level: Literal["book", "volume", "chapter", "scene"] = "chapter"
+    body: str = Field(default="", max_length=24000)
+
+
+class PlanOut(PlanInput):
+    id: str
+    novel_id: str
+    position: int
+    updated_at: str
+
+
+class Source(Schema):
+    source_id: str
+    novel_id: str
+    chapter_id: str
+    chapter_title: str
+    chapter_position: int
+    version_id: str
+    paragraph_id: str
+    content_hash: str
+    text: str
+    kind: str
+
+
+class Evidence(Schema):
+    source_id: str
+    quote: str = Field(min_length=1, max_length=10000)
+    novel_id: str | None = None
+    chapter_id: str | None = None
+    chapter_title: str | None = None
+    chapter_position: int | None = None
+    version_id: str | None = None
+    paragraph_id: str | None = None
+    content_hash: str | None = None
+    kind: str | None = None
+    start_codepoint: int | None = None
+    end_codepoint: int | None = None
+
+
+class MemoryProposal(Schema):
+    kind: Literal["event", "state", "knowledge", "thread"] = "event"
+    subject: str = Field(default="", max_length=160)
+    claim: str = Field(min_length=1, max_length=3000)
+    evidence: list[Evidence] = Field(min_length=1, max_length=8)
+    story_time: str | None = Field(default=None, max_length=240)
+    known_by: list[str] = Field(default_factory=list, max_length=50)
+
+
+class FactOut(MemoryProposal):
+    id: str
+    novel_id: str
+    chapter_id: str
+    version_id: str
+    canon_revision: int
+    active: bool
+
+
+class CanonInput(Schema):
+    version_id: str
+    operation_id: str = Field(min_length=8, max_length=160)
+    changes: list[MemoryProposal] = Field(default_factory=list, max_length=100)
+
+
+class CanonOut(Schema):
+    revision: int
+    confirmed_chapter_id: str
+    dirty_from_order: int | None
+    fact_count: int
+
+
+class ExtractResult(Schema):
+    kind: Literal["extract"]
+    changes: list[MemoryProposal] = Field(max_length=100)
+    uncertainties: list[str] = Field(default_factory=list, max_length=50)
+
+
+class Finding(Schema):
+    type: Literal["fact_conflict", "knowledge_leak", "timeline_question", "motivation_question",
+                  "repetition", "pacing", "thread_question", "needs_verification"]
+    severity: Literal["important", "question", "suggestion"]
+    target: Evidence
+    source_evidence: list[Evidence] = Field(default_factory=list, max_length=8)
+    explanation: str = Field(max_length=3000)
+    suggestion: str = Field(max_length=3000)
+    decision: Literal["pending", "confirmed", "intentional", "false_positive", "later"] = "pending"
+    decision_note: str = ""
+
+
+class ReviewResult(Schema):
+    kind: Literal["review"]
+    findings: list[Finding] = Field(max_length=50)
+    summary: str = Field(max_length=5000)
+
+
+class ScenePlan(Schema):
+    goal: str
+    obstacle: str
+    decision: str
+    change: str
+
+
+class PlanResult(Schema):
+    kind: Literal["plan"]
+    title: str
+    scenes: list[ScenePlan] = Field(min_length=1, max_length=12)
+    open_questions: list[str] = Field(default_factory=list)
+
+
+class HandoffResult(Schema):
+    kind: Literal["handoff"]
+    observations: list[MemoryProposal] = Field(max_length=30)
+    open_questions: list[str] = Field(default_factory=list)
+    next_suggestions: list[str] = Field(default_factory=list)
+
+
+TaskResult = ExtractResult | ReviewResult | PlanResult | HandoffResult
+
+
+class Selection(Schema):
+    start_codepoint: int = Field(ge=0)
+    end_codepoint: int = Field(ge=0)
+    text: str = Field(min_length=1, max_length=200000)
+
+
+class ContextInput(Schema):
+    chapter_id: str
+    base_version_id: str
+    task: Literal["continue", "rewrite", "plan", "extract", "review", "handoff"]
+    instruction: str = Field(default="", max_length=12000)
+    provider_id: str = "demo"
+    excluded_source_ids: list[str] = Field(default_factory=list, max_length=500)
+    selection: Selection | None = None
+    target_chars: int = Field(default=500, ge=100, le=6000)
+
+
+class ContextOut(Schema):
+    novel_id: str
+    chapter_id: str
+    base_version_id: str
+    task: str
+    canon_revision: int
+    settings_revision: int
+    author_brief: dict[str, str] = Field(default_factory=dict)
+    chapter_goal: str = ""
+    instruction: str = ""
+    current_selection: Selection | None = None
+    rewrite_surroundings: dict[str, str] = Field(default_factory=dict)
+    sources: list[Source]
+    entities: list[EntityOut]
+    facts: list[FactOut]
+    plans: list[PlanOut]
+    estimated_input_tokens: int
+    max_output_tokens: int
+    context_window: int
+    estimate_note: str
+    notices: list[str]
+    excluded_source_ids: list[str]
+    source_fingerprint: str
+    estimated_max_cost: float | None
+    currency: str
+    provider_name: str
+    model: str
+    is_demo: bool
+    provider_url: str = ""
+
+
+class JobInput(ContextInput):
+    idempotency_key: str = Field(min_length=8, max_length=160)
+    max_attempts: int = Field(default=3, ge=1, le=5)
+    max_cost: float | None = Field(default=None, gt=0, le=10000)
+
+
+class AttemptOut(Schema):
+    id: str
+    number: int
+    call_state: str
+    output_text: str
+    usage: dict[str, Any] | None
+    cost: float | None
+    error_code: str | None
+    created_at: str
+    finished_at: str | None
+
+
+class JobOut(Schema):
+    id: str
+    novel_id: str
+    chapter_id: str
+    task: str
+    instruction: str
+    provider_id: str
+    state: str
+    base_version_id: str
+    output_text: str
+    result: TaskResult | None
+    candidate_status: str
+    adopted_version_id: str | None
+    attempt_count: int
+    max_attempts: int
+    max_cost: float | None
+    reserved_cost: float | None
+    cost: float | None
+    checkpoint: str
+    error_code: str | None
+    error_message: str | None
+    is_demo: bool
+    created_at: str
+    updated_at: str
+
+
+class JobDetail(JobOut):
+    context: ContextOut
+    attempts: list[AttemptOut]
+
+
+class JobEventOut(Schema):
+    seq: int
+    kind: str
+    data: dict[str, Any]
+    created_at: str
+
+
+class AdoptInput(Schema):
+    base_version_id: str
+
+
+class FindingDecision(Schema):
+    index: int = Field(ge=0)
+    decision: Literal["confirmed", "intentional", "false_positive", "later"]
+    note: str = Field(default="", max_length=2000)
+
+
+class ProviderInput(Schema):
+    name: str = Field(min_length=1, max_length=120)
+    base_url: str = Field(max_length=1000)
+    model: str = Field(min_length=1, max_length=160)
+    api_key: SecretStr | None = Field(default=None, repr=False)
+    clear_key: bool = False
+    key_env: str = Field(default="", max_length=160)
+    stream: bool = True
+    include_usage: bool = True
+    json_mode: bool = False
+    token_parameter: Literal["max_tokens", "max_completion_tokens"] = "max_tokens"
+    context_window: int = Field(default=16000, ge=2048, le=2000000)
+    max_output_tokens: int = Field(default=2000, ge=64, le=64000)
+    input_price: float | None = Field(default=None, ge=0)
+    output_price: float | None = Field(default=None, ge=0)
+    currency: Literal["CNY", "USD"] = "CNY"
+    price_date: str | None = Field(default=None, max_length=10)
+
+    @field_validator("key_env")
+    @classmethod
+    def safe_env(cls, value: str) -> str:
+        import re
+        if value and not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,159}", value):
+            raise ValueError("环境变量名称无效")
+        return value
+
+
+class ProviderOut(Schema):
+    id: str
+    name: str
+    kind: str
+    base_url: str
+    model: str
+    revision: int
+    stream: bool
+    include_usage: bool
+    json_mode: bool
+    token_parameter: str
+    context_window: int
+    max_output_tokens: int
+    input_price: float | None
+    output_price: float | None
+    currency: str
+    price_date: str | None
+    key_env: str
+    has_key: bool
+    secret_persistent: bool
+
+
+class SearchResult(Schema):
+    source: Source
+    match_kind: str
+
+
+class ImportPreviewInput(Schema):
+    text: str = Field(max_length=2000000)
+
+
+class ImportChapter(Schema):
+    title: str = Field(min_length=1, max_length=240)
+    text: str = Field(max_length=200000)
+
+
+class ImportInput(Schema):
+    title: str = Field(min_length=1, max_length=160)
+    chapters: list[ImportChapter] = Field(min_length=1, max_length=1000)
+
+
+class HealthOut(Schema):
+    status: str
+    workspace_id: str
+    workspace_name: str
+    version: str
+    is_restored: bool = False
+
+
+class RestoreOut(Schema):
+    restore_id: str
+    novel_count: int
+    chapter_count: int
+    message: str
+
+
+class ActivateInput(Schema):
+    restore_id: str
+
+
+class ErrorOut(Schema):
+    code: str
+    message: str
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
+class RoleConfig(Schema):
+    writer: str = "demo"
+    planner: str = "demo"
+    extractor: str = "demo"
+    reviewer: str = "demo"
+
+
+class ConnectionOut(Schema):
+    reachable: bool
+    model_listed: bool
+    message: str

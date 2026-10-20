@@ -1,0 +1,30 @@
+{
+  "date": "2026-10-20T15:30:56.666Z",
+  "browser": "155.0.8059.85",
+  "viewports": [
+    {
+      "width": 1440,
+      "height": 900,
+      "bodyWidth": 1440,
+      "editorWidth": 724
+    },
+    {
+      "width": 1024,
+      "height": 768,
+      "bodyWidth": 1024,
+      "editorWidth": 560
+    },
+    {
+      "width": 768,
+      "height": 1024,
+      "bodyWidth": 768,
+      "editorWidth": 468
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "bodyWidth": 390,
+      "editorWidth": 390
+    }
+  ]
+}
