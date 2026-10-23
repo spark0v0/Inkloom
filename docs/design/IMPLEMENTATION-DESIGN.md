@@ -1,3 +1,5 @@
+> 本文保留第二版的历史设计。当前主要页面采用[第三版 UI](IMPLEMENTATION-V3.md)，用户已否定旧默认视觉。
+
 # 从概念图到真实工作台
 
 日期：2026-10-20。先使用内置生图生成 [写作工作台 v2](ui-workspace-v2.png) 与 [作品书架 v2](ui-library-v2.png)，查看后再落地。完整原始 prompt 见 [UI-V2-IMAGE-PROMPTS.md](UI-V2-IMAGE-PROMPTS.md)。已有 [故事档案图](ui-story-bible.png) 和 [移动候选图](ui-mobile-review.png) 继续作为相应页面的基线。

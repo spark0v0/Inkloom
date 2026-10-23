@@ -32,6 +32,9 @@ class Novel(Base):
     genre: Mapped[str] = mapped_column(String(80), default="")
     premise: Mapped[str] = mapped_column(Text, default="")
     style: Mapped[str] = mapped_column(Text, default="")
+    platform: Mapped[str] = mapped_column(String(40), default="番茄小说")
+    target_words: Mapped[int] = mapped_column(Integer, default=1000000)
+    chapter_words: Mapped[int] = mapped_column(Integer, default=2000)
     is_demo: Mapped[bool] = mapped_column(Boolean, default=False)
     archived: Mapped[bool] = mapped_column(Boolean, default=False)
     settings_revision: Mapped[int] = mapped_column(Integer, default=1)
@@ -94,6 +97,8 @@ class Plan(Base):
     level: Mapped[str] = mapped_column(String, default="chapter")
     body: Mapped[str] = mapped_column(Text, default="")
     position: Mapped[int] = mapped_column(Integer, default=1)
+    parent_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    structure: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     updated_at: Mapped[str] = mapped_column(String, default=now)
 
 

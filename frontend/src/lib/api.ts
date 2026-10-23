@@ -27,6 +27,8 @@ export type Health = Schema['HealthOut']
 export type ImportChapter = Schema['ImportChapter']
 export type Restore = Schema['RestoreOut']
 export type Task = ContextInput['task']
+export type Blueprint = Schema['BlueprintResult']
+export type Outline = Schema['OutlineResult']
 
 export class ApiError extends Error {
   code: string
@@ -90,6 +92,7 @@ export const api = {
   job: (id: string, novel: string) => request<JobDetail>(jpath(id, novel)),
   control: (id: string, novel: string, action: string) => request<JobDetail>(`/jobs/${id}/${action}?novel_id=${novel}`, { method: 'POST' }),
   adopt: (id: string, novel: string, base: string) => request<Version>(`/jobs/${id}/adopt?novel_id=${novel}`, { method: 'POST', body: JSON.stringify({ base_version_id: base }) }),
+  applyPlan: (id: string, novel: string) => request<Schema['ProductionApplyOut']>(`/jobs/${id}/apply-plan?novel_id=${novel}`, { method: 'POST' }),
   decide: (id: string, novel: string, data: Schema['FindingDecision']) => request<JobDetail>(`/jobs/${id}/review-decision?novel_id=${novel}`, { method: 'POST', body: JSON.stringify(data) }),
   providers: () => request<Provider[]>('/providers'),
   saveProvider: (data: ProviderInput, id?: string) => request<Provider>('/providers' + (id ? '/' + id : ''), { method: id ? 'PUT' : 'POST', body: JSON.stringify(data) }),
@@ -104,7 +107,7 @@ export const api = {
 }
 
 export const taskNames: Record<Task, string> = {
-  continue: '续写', rewrite: '选段改写', plan: '场景规划', extract: '提取变化', review: '一致性审稿', handoff: '前章交接',
+  continue: '正文生成', rewrite: '改写', plan: '场景规划', extract: '本章记忆', review: '审稿', handoff: '章节交接', blueprint: '全书方案', outline: '章节细纲',
 }
 export const jobStateNames: Record<string, string> = {
   queued: '等待执行', running: '正在生成', pausing: '等待本次调用结束', paused: '已暂停', cancelling: '正在取消',

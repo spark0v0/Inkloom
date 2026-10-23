@@ -1,0 +1,63 @@
+Desktop section: 16 individual passes; session interrupted before mobile project. No overall exit code was received.
+
+> story-workshop@0.2.0 test:e2e
+> playwright test
+
+[WebServer] INFO:     Started server process [10292]
+[WebServer] INFO:     Waiting for application startup.
+[WebServer] INFO:     Application startup complete.
+[WebServer] INFO:     Uvicorn running on http://127.0.0.1:9876 (Press CTRL+C to quit)
+
+Running 32 tests using 1 worker
+
+(node:20236) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  1 [desktop] › e2e\workshop.spec.ts:35:1 › 手写保存、刷新、版本、导出与正史确认 (5.1s)
+  ok  2 [desktop] › e2e\workshop.spec.ts:54:1 › 演示候选不会直接改稿，采纳后旧版本保留 (5.3s)
+  ok  3 [desktop] › e2e\workshop.spec.ts:71:1 › 生成后修改原稿，旧候选不能覆盖新文字 (6.4s)
+  ok  4 [desktop] › e2e\workshop.spec.ts:87:1 › 两页编辑冲突保留双方，显式另存解决 (7.9s)
+  ok  5 [desktop] › e2e\workshop.spec.ts:105:1 › 离线保存不报成功，恢复连接后重试原请求 (5.8s)
+  ok  6 [desktop] › e2e\workshop.spec.ts:119:1 › 提取只给提议，确认后可以定位来源与搜索 (5.6s)
+  ok  7 [desktop] › e2e\workshop.spec.ts:139:1 › 窄屏无横向溢出，助手和目录通过抽屉可达 (3.5s)
+  ok  8 [desktop] › e2e\workshop.spec.ts:155:1 › emoji 后选段改写保留其余原文 (5.0s)
+  ok  9 [desktop] › e2e\workshop.spec.ts:178:1 › 手稿切分预览与实际导入一致 (1.8s)
+  ok 10 [desktop] › e2e\workshop.spec.ts:194:1 › 备份下载、校验与新工作区恢复 (5.1s)
+  ok 11 [desktop] › e2e\workshop.spec.ts:221:1 › 编辑器与助手的自动可访问性检查 (5.6s)
+  ok 12 [desktop] › e2e\workshop.spec.ts:230:1 › 任务已提交但响应失败，重试复用同一任务 (4.2s)
+  ok 13 [desktop] › e2e\workshop.spec.ts:252:1 › AI 建书、章节细纲、整章生成、记忆定稿、下一章与连载导出 (14.1s)
+  ok 14 [desktop] › e2e\workshop.spec.ts:296:1 › 首个模型连接可同时用于全部创作环节 (842ms)
+  ok 15 [desktop] › e2e\workshop.spec.ts:322:1 › 开书方案刷新可恢复，采纳后页内进入细纲且不会自动调用 (6.0s)
+  ok 16 [desktop] › e2e\workshop.spec.ts:340:1 › 继续写作进入未完成章，前章未定稿有直接处理入口 (4.5s)
+
+Mobile-only rerun: exit code 0.
+
+> story-workshop@0.2.0 test:e2e
+> playwright test --project=mobile
+
+[WebServer] INFO:     Started server process [6356]
+[WebServer] INFO:     Waiting for application startup.
+[WebServer] INFO:     Application startup complete.
+[WebServer] INFO:     Uvicorn running on http://127.0.0.1:9876 (Press CTRL+C to quit)
+
+Running 16 tests using 1 worker
+
+(node:19828) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  1 [mobile] › e2e\workshop.spec.ts:35:1 › 手写保存、刷新、版本、导出与正史确认 (5.0s)
+  ok  2 [mobile] › e2e\workshop.spec.ts:54:1 › 演示候选不会直接改稿，采纳后旧版本保留 (4.7s)
+  ok  3 [mobile] › e2e\workshop.spec.ts:71:1 › 生成后修改原稿，旧候选不能覆盖新文字 (6.0s)
+  ok  4 [mobile] › e2e\workshop.spec.ts:87:1 › 两页编辑冲突保留双方，显式另存解决 (7.2s)
+  ok  5 [mobile] › e2e\workshop.spec.ts:105:1 › 离线保存不报成功，恢复连接后重试原请求 (5.4s)
+  ok  6 [mobile] › e2e\workshop.spec.ts:119:1 › 提取只给提议，确认后可以定位来源与搜索 (5.5s)
+  ok  7 [mobile] › e2e\workshop.spec.ts:139:1 › 窄屏无横向溢出，助手和目录通过抽屉可达 (3.7s)
+  ok  8 [mobile] › e2e\workshop.spec.ts:155:1 › emoji 后选段改写保留其余原文 (4.7s)
+  ok  9 [mobile] › e2e\workshop.spec.ts:178:1 › 手稿切分预览与实际导入一致 (1.4s)
+  ok 10 [mobile] › e2e\workshop.spec.ts:194:1 › 备份下载、校验与新工作区恢复 (5.2s)
+  ok 11 [mobile] › e2e\workshop.spec.ts:221:1 › 编辑器与助手的自动可访问性检查 (4.5s)
+  ok 12 [mobile] › e2e\workshop.spec.ts:230:1 › 任务已提交但响应失败，重试复用同一任务 (4.6s)
+  ok 13 [mobile] › e2e\workshop.spec.ts:252:1 › AI 建书、章节细纲、整章生成、记忆定稿、下一章与连载导出 (13.3s)
+  ok 14 [mobile] › e2e\workshop.spec.ts:296:1 › 首个模型连接可同时用于全部创作环节 (556ms)
+  ok 15 [mobile] › e2e\workshop.spec.ts:322:1 › 开书方案刷新可恢复，采纳后页内进入细纲且不会自动调用 (5.7s)
+  ok 16 [mobile] › e2e\workshop.spec.ts:340:1 › 继续写作进入未完成章，前章未定稿有直接处理入口 (4.2s)
+
+  16 passed (1.4m)

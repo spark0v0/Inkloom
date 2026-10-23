@@ -58,6 +58,34 @@ def completion_cost(usage: dict[str, int] | None, config: dict[str, Any]) -> flo
 
 def demo_text(task: str, context: dict[str, Any]) -> str:
     body = context["input"]
+    if task == "blueprint":
+        return json.dumps({"kind": "blueprint", "title": body["author_brief"]["title"],
+            "logline": "演示方案：一封迟到十年的信，让离乡者回到旧港追查家人的失踪。",
+            "blurb": "雨夜，他收到一封不该出现的信。寄信人已经失踪十年，邮戳却是昨天。",
+            "reader_promise": "循线调查、人物博弈与逐卷揭开的旧案。演示固定样例，请连接模型生成自己的故事。",
+            "main_conflict": "陈序要找到父亲，港务公司却在销毁当年的航运记录。",
+            "ending": "陈序公开原始航运档案，还原失踪船只的真相，并决定留在雾港。",
+            "style_guide": "第三人称限知，动作推进，简短对白，章末保留具体未解问题。",
+            "characters": [{"name": "陈序", "role": "归乡调查者", "motivation": "寻找失踪父亲的去向",
+                "arc": "从只相信证据到学会与他人协作，承担公开真相的代价。"},
+                {"name": "林知夏", "role": "码头档案员", "motivation": "保护家人留下的档案",
+                 "arc": "从回避调查到主动交出关键线索。"}],
+            "world": [{"name": "雾港旧码头", "rule": "旧航运档案由港务公司保管，失踪船只资料不对外公开。"}],
+            "volumes": [{"title": "第一卷 雨夜归港", "summary": "一封信引出失踪船只与被删改的记录。",
+                "climax": "陈序找到原始航海日志。", "ending_hook": "日志上出现了他自己的名字。", "planned_chapters": 30},
+                {"title": "第二卷 潮下旧案", "summary": "追查当年的证人与航运公司的利益链。",
+                 "climax": "找到失踪船只的真正目的地。", "ending_hook": "父亲可能仍然活着。", "planned_chapters": 30},
+                {"title": "第三卷 无人来信", "summary": "保护证人并将旧案证据送出雾港。",
+                 "climax": "公开档案，与幕后的操纵者对峙。", "ending_hook": "最后一封信终于送达。", "planned_chapters": 30}]}, ensure_ascii=False)
+    if task == "outline":
+        production = body["production"]
+        titles = ["雨夜来信", "旧码头", "没有名字的船", "潮水之下", "第二封信"]
+        return json.dumps({"kind": "outline", "volume_title": production["volume"]["title"],
+            "chapters": [{"number": number, "title": titles[number - 1] if number <= 5 else f"线索{number}",
+                "goal": f"演示细纲第{number}章：陈序追查来信中的线索，发现旧港的新秘密。",
+                "conflict": "关键记录被人拿走，知情者不愿开口。", "beats": ["循着线索抵达现场", "与知情者交换信息", "发现与预期不符的证据"],
+                "ending_hook": "证据指向一个本不该出现的人。"} for number in range(
+                    production["start_number"], production["start_number"] + production["chapter_count"])]}, ensure_ascii=False)
     sources = body.get("draft_sources", [])
     changes = []
     for source in sources[:3]:
@@ -108,7 +136,7 @@ async def stream_completion(config: dict[str, Any], key: str, messages: list[dic
         "stream": config["stream"], config["token_parameter"]: config["max_output_tokens"]}
     if config["stream"] and config["include_usage"]:
         payload["stream_options"] = {"include_usage": True}
-    if config["json_mode"] and task in {"extract", "review", "plan", "handoff"}:
+    if config["json_mode"] and task in {"extract", "review", "plan", "handoff", "blueprint", "outline"}:
         payload["response_format"] = {"type": "json_object"}
     endpoint = config["base_url"].rstrip("/") + "/chat/completions"
     headers = {"Authorization": "Bearer " + key, "Content-Type": "application/json"}

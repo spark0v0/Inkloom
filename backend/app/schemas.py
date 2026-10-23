@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 
@@ -16,6 +16,9 @@ class NovelInput(Schema):
     genre: str = Field(default="", max_length=80)
     premise: str = Field(default="", max_length=12000)
     style: str = Field(default="", max_length=8000)
+    platform: str = Field(default="番茄小说", max_length=40)
+    target_words: int = Field(default=1000000, ge=10000, le=10000000)
+    chapter_words: int = Field(default=2000, ge=500, le=6000)
 
 
 class NovelPatch(Schema):
@@ -24,6 +27,9 @@ class NovelPatch(Schema):
     premise: str | None = Field(default=None, max_length=12000)
     style: str | None = Field(default=None, max_length=8000)
     archived: bool | None = None
+    platform: str | None = Field(default=None, max_length=40)
+    target_words: int | None = Field(default=None, ge=10000, le=10000000)
+    chapter_words: int | None = Field(default=None, ge=500, le=6000)
 
 
 class NovelOut(Schema):
@@ -32,6 +38,9 @@ class NovelOut(Schema):
     genre: str
     premise: str
     style: str
+    platform: str
+    target_words: int
+    chapter_words: int
     is_demo: bool
     archived: bool
     settings_revision: int
@@ -133,6 +142,8 @@ class PlanOut(PlanInput):
     novel_id: str
     position: int
     updated_at: str
+    parent_id: str | None = None
+    structure: dict[str, Any] = Field(default_factory=dict)
 
 
 class Source(Schema):
@@ -239,7 +250,62 @@ class HandoffResult(Schema):
     next_suggestions: list[str] = Field(default_factory=list)
 
 
-TaskResult = ExtractResult | ReviewResult | PlanResult | HandoffResult
+class BlueprintCharacter(Schema):
+    name: str = Field(min_length=1, max_length=160)
+    role: str = Field(min_length=1, max_length=240)
+    motivation: str = Field(min_length=1, max_length=1200)
+    arc: str = Field(min_length=1, max_length=1600)
+
+
+class BlueprintWorld(Schema):
+    name: str = Field(min_length=1, max_length=160)
+    rule: str = Field(min_length=1, max_length=3000)
+
+
+class VolumeBlueprint(Schema):
+    title: str = Field(min_length=1, max_length=160)
+    summary: str = Field(min_length=1, max_length=3000)
+    climax: str = Field(min_length=1, max_length=1200)
+    ending_hook: str = Field(min_length=1, max_length=1200)
+    planned_chapters: int = Field(ge=3, le=300)
+
+
+class BlueprintResult(Schema):
+    kind: Literal["blueprint"]
+    title: str = Field(min_length=1, max_length=160)
+    logline: str = Field(min_length=1, max_length=1200)
+    blurb: str = Field(min_length=1, max_length=3000)
+    reader_promise: str = Field(min_length=1, max_length=3000)
+    main_conflict: str = Field(min_length=1, max_length=3000)
+    ending: str = Field(min_length=1, max_length=3000)
+    style_guide: str = Field(min_length=1, max_length=4000)
+    characters: list[BlueprintCharacter] = Field(min_length=1, max_length=12)
+    world: list[BlueprintWorld] = Field(min_length=1, max_length=12)
+    volumes: list[VolumeBlueprint] = Field(min_length=1, max_length=20)
+
+
+class ChapterOutline(Schema):
+    number: int = Field(ge=1, le=10000)
+    title: str = Field(min_length=1, max_length=200)
+    goal: str = Field(min_length=1, max_length=1200)
+    conflict: str = Field(min_length=1, max_length=1200)
+    beats: list[Annotated[str, Field(min_length=1, max_length=600)]] = Field(min_length=1, max_length=6)
+    ending_hook: str = Field(min_length=1, max_length=1000)
+
+
+class OutlineResult(Schema):
+    kind: Literal["outline"]
+    volume_title: str = Field(min_length=1, max_length=160)
+    chapters: list[ChapterOutline] = Field(min_length=3, max_length=20)
+
+
+class ProductionApplyOut(Schema):
+    novel_id: str
+    chapter_ids: list[str]
+    plan_ids: list[str]
+
+
+TaskResult = ExtractResult | ReviewResult | PlanResult | HandoffResult | BlueprintResult | OutlineResult
 
 
 class Selection(Schema):
@@ -251,12 +317,14 @@ class Selection(Schema):
 class ContextInput(Schema):
     chapter_id: str
     base_version_id: str
-    task: Literal["continue", "rewrite", "plan", "extract", "review", "handoff"]
+    task: Literal["continue", "rewrite", "plan", "extract", "review", "handoff", "blueprint", "outline"]
     instruction: str = Field(default="", max_length=12000)
     provider_id: str = "demo"
     excluded_source_ids: list[str] = Field(default_factory=list, max_length=500)
     selection: Selection | None = None
     target_chars: int = Field(default=500, ge=100, le=6000)
+    volume_plan_id: str | None = None
+    chapter_batch: int = Field(default=5, ge=3, le=20)
 
 
 class ContextOut(Schema):

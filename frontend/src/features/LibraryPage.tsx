@@ -1,39 +1,44 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Archive, ArrowRight, BookOpen, FileText, FolderOpen, Lightbulb, Plus, UploadSimple, ArrowCounterClockwise } from '@phosphor-icons/react'
+import { Archive, ArrowRight, BookOpen, Plus, Sparkle, UploadSimple, ArrowCounterClockwise, PlugsConnected } from '@phosphor-icons/react'
 import { useState } from 'react'
 import { api, number, errorText, dateLabel } from '../lib/api'
 import type { Novel, ImportChapter } from '../lib/api'
 import type { Navigate } from '../lib/route'
-import { Badge, Button, Empty, Field, Loading, Modal, Notice, PageHeading, TextLink } from '../components/ui'
+import { nextWritingChapter } from '../lib/workflow'
+import { Badge, Button, Empty, Field, Loading, Modal, Notice, PageHeading } from '../components/ui'
 
 export async function openNovel(novel: Novel, navigate: Navigate) {
   const chapters = await api.chapters(novel.id)
-  if (!chapters.length) {
-    const first = await api.createChapter(novel.id, { title: '第一章', volume: '第一卷', goal: novel.premise })
-    await navigate({ page: 'write', novelId: novel.id, chapterId: first.id })
+  const next = nextWritingChapter(chapters)
+  if (!next) {
+    await navigate({ page: 'plot', novelId: novel.id })
     return
   }
-  const written = chapters.filter(c => c.char_count > 0)
-  const last = [...(written.length ? written : chapters)].sort((a, b) => b.updated_at.localeCompare(a.updated_at))[0]
-  await navigate({ page: 'write', novelId: novel.id, chapterId: last.id })
+  await navigate({ page: 'write', novelId: novel.id, chapterId: next.id })
 }
 
-export function NewNovelModal({ open, onClose, navigate, idea = false }: { open: boolean; onClose: () => void; navigate: Navigate; idea?: boolean }) {
+export function NewNovelModal({ open, onClose, navigate }: { open: boolean; onClose: () => void; navigate: Navigate }) {
   const cache = useQueryClient()
   const [title, setTitle] = useState('')
-  const [genre, setGenre] = useState('')
+  const [genre, setGenre] = useState('悬疑')
   const [premise, setPremise] = useState('')
-  const mutation = useMutation({ mutationFn: () => api.createNovel({ title, genre, premise, style: '' }),
-    onSuccess: async novel => { await cache.invalidateQueries({ queryKey: ['novels'] }); onClose(); await openNovel(novel, navigate) } })
-  return <Modal open={open} onOpenChange={value => !value && onClose()} title={idea ? '从一句创意开始' : '新建作品'} description="只需一个名字，就可以开始写作。其他内容可以慢慢补全。">
-    <form onSubmit={e => { e.preventDefault(); mutation.mutate() }} className="form-stack">
-      <Field label="作品名"><input autoFocus required maxLength={160} value={title} onChange={e => setTitle(e.target.value)} placeholder="给故事起一个暂时的名字" /></Field>
-      <Field label="题材（可选）"><input maxLength={80} value={genre} onChange={e => setGenre(e.target.value)} placeholder="如：悬疑、仙侠、都市、现实" /></Field>
-      <Field label={idea ? '一句话创意' : '故事方向（可选）'} help="先保存你的想法，之后可以在剧情规划中继续完善。"><textarea rows={4} value={premise} onChange={e => setPremise(e.target.value)} maxLength={12000} placeholder="谁想得到什么，又被什么阻挡？" /></Field>
-      {mutation.error && <Notice>{errorText(mutation.error)}</Notice>}
-      <div className="modal-actions"><Button onClick={onClose}>取消</Button><Button type="submit" variant="primary" disabled={!title.trim() || mutation.isPending}>{mutation.isPending ? '正在创建…' : '创建并开始写作'}<ArrowRight size={17} /></Button></div>
-    </form>
-  </Modal>
+  const [platform, setPlatform] = useState('番茄小说')
+  const [targetWords, setTargetWords] = useState(1000000)
+  const [chapterWords, setChapterWords] = useState(2000)
+  const mutation = useMutation({ mutationFn: () => api.createNovel({ title: title.trim() || '未命名作品', genre, premise, style: '', platform, target_words: targetWords, chapter_words: chapterWords }),
+    onSuccess: async novel => { await cache.invalidateQueries({ queryKey: ['novels'] }); onClose(); await navigate({ page: 'plot', novelId: novel.id }) } })
+  return <Modal open={open} onOpenChange={value => !value && onClose()} title="新建小说" wide className="new-novel-modal"><form onSubmit={e => { e.preventDefault(); mutation.mutate() }} className="form-stack">
+    <Field label="你想写一个什么故事？"><textarea autoFocus rows={4} value={premise} onChange={e => setPremise(e.target.value)} maxLength={12000} placeholder="例如：一个能听见旧物最后一句话的修复师，在一枚古戒里听到了自己的求救声。" /></Field>
+
+    <div className="form-row"><Field label="题材"><input list="novel-genres" value={genre} maxLength={80} onChange={e => setGenre(e.target.value)} /></Field><Field label="目标平台"><select value={platform} onChange={e => setPlatform(e.target.value)}><option>番茄小说</option><option>起点中文网</option><option>自由创作</option></select></Field></div>
+    <Field label="书名（可以稍后由 AI 起名）"><input maxLength={160} value={title} onChange={e => setTitle(e.target.value)} placeholder="暂时没有名字也可以开始" /></Field>
+    <datalist id="novel-genres">{['玄幻', '仙侠', '都市', '悬疑', '科幻', '历史', '言情'].map(g => <option value={g} key={g} />)}</datalist>
+    <details className="new-book-options"><summary>篇幅设置 · {targetWords / 10000} 万字 / 每章 {number(chapterWords)} 字</summary>
+    <div className="form-row"><Field label="全书计划"><select value={targetWords} onChange={e => setTargetWords(Number(e.target.value))}>{[100000, 300000, 500000, 1000000, 2000000, 3000000].map(n => <option key={n} value={n}>{n / 10000} 万字</option>)}</select></Field><Field label="每章字数"><select value={chapterWords} onChange={e => setChapterWords(Number(e.target.value))}>{[1000, 1500, 2000, 2500, 3000, 4000, 5000, 6000].map(n => <option key={n} value={n}>{number(n)} 字</option>)}</select></Field></div>
+    </details>
+    {mutation.error && <Notice>{errorText(mutation.error)}</Notice>}
+    <div className="modal-actions"><Button onClick={onClose}>取消</Button><Button type="submit" variant="primary" disabled={mutation.isPending}>{mutation.isPending ? '正在创建…' : '下一步：全书方案'}<ArrowRight size={17} /></Button></div>
+  </form></Modal>
 }
 
 export function ImportModal({ open, onClose, navigate }: { open: boolean; onClose: () => void; navigate: Navigate }) {
@@ -71,31 +76,24 @@ export function LibraryPage({ navigate, query = '' }: { navigate: Navigate; quer
   const cache = useQueryClient()
   const [archived, setArchived] = useState(false)
   const [creating, setCreating] = useState(false)
-  const [idea, setIdea] = useState(false)
   const [importing, setImporting] = useState(false)
   const [error, setError] = useState('')
   const novels = useQuery({ queryKey: ['novels', archived], queryFn: () => api.novels(archived) })
+  const providers = useQuery({ queryKey: ['providers'], queryFn: api.providers })
+  const realProvider = providers.data?.find(p => p.kind !== 'demo' && p.has_key)
   const demo = useMutation({ mutationFn: api.demo, onSuccess: async novel => { await cache.invalidateQueries({ queryKey: ['novels'] }); await openNovel(novel, navigate) } })
   const list = (novels.data ?? []).filter(n => [n.title, n.genre, n.premise].join(' ').includes(query))
   async function archive(novel: Novel) {
     try { await api.editNovel(novel.id, { archived: !archived }); await cache.invalidateQueries({ queryKey: ['novels'] }) }
     catch (e) { setError(errorText(e)) }
   }
-  return <div className="page library-page">
-    <PageHeading title="我的作品" description="把灵感写成故事，把故事慢慢写完。" action={<div className="button-row"><Button onClick={() => setImporting(true)}><UploadSimple size={18} />导入手稿</Button><Button variant="primary" onClick={() => { setIdea(false); setCreating(true) }}><Plus size={18} />新建作品</Button></div>} />
-    <div className="section-tabs"><button className={!archived ? 'active' : ''} onClick={() => setArchived(false)}>全部作品</button><button className={archived ? 'active' : ''} onClick={() => setArchived(true)}>已归档</button><span className="tab-end">按最近编辑排序</span></div>
+  return <div className="page library-page"><PageHeading title="我的作品" action={<div className="button-row"><Button onClick={() => setImporting(true)}><UploadSimple size={18} />导入手稿</Button><Button variant="primary" onClick={() => setCreating(true)}><Plus size={18} />新建小说</Button></div>} />
+    <div className="library-model"><PlugsConnected size={20} /><span>{realProvider ? <><strong>{realProvider.name}</strong><small>{realProvider.model}</small></> : <><strong>连接你的 AI，开始创作</strong><small>支持 OpenAI 兼容接口</small></>}</span><Button variant="ghost" onClick={() => void navigate({ page: 'settings' })}>{realProvider ? '管理模型' : '连接模型'}<ArrowRight size={16} /></Button></div>
+    <div className="section-tabs"><button className={!archived ? 'active' : ''} onClick={() => setArchived(false)}>创作中</button><button className={archived ? 'active' : ''} onClick={() => setArchived(true)}>已归档</button><span className="tab-end">最近编辑</span></div>
     {(error || demo.error || novels.error) && <Notice>{error || errorText(demo.error ?? novels.error)}</Notice>}
-    {novels.isLoading ? <Loading /> : list.length ? <div className="novel-list">{list.map(novel => <article className="novel-feature" key={novel.id}>
-      <button className="book-cover" onClick={() => void openNovel(novel, navigate).catch(e => setError(errorText(e)))} aria-label={`打开${novel.title}`}><BookOpen size={30} weight="light" /><span>{novel.title}</span><small>{novel.genre || '创作手稿'}</small></button>
-      <div className="novel-info"><div className="novel-title-row"><h2>{novel.title}</h2>{novel.genre && <Badge tone="green">{novel.genre}</Badge>}{novel.is_demo && <Badge tone="amber">示例作品</Badge>}</div><p className="novel-description">{novel.premise || '故事还在生长，下一段由你决定。'}</p>
-        <div className="novel-meta"><span><FileText />{novel.chapter_count} 章</span><span>{number(novel.total_chars)} 字</span><span>{novel.accepted_count} 章已确认</span></div>
-        <div className="button-row">{!archived && <><Button onClick={() => void openNovel(novel, navigate).catch(e => setError(errorText(e)))}><BookOpen size={18} />继续创作</Button><TextLink onClick={() => void navigate({ page: 'bible', novelId: novel.id })}>故事档案</TextLink></>}<Button variant="ghost" onClick={() => void archive(novel)}>{archived ? <ArrowCounterClockwise size={17} /> : <Archive size={17} />}{archived ? '恢复到书架' : '归档'}</Button></div>
-      </div><div className="novel-side-note"><span>最近编辑</span><strong>{dateLabel(novel.updated_at)}</strong><p>每次保存都会保留正文版本。</p>{novel.dirty_from_order && <Badge tone="amber">第 {novel.dirty_from_order} 章起待复核</Badge>}</div>
-    </article>)}</div> : <Empty icon={<BookOpen size={38} weight="light" />} title={query ? '没有找到这部作品' : archived ? '还没有归档的作品' : '给下一个故事，留一页空白'} action={!archived && !query ? <div className="button-row"><Button variant="primary" onClick={() => setCreating(true)}><Plus size={18} />新建第一部作品</Button><Button onClick={() => demo.mutate()} disabled={demo.isPending}>{demo.isPending ? '正在载入…' : '打开示例作品'}</Button></div> : undefined}>{query ? '试试其他书名或题材。' : '可以从空白开始，也可以先用示例作品熟悉创作流程。'}</Empty>}
-    <section className="start-section"><h2>开始一个新故事</h2><div className="start-options"><button onClick={() => { setIdea(false); setCreating(true) }}><FileText size={28} weight="light" /><span><strong>空白作品</strong><small>直接进入编辑器，从第一段开始。</small></span><ArrowRight size={19} /></button><button onClick={() => { setIdea(true); setCreating(true) }}><Lightbulb size={28} weight="light" /><span><strong>从创意开始</strong><small>写下一句话，再逐步补全故事方向。</small></span><ArrowRight size={19} /></button><button onClick={() => setImporting(true)}><UploadSimple size={28} weight="light" /><span><strong>导入已有手稿</strong><small>支持 TXT 与 Markdown，先预览再导入。</small></span><ArrowRight size={19} /></button></div></section>
-    <div className="workspace-note"><FolderOpen size={26} weight="light" /><div><strong>作品保存在你的工作区</strong><p>没有模型也可以写作。连接云端模型时，选定上下文会发送到你配置的服务。</p></div><TextLink onClick={() => void navigate({ page: 'settings' })}>管理模型连接</TextLink></div>
-    {list.length > 0 && !list.some(n => n.is_demo) && !archived && <button className="demo-link" onClick={() => demo.mutate()} disabled={demo.isPending}>载入示例作品，熟悉候选稿与正史流程</button>}
-    {creating && <NewNovelModal open={creating} onClose={() => setCreating(false)} navigate={navigate} idea={idea} />}
+    {novels.isLoading ? <Loading /> : list.length ? <div className="book-grid">{list.map(novel => <article className="library-book" key={novel.id}><button className="library-book-main" onClick={() => void navigate({ page: 'plot', novelId: novel.id })} aria-label={`打开${novel.title}`}><div className="studio-book-cover" aria-hidden="true"><BookOpen size={24} weight="light" /><span>{novel.title}</span></div><div className="library-book-info"><div className="book-category">{novel.genre || '未分类'}<span>/</span>{novel.platform}{novel.is_demo && <Badge tone="amber">示例</Badge>}</div><h2>{novel.title}</h2><p>{novel.premise || '继续完善这个故事的想法。'}</p><div className="book-counts"><strong>{number(novel.total_chars)} <small>字</small></strong><span>{novel.chapter_count} 章</span><span>{novel.accepted_count} 章定稿</span></div></div></button><div className="library-book-footer"><span>{dateLabel(novel.updated_at)}</span><div className="button-row">{!archived && <Button variant="primary" onClick={() => void openNovel(novel, navigate).catch(e => setError(errorText(e)))}>{!novel.chapter_count ? '开始策划' : novel.accepted_count === novel.chapter_count ? '规划下一章' : '继续写作'}<ArrowRight size={16} /></Button>}<button className="icon-button" aria-label={archived ? `恢复${novel.title}` : `归档${novel.title}`} onClick={() => void archive(novel)}>{archived ? <ArrowCounterClockwise size={18} /> : <Archive size={18} />}</button></div></div></article>)}{!archived && <button className="new-book-tile" onClick={() => setCreating(true)}><Plus size={30} weight="light" /><strong>开始下一本小说</strong></button>}</div> : <Empty icon={<BookOpen size={36} weight="light" />} title={query ? '没有找到这部作品' : archived ? '没有归档作品' : '你的第一本小说，从一个想法开始'} action={!archived && !query ? <Button variant="primary" onClick={() => setCreating(true)}><Sparkle size={18} />创建第一本小说</Button> : undefined}>{query ? '试试其他书名或题材。' : !archived ? '让 AI 帮你策划全书，再逐章创作。' : undefined}</Empty>}
+    {!archived && !list.some(n => n.is_demo) && <button className="demo-link" onClick={() => demo.mutate()} disabled={demo.isPending}>{demo.isPending ? '正在载入…' : '先看示例作品'}<ArrowRight size={16} /></button>}
+    {creating && <NewNovelModal open={creating} onClose={() => setCreating(false)} navigate={navigate} />}
     {importing && <ImportModal open={importing} onClose={() => setImporting(false)} navigate={navigate} />}
   </div>
 }

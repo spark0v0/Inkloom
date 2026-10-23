@@ -12,7 +12,7 @@ from pydantic import ValidationError
 from sqlalchemy import func, select
 
 from . import schemas as dto
-from .context import build_context, context_current, validate_result
+from .context import RESULT_SCHEMAS, build_context, context_current, validate_result
 from .domain import ACTIVE_JOB_STATES, DomainError, digest, now, splice_document, text_document, uid
 from .library import (
     mark_dirty,
@@ -261,6 +261,21 @@ class Generation:
             emit(s, job, "candidate", {"status": "adopted", "version_id": version.id})
             return version_out(version)
 
+    def apply_plan(self, novel_id: str, job_id: str) -> dto.ProductionApplyOut:
+        from .production import apply_production
+        with self.ws.session(write=True) as s:
+            job = require_job(s, novel_id, job_id)
+            if job.context.get("applied"):
+                return dto.ProductionApplyOut(**job.context["applied"])
+            if (job.task not in {"blueprint", "outline"} or job.state != "succeeded"
+                    or job.candidate_status != "ready" or not job.result):
+                raise DomainError("CANDIDATE_NOT_READY", "只有完整且仍有效的规划可采纳。", 409)
+            if not context_current(s, job):
+                raise DomainError("CONTEXT_STALE", "作品或章节目录已变化，请重新规划。未覆盖任何内容。", 409)
+            result = apply_production(s, job)
+            emit(s, job, "candidate", {"status": "adopted", **result.model_dump()})
+            return result
+
     def decide_finding(self, novel_id: str, job_id: str, decision: dto.FindingDecision):
         with self.ws.session(write=True) as s:
             job = require_job(s, novel_id, job_id)
@@ -360,7 +375,7 @@ class Generation:
                 raise ProviderFailure("OUTPUT_TRUNCATED" if finish == "length" else "INCOMPLETE_OUTPUT",
                                       "模型未正常完成输出。片段已保留，不能直接作为完整候选采纳。")
             result = None
-            if task in {"extract", "review", "plan", "handoff"}:
+            if task in RESULT_SCHEMAS:
                 try:
                     result = validate_result(task, json.loads(output), context)
                 except (ValueError, ValidationError, DomainError) as exc:

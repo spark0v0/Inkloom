@@ -100,7 +100,7 @@ def create_app(data_dir: Path | None = None, *, worker: bool = True, port: int =
                     await task
             workspace.close()
 
-    app = FastAPI(title="叙事工坊 API", version="0.1.0", lifespan=lifespan,
+    app = FastAPI(title="Inkloom API", version="0.2.0", lifespan=lifespan,
                   docs_url=None, redoc_url=None, openapi_url=None)
     app.add_middleware(LocalSessionMiddleware, session_token=secrets.token_urlsafe(40), port=port)
 
@@ -128,7 +128,7 @@ def create_app(data_dir: Path | None = None, *, worker: bool = True, port: int =
         ws = request.app.state.workspace
         task = request.app.state.worker_task
         return dto.HealthOut(status="ok" if task is None or not task.done() else "worker_unavailable",
-            workspace_id=ws.db.workspace_id, workspace_name=ws.db.root.name, version="0.1.0",
+            workspace_id=ws.db.workspace_id, workspace_name=ws.db.root.name, version="0.2.0",
             is_restored=ws.db.root != ws.home)
 
     @app.get(prefix + "/novels", response_model=list[dto.NovelOut])
@@ -266,6 +266,10 @@ def create_app(data_dir: Path | None = None, *, worker: bool = True, port: int =
     def review_decision(job_id: str, novel_id: str, data: dto.FindingDecision, request: Request):
         return request.app.state.generation.decide_finding(novel_id, job_id, data)
 
+    @app.post(prefix + "/jobs/{job_id}/apply-plan", response_model=dto.ProductionApplyOut)
+    def apply_plan(job_id: str, novel_id: str, request: Request):
+        return request.app.state.generation.apply_plan(novel_id, job_id)
+
     @app.post(prefix + "/jobs/{job_id}/{action}", response_model=dto.JobDetail)
     def control(job_id: str, action: str, novel_id: str, request: Request):
         return request.app.state.generation.control(novel_id, job_id, action)
@@ -324,10 +328,14 @@ def create_app(data_dir: Path | None = None, *, worker: bool = True, port: int =
 
     @app.get(prefix + "/novels/{novel_id}/export")
     def export(novel_id: str, request: Request, format: str = "md", confirmed: bool = False):
-        if format not in {"md", "txt"}:
-            raise DomainError("INVALID_EXPORT", "首版支持 Markdown 和 TXT。")
+        if format not in {"md", "txt", "zip"}:
+            raise DomainError("INVALID_EXPORT", "支持 Markdown、TXT 和按章 TXT 压缩包。")
         library = request.app.state.library
         title = library.novel(novel_id).title
+        if format == "zip":
+            filename = quote(title.replace("/", "_").replace("\\", "_") + "-章节.zip")
+            return Response(library.export_chapters(novel_id, confirmed), media_type="application/zip",
+                headers={"Content-Disposition": "attachment; filename*=UTF-8''" + filename})
         body = library.export(novel_id, confirmed, format == "md")
         filename = quote(title.replace("/", "_").replace("\\", "_") + "." + format)
         return Response(body, media_type="text/plain; charset=utf-8",

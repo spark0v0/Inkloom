@@ -22,7 +22,8 @@ from .domain import (
 from .storage import Workspace
 
 FORMAT_VERSION = 1
-SCHEMA_REVISION = "924486b5f963"
+SCHEMA_REVISION = "a12c7e604bc9"
+SUPPORTED_REVISIONS = {"924486b5f963", SCHEMA_REVISION}
 MAX_ARCHIVE = 64 * 1024 * 1024
 MAX_DATABASE = 256 * 1024 * 1024
 
@@ -73,7 +74,7 @@ def restore(workspace: Workspace, contents: bytes) -> dict:
                 raise DomainError("INVALID_ARCHIVE", "备份清单必须是对象。")
             if (manifest.get("format") != "story-workshop-backup"
                     or manifest.get("format_version") != FORMAT_VERSION
-                    or manifest.get("schema_revision") != SCHEMA_REVISION):
+                    or manifest.get("schema_revision") not in SUPPORTED_REVISIONS):
                 raise DomainError("UNSUPPORTED_BACKUP", "备份格式或数据库版本不受支持，原工作区未改变。")
             raw = archive.read("workspace.db")
             import hashlib
@@ -104,7 +105,7 @@ def restore(workspace: Workspace, contents: bytes) -> dict:
         if connection.execute("PRAGMA foreign_key_check").fetchall():
             raise DomainError("INVALID_DATABASE", "恢复库中存在无效引用。")
         revision = connection.execute("SELECT version_num FROM alembic_version").fetchone()
-        if revision is None or revision[0] != SCHEMA_REVISION:
+        if revision is None or revision[0] != manifest["schema_revision"]:
             raise DomainError("UNSUPPORTED_BACKUP", "备份库迁移版本不匹配。")
         for body, content_hash, editor_doc, raw_paragraphs, chars in connection.execute(
                 "SELECT text, content_hash, editor_doc, paragraphs, char_count FROM versions"):
@@ -169,6 +170,11 @@ def restore(workspace: Workspace, contents: bytes) -> dict:
         raise DomainError("INVALID_DATABASE", "备份库无法验证，原工作区未改变。") from exc
     finally:
         connection.close()
+    if revision[0] != SCHEMA_REVISION:
+        # Only after the untrusted database has passed validation may local migrations run.
+        from .storage import Database
+        migrated = Database(target)
+        migrated.engine.dispose()
     workspace.restores[restore_id] = target
     return {"restore_id": restore_id, "novel_count": novel_count, "chapter_count": chapter_count,
             "message": "已在新目录校验正文、版本和引用。切换后需重新配置密钥，历史任务不会自动执行。"}

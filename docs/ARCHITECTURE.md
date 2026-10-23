@@ -1,5 +1,7 @@
 # 技术方案与关键契约
 
+> 当前 0.2 沿用模块化单体和 SQLite，在已有生成任务中增加全书方案、分卷章节细纲及事务采纳。新增数据迁移为 `a12c7e604bc9`。实际变更见 [连载工作流决策](decisions/0004-serial-production.md) 与 [实现记录](IMPLEMENTATION-V0.2.md)，以下保留最初的完整技术方案。
+
 状态：**规划基线，已有 0.1.0 本地实现**。以下细分目录和部分字段仍是可演进设计，实际结构与取舍见 [ADR 0001](adr/0001-local-workspace.md)，验证范围见 [IMPLEMENTATION.md](IMPLEMENTATION.md)。技术调整不能绕开数据安全和作者控制原则。
 
 ## 架构选择

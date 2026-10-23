@@ -133,6 +133,11 @@ class Library:
                 if key == "title" and not value.strip():
                     raise DomainError("TITLE_REQUIRED", "请填写作品名。")
                 setattr(novel, key, value)
+            if data.title is not None:
+                for plan in s.scalars(select(Plan).where(Plan.novel_id == novel_id, Plan.level == "book")).all():
+                    plan.title = novel.title
+                    if plan.structure.get("kind") == "blueprint":
+                        plan.structure = {**plan.structure, "title": novel.title}
             novel.settings_revision += 1
             novel.updated_at = now()
             s.flush()
@@ -168,6 +173,11 @@ class Library:
             chapter = require_chapter(s, novel_id, chapter_id)
             for key, value in data.model_dump(exclude_none=True).items():
                 setattr(chapter, key, value)
+            for plan in s.scalars(select(Plan).where(Plan.novel_id == novel_id, Plan.level == "chapter")).all():
+                if plan.structure.get("chapter_id") == chapter.id:
+                    plan.title, plan.body = chapter.title, chapter.goal
+                    plan.structure = {"kind": "author_chapter", "chapter_id": chapter.id}
+                    plan.updated_at = now()
             chapter.updated_at = now()
             novel.settings_revision += 1
             novel.updated_at = now()
@@ -249,11 +259,32 @@ class Library:
             if plan_id and (plan is None or plan.novel_id != novel_id):
                 raise DomainError("PLAN_NOT_FOUND", "此作品中没有该规划。", 404)
             if plan is None:
+                if data.level == "volume" and s.scalar(select(Plan.id).where(
+                        Plan.novel_id == novel_id, Plan.level == "volume", Plan.title == data.title)):
+                    raise DomainError("DUPLICATE_VOLUME", "分卷名已存在，请使用不同名称。")
                 position = (s.scalar(select(func.max(Plan.position)).where(
                     Plan.novel_id == novel_id)) or 0) + 1
                 plan = Plan(id=uid("plan"), novel_id=novel_id, position=position, **data.model_dump())
                 s.add(plan)
             else:
+                if plan.level != data.level:
+                    raise DomainError("PLAN_LEVEL_LOCKED", "已有规划的层级不能更改。")
+                previous_title = plan.title
+                if plan.level == "volume" and previous_title != data.title:
+                    if s.scalar(select(Plan.id).where(Plan.novel_id == novel_id, Plan.level == "volume",
+                                                     Plan.id != plan.id, Plan.title == data.title)):
+                        raise DomainError("DUPLICATE_VOLUME", "分卷名已存在，请使用不同名称。")
+                    for chapter in s.scalars(select(Chapter).where(Chapter.novel_id == novel_id,
+                                                                  Chapter.volume == previous_title)).all():
+                        chapter.volume, chapter.updated_at = data.title, now()
+                if plan.structure.get("chapter_id"):
+                    chapter = require_chapter(s, novel_id, plan.structure["chapter_id"])
+                    chapter.title, chapter.goal, chapter.updated_at = data.title, data.body, now()
+                    plan.structure = {"kind": "author_chapter", "chapter_id": chapter.id}
+                elif plan.level == "book" and plan.body != data.body:
+                    plan.structure = {"kind": "author_book"}
+                elif plan.level == "volume" and plan.body != data.body:
+                    plan.structure = {"planned_chapters": plan.structure.get("planned_chapters", 30)}
                 for key, value in data.model_dump().items():
                     setattr(plan, key, value)
             plan.updated_at = now()
@@ -393,8 +424,33 @@ class Library:
                 if not version_id:
                     continue
                 version = s.get(Version, version_id)
+                if not version.text.strip():
+                    continue
                 parts.extend([("## " if markdown else "") + chapter.title, version.text])
             return "\n\n".join(parts) + "\n"
+
+    def export_chapters(self, novel_id: str, confirmed: bool = True) -> bytes:
+        import io
+        import re
+        import zipfile
+        buffer = io.BytesIO()
+        with self.ws.session() as s, zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            require_novel(s, novel_id)
+            chapters = s.scalars(select(Chapter).where(Chapter.novel_id == novel_id).order_by(
+                Chapter.position)).all()
+            for chapter in chapters:
+                if confirmed and chapter.review_state != "confirmed":
+                    continue
+                version_id = chapter.accepted_version_id if confirmed else chapter.working_version_id
+                version = s.get(Version, version_id) if version_id else None
+                if version is None or not version.text.strip():
+                    continue
+                title = re.sub(r'[\\/:*?"<>|\x00-\x1f]', "_", chapter.title).strip(" .")[:90] or "章节"
+                filename = f"{chapter.position:04d}_{title}.txt"
+                archive.writestr(filename, chapter.title + "\n\n" + version.text + "\n")
+            if not archive.namelist():
+                raise DomainError("NO_EXPORT_CHAPTERS", "所选范围没有可导出的正文。请先写作或定稿章节。")
+        return buffer.getvalue()
 
     def import_manuscript(self, data: dto.ImportInput) -> dto.NovelOut:
         # The full import is atomic; partial books are not left after a failed chapter.

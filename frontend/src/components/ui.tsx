@@ -20,7 +20,7 @@ export function Modal({ open, onOpenChange, title, description, children, wide =
     <Dialog.Portal><Dialog.Overlay className="modal-overlay" />
       <Dialog.Content className={`modal ${wide ? 'modal-wide' : ''} ${className}`} onCloseAutoFocus={event => { if (returnFocus.current?.isConnected) { event.preventDefault(); returnFocus.current.focus({ preventScroll: true }) } }} onEscapeKeyDown={event => { if (!dismissible) event.preventDefault() }}>
         <div className="modal-heading"><div><Dialog.Title>{title}</Dialog.Title>
-          <Dialog.Description>{description ?? '请核对内容后完成操作。'}</Dialog.Description></div>
+          <Dialog.Description className={description ? undefined : 'sr-only'}>{description || title}</Dialog.Description></div>
           {dismissible && <Dialog.Close className="icon-button" aria-label="关闭对话框"><X size={20} /></Dialog.Close>}
         </div>
         {children}

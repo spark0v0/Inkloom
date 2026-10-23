@@ -1,0 +1,60 @@
+{
+  "captures": [
+    {
+      "name": "setup-v4-desktop",
+      "viewport": 1440,
+      "body": 1440,
+      "document": 1440
+    },
+    {
+      "name": "blueprint-v4-desktop",
+      "viewport": 1440,
+      "body": 1440,
+      "document": 1440
+    },
+    {
+      "name": "chapters-v4-desktop",
+      "viewport": 1440,
+      "body": 1440,
+      "document": 1440
+    },
+    {
+      "name": "draft-v4-desktop",
+      "viewport": 1440,
+      "body": 1440,
+      "document": 1440
+    },
+    {
+      "name": "editor-v4-tablet",
+      "viewport": 768,
+      "body": 768,
+      "document": 768
+    },
+    {
+      "name": "editor-v4-mobile",
+      "viewport": 390,
+      "body": 390,
+      "document": 390
+    },
+    {
+      "name": "draft-v4-mobile",
+      "viewport": 390,
+      "body": 390,
+      "document": 390
+    },
+    {
+      "name": "manuscript-v4-mobile",
+      "viewport": 390,
+      "body": 390,
+      "document": 390
+    },
+    {
+      "name": "manuscript-v4-desktop",
+      "viewport": 1440,
+      "body": 1440,
+      "document": 1440
+    }
+  ],
+  "errors": [],
+  "novelRoute": "/#/write/novel_a3185b36c5c24dfd9a5ccf529e4f6549/chapter_27bb329d305c49289693a4f4992694e7"
+}

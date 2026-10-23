@@ -380,6 +380,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/jobs/{job_id}/apply-plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply Plan */
+        post: operations["apply_plan_api_v1_jobs__job_id__apply_plan_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/jobs/{job_id}/{action}": {
         parameters: {
             query?: never;
@@ -640,6 +657,52 @@ export interface components {
             /** Finished At */
             finished_at: string | null;
         };
+        /** BlueprintCharacter */
+        BlueprintCharacter: {
+            /** Name */
+            name: string;
+            /** Role */
+            role: string;
+            /** Motivation */
+            motivation: string;
+            /** Arc */
+            arc: string;
+        };
+        /** BlueprintResult */
+        BlueprintResult: {
+            /**
+             * Kind
+             * @constant
+             */
+            kind: "blueprint";
+            /** Title */
+            title: string;
+            /** Logline */
+            logline: string;
+            /** Blurb */
+            blurb: string;
+            /** Reader Promise */
+            reader_promise: string;
+            /** Main Conflict */
+            main_conflict: string;
+            /** Ending */
+            ending: string;
+            /** Style Guide */
+            style_guide: string;
+            /** Characters */
+            characters: components["schemas"]["BlueprintCharacter"][];
+            /** World */
+            world: components["schemas"]["BlueprintWorld"][];
+            /** Volumes */
+            volumes: components["schemas"]["VolumeBlueprint"][];
+        };
+        /** BlueprintWorld */
+        BlueprintWorld: {
+            /** Name */
+            name: string;
+            /** Rule */
+            rule: string;
+        };
         /** CanonInput */
         CanonInput: {
             /** Version Id */
@@ -704,6 +767,21 @@ export interface components {
             updated_at: string;
             version: components["schemas"]["VersionOut"];
         };
+        /** ChapterOutline */
+        ChapterOutline: {
+            /** Number */
+            number: number;
+            /** Title */
+            title: string;
+            /** Goal */
+            goal: string;
+            /** Conflict */
+            conflict: string;
+            /** Beats */
+            beats: string[];
+            /** Ending Hook */
+            ending_hook: string;
+        };
         /** ChapterPatch */
         ChapterPatch: {
             /** Title */
@@ -757,7 +835,7 @@ export interface components {
              * Task
              * @enum {string}
              */
-            task: "continue" | "rewrite" | "plan" | "extract" | "review" | "handoff";
+            task: "continue" | "rewrite" | "plan" | "extract" | "review" | "handoff" | "blueprint" | "outline";
             /**
              * Instruction
              * @default
@@ -776,6 +854,13 @@ export interface components {
              * @default 500
              */
             target_chars: number;
+            /** Volume Plan Id */
+            volume_plan_id?: string | null;
+            /**
+             * Chapter Batch
+             * @default 5
+             */
+            chapter_batch: number;
         };
         /** ContextOut */
         ContextOut: {
@@ -1104,7 +1189,7 @@ export interface components {
             /** Output Text */
             output_text: string;
             /** Result */
-            result: components["schemas"]["ExtractResult"] | components["schemas"]["ReviewResult"] | components["schemas"]["PlanResult"] | components["schemas"]["HandoffResult"] | null;
+            result: components["schemas"]["ExtractResult"] | components["schemas"]["ReviewResult"] | components["schemas"]["PlanResult"] | components["schemas"]["HandoffResult"] | components["schemas"]["BlueprintResult"] | components["schemas"]["OutlineResult"] | null;
             /** Candidate Status */
             candidate_status: string;
             /** Adopted Version Id */
@@ -1145,7 +1230,7 @@ export interface components {
              * Task
              * @enum {string}
              */
-            task: "continue" | "rewrite" | "plan" | "extract" | "review" | "handoff";
+            task: "continue" | "rewrite" | "plan" | "extract" | "review" | "handoff" | "blueprint" | "outline";
             /**
              * Instruction
              * @default
@@ -1164,6 +1249,13 @@ export interface components {
              * @default 500
              */
             target_chars: number;
+            /** Volume Plan Id */
+            volume_plan_id?: string | null;
+            /**
+             * Chapter Batch
+             * @default 5
+             */
+            chapter_batch: number;
             /** Idempotency Key */
             idempotency_key: string;
             /**
@@ -1195,7 +1287,7 @@ export interface components {
             /** Output Text */
             output_text: string;
             /** Result */
-            result: components["schemas"]["ExtractResult"] | components["schemas"]["ReviewResult"] | components["schemas"]["PlanResult"] | components["schemas"]["HandoffResult"] | null;
+            result: components["schemas"]["ExtractResult"] | components["schemas"]["ReviewResult"] | components["schemas"]["PlanResult"] | components["schemas"]["HandoffResult"] | components["schemas"]["BlueprintResult"] | components["schemas"]["OutlineResult"] | null;
             /** Candidate Status */
             candidate_status: string;
             /** Adopted Version Id */
@@ -1264,6 +1356,21 @@ export interface components {
              * @default
              */
             style: string;
+            /**
+             * Platform
+             * @default 番茄小说
+             */
+            platform: string;
+            /**
+             * Target Words
+             * @default 1000000
+             */
+            target_words: number;
+            /**
+             * Chapter Words
+             * @default 2000
+             */
+            chapter_words: number;
         };
         /** NovelOut */
         NovelOut: {
@@ -1277,6 +1384,12 @@ export interface components {
             premise: string;
             /** Style */
             style: string;
+            /** Platform */
+            platform: string;
+            /** Target Words */
+            target_words: number;
+            /** Chapter Words */
+            chapter_words: number;
             /** Is Demo */
             is_demo: boolean;
             /** Archived */
@@ -1310,6 +1423,24 @@ export interface components {
             style?: string | null;
             /** Archived */
             archived?: boolean | null;
+            /** Platform */
+            platform?: string | null;
+            /** Target Words */
+            target_words?: number | null;
+            /** Chapter Words */
+            chapter_words?: number | null;
+        };
+        /** OutlineResult */
+        OutlineResult: {
+            /**
+             * Kind
+             * @constant
+             */
+            kind: "outline";
+            /** Volume Title */
+            volume_title: string;
+            /** Chapters */
+            chapters: components["schemas"]["ChapterOutline"][];
         };
         /** ParagraphOut */
         ParagraphOut: {
@@ -1359,6 +1490,12 @@ export interface components {
             position: number;
             /** Updated At */
             updated_at: string;
+            /** Parent Id */
+            parent_id?: string | null;
+            /** Structure */
+            structure?: {
+                [key: string]: unknown;
+            };
         };
         /** PlanResult */
         PlanResult: {
@@ -1373,6 +1510,15 @@ export interface components {
             scenes: components["schemas"]["ScenePlan"][];
             /** Open Questions */
             open_questions?: string[];
+        };
+        /** ProductionApplyOut */
+        ProductionApplyOut: {
+            /** Novel Id */
+            novel_id: string;
+            /** Chapter Ids */
+            chapter_ids: string[];
+            /** Plan Ids */
+            plan_ids: string[];
         };
         /** ProviderInput */
         ProviderInput: {
@@ -1635,6 +1781,19 @@ export interface components {
             content_hash: string;
             /** Created At */
             created_at: string;
+        };
+        /** VolumeBlueprint */
+        VolumeBlueprint: {
+            /** Title */
+            title: string;
+            /** Summary */
+            summary: string;
+            /** Climax */
+            climax: string;
+            /** Ending Hook */
+            ending_hook: string;
+            /** Planned Chapters */
+            planned_chapters: number;
         };
     };
     responses: never;
@@ -2587,6 +2746,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_plan_api_v1_jobs__job_id__apply_plan_post: {
+        parameters: {
+            query: {
+                novel_id: string;
+            };
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductionApplyOut"];
                 };
             };
             /** @description Validation Error */
