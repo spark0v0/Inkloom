@@ -528,3 +528,5 @@ class ConnectionOut(Schema):
     reachable: bool
     model_listed: bool
     message: str
+    models: list[str] = Field(default_factory=list, max_length=1000)
+    models_truncated: bool = False

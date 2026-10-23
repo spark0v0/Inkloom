@@ -824,6 +824,13 @@ export interface components {
             model_listed: boolean;
             /** Message */
             message: string;
+            /** Models */
+            models?: string[];
+            /**
+             * Models Truncated
+             * @default false
+             */
+            models_truncated: boolean;
         };
         /** ContextInput */
         ContextInput: {

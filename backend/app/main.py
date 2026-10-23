@@ -11,7 +11,6 @@ from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from urllib.parse import quote, urlsplit
 
-import httpx
 from fastapi import FastAPI, Header, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
@@ -23,7 +22,6 @@ from . import schemas as dto
 from .domain import TERMINAL_JOB_STATES, DomainError, split_manuscript
 from .jobs import Generation
 from .library import Library
-from .models import Provider
 from .seed import create_demo
 from .storage import PROJECT_DIR, Workspace
 from .workspace_io import activate_original, activate_restore, backup, restore
@@ -288,27 +286,7 @@ def create_app(data_dir: Path | None = None, *, worker: bool = True, port: int =
 
     @app.post(prefix + "/providers/{provider_id}/check", response_model=dto.ConnectionOut)
     async def check_provider(provider_id: str, request: Request):
-        workspace = request.app.state.workspace
-        with workspace.session() as session:
-            provider = session.get(Provider, provider_id)
-            if provider is None or provider.kind == "demo":
-                return dto.ConnectionOut(reachable=True, model_listed=True, message="演示模型在本机运行，不调用外部服务。")
-            key = workspace.db.secrets.get(provider.id, provider.key_env)
-            url, model = provider.base_url, provider.model
-        if not key:
-            raise DomainError("PROVIDER_KEY_MISSING", "请先配置密钥。")
-        try:
-            async with httpx.AsyncClient(timeout=12, follow_redirects=False, trust_env=False) as client:
-                response = await client.get(url.rstrip("/") + "/models", headers={"Authorization": "Bearer " + key})
-                if response.status_code != 200:
-                    raise DomainError("PROVIDER_CHECK_FAILED", f"模型目录返回 HTTP {response.status_code}。此检查不调用正文生成。")
-                if len(response.content) > 2_000_000:
-                    raise DomainError("PROVIDER_CHECK_FAILED", "模型目录响应过大。")
-                listed = any(item.get("id") == model for item in response.json().get("data", []) if isinstance(item, dict))
-                return dto.ConnectionOut(reachable=True, model_listed=listed,
-                    message="模型目录可访问。此结果不代表流式生成或结构化输出已验证。" + ("" if listed else "填写的模型未出现在目录中。"))
-        except (httpx.HTTPError, ValueError) as exc:
-            raise DomainError("PROVIDER_CHECK_FAILED", "无法读取模型目录，请检查服务与本机网络。") from exc
+        return await request.app.state.generation.check_provider(provider_id)
 
     @app.get(prefix + "/roles", response_model=dto.RoleConfig)
     def roles(request: Request):

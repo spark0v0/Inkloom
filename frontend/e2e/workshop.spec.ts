@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { resolve } from 'node:path'
+import { createServer } from 'node:http'
 
 async function create(page: Page, name: string, enterEditor = true) {
   await page.goto('/')
@@ -394,6 +395,56 @@ test('首个模型连接可同时用于全部创作环节', async ({ page }, tes
   await page.evaluate(async () => {
     await fetch('/api/v1/roles', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ writer: 'demo', planner: 'demo', extractor: 'demo', reviewer: 'demo' }) })
   })
+})
+
+test('模型目录读取、选择和就地错误反馈', async ({ page }, testInfo) => {
+  let malformed = false
+  const calls: string[] = []
+  const server = createServer((request, response) => {
+    calls.push(`${request.method} ${request.url}`)
+    response.writeHead(200, { 'Content-Type': 'application/json' })
+    response.end(JSON.stringify(malformed ? [] : { data: [{ id: 'writer-a' }, { id: 'writer-b' }] }))
+  })
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+  const address = server.address()
+  if (!address || typeof address === 'string') throw new Error('Test provider did not bind')
+  const baseUrl = `http://127.0.0.1:${address.port}/v1`
+  const name = `目录选择-${testInfo.project.name}-${Date.now()}`
+  try {
+    await page.goto('/#/settings')
+    const id = await page.evaluate(async ({ baseUrl, name }) => {
+      const response = await fetch('/api/v1/providers', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, base_url: baseUrl, model: 'unknown-model', api_key: 'test-only-placeholder' }) })
+      if (!response.ok) throw new Error(`Provider fixture failed: ${response.status}`)
+      return (await response.json()).id
+    }, { baseUrl, name })
+    await page.reload()
+    const card = page.locator('.provider-card').filter({ has: page.getByRole('heading', { name, exact: true }) })
+    await card.getByRole('button', { name: '检查连接', exact: true }).click()
+    await expect(card.getByText(/当前模型未出现在目录中/)).toBeVisible()
+    await card.getByRole('button', { name: '选择目录中的模型（2 个）', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: '配置模型连接', exact: true })
+    await dialog.getByRole('combobox', { name: '从服务目录选择模型', exact: true }).selectOption('writer-b')
+    await expect(dialog.getByLabel('模型 ID', { exact: true })).toHaveValue('writer-b')
+    await dialog.getByLabel('服务地址', { exact: true }).fill('http://127.0.0.1:1/v1')
+    await expect(dialog.getByRole('combobox', { name: '从服务目录选择模型', exact: true })).toHaveCount(0)
+    await dialog.getByLabel('服务地址', { exact: true }).fill(baseUrl)
+    await page.screenshot({ path: resolve(`../docs/screenshots/model-catalog-${testInfo.project.name}.png`) })
+    await dialog.getByRole('button', { name: '保存连接', exact: true }).click()
+    await expect(dialog).not.toBeVisible()
+    await expect(card.getByText('writer-b', { exact: true })).toBeVisible()
+    expect(calls).toEqual(['GET /v1/models'])
+    const saved = await page.evaluate(async id => (await (await fetch('/api/v1/providers')).json()).find((p: { id: string }) => p.id === id), id)
+    expect(saved.model).toBe('writer-b')
+    expect(JSON.stringify(saved)).not.toContain('test-only-placeholder')
+    malformed = true
+    await card.getByRole('button', { name: '检查连接', exact: true }).click()
+    await expect(card.getByRole('alert')).toContainText('模型目录格式不兼容')
+    expect(calls).toEqual(['GET /v1/models', 'GET /v1/models'])
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+  }
 })
 
 

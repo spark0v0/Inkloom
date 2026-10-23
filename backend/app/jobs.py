@@ -23,7 +23,13 @@ from .library import (
     version_out,
 )
 from .models import Attempt, Job, JobEvent, Provider, Setting, Version
-from .providers import ProviderFailure, completion_cost, normalize_endpoint, stream_completion
+from .providers import (
+    ProviderFailure,
+    completion_cost,
+    model_catalog,
+    normalize_endpoint,
+    stream_completion,
+)
 from .storage import Workspace
 
 
@@ -96,6 +102,27 @@ class Generation:
                 self.ws.db.secrets.set(provider.id, data.api_key.get_secret_value())
             s.flush()
             return self._provider_out(provider)
+
+    async def check_provider(self, provider_id: str) -> dto.ConnectionOut:
+        with self.ws.session() as session:
+            provider = session.get(Provider, provider_id)
+            if provider is None:
+                raise DomainError("PROVIDER_NOT_FOUND", "模型连接不存在，请刷新连接列表。", 404)
+            if provider.kind == "demo":
+                return dto.ConnectionOut(reachable=True, model_listed=True,
+                    message="演示模型在本机运行，不调用外部服务。")
+            key = self.ws.db.secrets.get(provider.id, provider.key_env)
+            url, model = provider.base_url, provider.model
+        if not key:
+            raise DomainError("PROVIDER_KEY_MISSING", "请先配置密钥。")
+        try:
+            models = await model_catalog(url, key)
+        except ProviderFailure as exc:
+            raise DomainError(exc.code, exc.message) from exc
+        listed = model in models
+        return dto.ConnectionOut(reachable=True, model_listed=listed,
+            models=models[:1000], models_truncated=len(models) > 1000,
+            message="模型目录可访问；尚未验证生成能力。" + ("" if listed else "当前模型未出现在目录中，可核对或更换模型 ID。"))
 
     def roles(self) -> dict[str, str]:
         with self.ws.session() as s:

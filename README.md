@@ -8,6 +8,8 @@ Inkloom 是中文 AI 小说创作工作台。接入自己的大模型，让 AI �
 
 最新改进：[长篇目录与参考资料](docs/IMPLEMENTATION-LONGFORM.md)。支持目录搜索、分卷折叠、状态筛选和前后切章；AI 按本章细纲与人物别名召回相关资料，修复较早设定被遗漏的问题。
 
+模型接入改进：检查连接后可从服务目录选择模型，错误在对应连接旁显示；读取模型响应时执行大小限制。详见 [本轮代码审查、调研与后续优先级](docs/REVIEW-2026-10-23.md)。
+
 ## 开始创作
 
 1. **连接模型**：在“模型设置”填写服务地址、模型 ID 和 API Key；首次保存可同时设为策划、写作、记忆与审稿的默认模型。
@@ -64,6 +66,7 @@ pwsh -File .\scripts\start.ps1 -Port 8766 -DataDirectory D:\StoryWorkspace
 - [新版 UI、概念图与真实截图](docs/design/IMPLEMENTATION-V4.md)
 - [最初的开源与论坛调研](docs/RESEARCH.md)
 - [新增热门项目调研与长篇改进取舍](docs/decisions/0006-longform-navigation-context.md)
+- [模型接入审查、开源反馈与后续优先级](docs/REVIEW-2026-10-23.md)
 - [开发启动提示词](START_PROMPT.md) / [运行时提示词](prompts/)
 
 真实云模型的长篇质量、完整 Windows 输入法人工体验、跨浏览器与百万字性能仍待独立验证。当前不提供云同步、多人协作或完整剧情分支。项目独立实现，运行数据和密钥不进入源码仓库。
