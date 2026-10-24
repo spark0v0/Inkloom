@@ -39,6 +39,19 @@ Inkloom 是中文 AI 小说创作工作台。接入自己的大模型，让 AI �
 
 Windows 使用 PowerShell 7，需要 Node.js 22.12+、Python 3.13+ 和 uv。
 
+**一键启动：双击根目录的 [`启动 Inkloom.cmd`](启动%20Inkloom.cmd)。** 首次自动准备项目依赖并构建网页，服务就绪后打开默认浏览器；后续启动按依赖锁文件和源码变化决定是否重新安装或构建。重复打开会复用同一工作区已运行的服务；默认端口被其他程序占用时，会在 8765—8774 中寻找空闲端口。
+
+保留首次启动窗口，按 Ctrl+C 停止服务。缺少系统工具时按窗口提示安装后重试，启动器不会自动安装系统软件或更改执行策略的永久设置。[启动验收记录](docs/verification/2026-10-25-launcher.txt)。
+
+也可在 PowerShell 中运行以下命令；`-Port` 指定新服务的端口（同一工作区已运行时仍复用原地址），`-NoBrowser` 禁用自动打开网页，`-Rebuild` 强制重新构建（先停止已运行的服务）：
+
+```powershell
+pwsh -File .\scripts\launch.ps1
+pwsh -File .\scripts\launch.ps1 -Port 8766 -NoBrowser -DataDirectory D:\StoryWorkspace
+```
+
+原有分步安装与启动入口仍可使用：
+
 ```powershell
 pwsh -File .\scripts\setup.ps1
 pwsh -File .\scripts\start.ps1

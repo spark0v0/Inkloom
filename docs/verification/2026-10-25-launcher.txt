@@ -1,0 +1,29 @@
+Inkloom Windows 一键启动验收，2026-10-25
+
+范围：根目录“启动 Inkloom.cmd”、scripts/launch.ps1 与 README。
+在本机现有 PowerShell 7 / Node.js / uv 环境验证；使用 .tmp 中的独立空工作区。
+没有读写原工作区的小说正文，没有调用模型。原有 8765 服务的 PID 与健康状态在测试前后保持不变。
+
+实际执行与结果：
+
+1. PowerShell Parser.ParseFile：最终脚本无语法错误；git diff --check 无错误。
+2. cmd.exe /d /c 调用“启动 Inkloom.cmd -NoBrowser”：退出 0，复用原 8765 服务。
+3. 启动缓存为空时运行 launch.ps1 -Port 9891 -NoBrowser -DataDirectory <临时目录>：
+   uv sync --project backend --frozen --link-mode copy 成功；同步本地项目包到 0.2.0。
+   npm --prefix frontend ci 成功，实际输出 added 175 packages in 30s。
+   npm --prefix frontend run build 成功（包含 TypeScript 检查），4733 modules transformed。
+   随后 health.status=ok，health.workspace_id 与指定临时目录一致；网页返回 200，包含 Inkloom。
+4. 临时工作区路径含中文、空格与 &；另一次启动的 DataDirectory 以反斜杠结尾：均就绪并匹配正确工作区。
+5. 同一临时工作区已在 9891 运行，改用 -Port 9892 重复启动：退出 0，仍返回原 9891；9892 没有新监听，原服务进程不变。
+6. 持有 launcher.lock 后在独立进程运行启动器：退出 1，提示“另一个启动窗口正在准备”。
+7. 独立进程移除 PATH 中的 Node.js 并使用 -Rebuild：退出 1，提示“缺少 Node.js”；测试后恢复父进程 PATH。
+8. 用本机临时 HTTP 服务器占据 9894，再以独立空工作区指定 -Port 9894：退出 1，提示端口已被其他服务占用；HTTP 进程保持原状，最后由测试清理。
+9. 在 PTY 中发送 Ctrl+C：9891 及另一次启动的 8766 均停止，原 8765 服务未改变。PowerShell 中断退出码 1 按预期中断记录，没有计为启动成功。
+10. 原 8765 服务存在时使用另一临时工作区、不指定端口：自动选择 8766；未重复安装依赖或构建。
+11. 将入口与 launch.ps1 复制到含中文、空格与 & 的临时目录，从 Windows 目录执行复制的 cmd 入口：退出 0，正确找到脚本并复用 8766。
+12. 实际执行不带 -NoBrowser 的根目录 cmd：退出 0，执行默认浏览器打开请求；未对浏览器视觉进行截图验收。
+13. 最后复查：所有测试监听端口已关闭；原服务仍在 8765 且 health.status=ok。
+
+调试记录：初版仅检查本次指定端口，换端口启动同一工作区时实际创建了第二个临时服务。已根据进程、监听与启动日志定位；改为检查默认端口和本启动器记录过的端口，并以当前工作区身份和实际健康响应确认复用。修复后按第 5 项重验，不将失败结果计作通过。两次旧测试进程仅在核实 PID、命令与测试日志标记后清理。
+
+限制：未在完全没有系统前置工具的新 Windows 安装上验证，没有声称脚本会安装 PowerShell / Node.js / uv。此次未改应用代码，不重复执行全量小说创作回归。
