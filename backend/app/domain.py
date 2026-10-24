@@ -162,7 +162,8 @@ def resolve_evidence(raw: dict[str, Any], sources: list[dict[str, Any]]) -> dict
     if start < 0:
         raise DomainError("INVALID_EVIDENCE", "引用不能在指定原文版本中找到。")
     return {
-        **{k: v for k, v in source.items() if k != "text"},
+        **{key: source[key] for key in ("source_id", "novel_id", "chapter_id", "chapter_title",
+            "chapter_position", "version_id", "paragraph_id", "content_hash", "kind") if key in source},
         "quote": quote,
         "start_codepoint": start,
         "end_codepoint": start + len(quote),

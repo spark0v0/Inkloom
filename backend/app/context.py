@@ -14,6 +14,7 @@ from . import schemas as dto
 from .domain import DomainError, digest, source_for
 from .library import require_chapter, require_novel
 from .models import Chapter, Entity, Fact, Job, Plan, Provider, Version
+from .references import resolve_references
 from .storage import PROJECT_DIR
 
 RESULT_SCHEMAS = {
@@ -42,7 +43,8 @@ def context_current(session: Session, job: Job) -> bool:
     snapshot = job.context["preview"]
     if (chapter.working_version_id != job.base_version_id
             or novel.canon_revision != snapshot["canon_revision"]
-            or novel.settings_revision != snapshot["settings_revision"]):
+            or novel.settings_revision != snapshot["settings_revision"]
+            or chapter.references_revision != snapshot.get("references_revision", 0)):
         return False
     if canon_checkpoint(session, novel.id, chapter.position) != job.context.get("canon_checkpoint", {}):
         return False
@@ -63,10 +65,16 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
     chapter = require_chapter(session, novel_id, request.chapter_id)
     if chapter.working_version_id != request.base_version_id:
         raise DomainError("VERSION_CONFLICT", "正文已更新，请保存当前稿后重新准备上下文。", 409)
+    if request.references_revision is not None and chapter.references_revision != request.references_revision:
+        raise DomainError("REFERENCE_CONFLICT", "本章参考已在其他窗口更新，请重新读取后再生成。", 409)
     version = session.get(Version, chapter.working_version_id)
     provider = session.get(Provider, request.provider_id)
     if provider is None:
         raise DomainError("PROVIDER_NOT_FOUND", "请先选择或配置模型连接。", 404)
+    reference_selection = dto.ReferenceSelection.model_validate(chapter.references)
+    pinned_entities, pinned_sources = resolve_references(session, chapter, reference_selection)
+    if any(source["source_id"] in request.excluded_source_ids for source in pinned_sources):
+        raise DomainError("PROTECTED_CONTEXT", "本章必读不能在预览中排除，请先调整“本章参考”。")
     from .inspiration import chosen_direction
     direction = chosen_direction(session, novel_id, request)
     if request.task == "continue":
@@ -91,7 +99,9 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
     chapter_plans = [p for p in all_plans if p.structure.get("chapter_id") == chapter.id]
     # Future/global outlines may contain every character. Only the current chapter's
     # plan activates retrieval; plans remain intentions, never evidence of past events.
-    query_text = "\n".join([request.instruction, chapter.title, chapter.goal,
+    direction_query = " ".join(str(direction["direction"][key]) for key in ("title", "event", "motivation")) if direction else ""
+    query_text = "\n".join([request.instruction, chapter.title, chapter.goal, direction_query,
+                            *(" ".join([e.name, *e.aliases]) for e in pinned_entities),
                             *(p.body for p in chapter_plans)])
     relevance_text = (query_text + "\n" + version.text[-6000:]).casefold()
     all_entities = session.scalars(select(Entity).where(Entity.novel_id == novel_id,
@@ -100,7 +110,8 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
                                              for name in [e.name, *e.aliases])]
     # Match BEFORE limiting. All matched settings and world rules are mandatory;
     # the context budget rejects an oversized request instead of silently dropping them.
-    required_ids = {e.id for e in matched} | {e.id for e in all_entities if e.kind == "world"}
+    required_ids = {e.id for e in matched} | {e.id for e in all_entities if e.kind == "world"} | {
+        e.id for e in pinned_entities}
     required = [e for e in all_entities if e.id in required_ids]
     entities = required + [e for e in all_entities if e.id not in required_ids][:max(0, 60 - len(required))]
     entity_terms = [name.casefold() for e in matched for name in [e.name, *e.aliases] if len(name) >= 2]
@@ -141,6 +152,10 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
             elif len(optional_sources) < 30:
                 if source["source_id"] in relevant_ids:
                     optional_sources.append(source)
+    # Explicit pins are mandatory and de-duplicated against recent/retrieved text.
+    prior_by_id = {source["source_id"]: source for source in prior_sources}
+    prior_by_id.update({source["source_id"]: source for source in pinned_sources})
+    prior_sources = list(prior_by_id.values())
     volume_id = request.volume_plan_id if request.task == "outline" else next(
         (p.id for p in all_plans if p.level == "volume" and p.title == chapter.volume), None)
     plans = [p for p in all_plans if p.level == "book" or p.id == volume_id
@@ -210,6 +225,10 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
         notices.append("此前尚未整理结构化事实；本次只使用可用设定与已确认原文，不补造记忆。")
     if request.excluded_source_ids:
         notices.append("已按你的选择移除可选参考。当前章基线与作者硬约束保留。")
+    if reference_selection.entity_ids or reference_selection.chapters:
+        notices.append(f"本章必读：{len(reference_selection.entity_ids)} 项设定、{len(reference_selection.chapters)} 章定稿；不自动裁剪。")
+    if reference_selection.notes:
+        notices.append("本章补充资料只作创作参考，不作为故事中已发生事实的依据。")
     input_body: dict[str, Any] = {
         "task": request.task,
         "author_brief": {"title": novel.title, "genre": novel.genre,
@@ -228,6 +247,10 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
         input_body["production"] = production
     if direction is not None:
         input_body["inspiration_direction"] = direction
+    input_body["reference_selection"] = {"entity_ids": reference_selection.entity_ids,
+        "chapters": [pin.model_dump() for pin in reference_selection.chapters], "revision": chapter.references_revision}
+    if reference_selection.notes:
+        input_body["reference_material"] = {"status": "author_supplied_noncanonical", "text": reference_selection.notes}
     input_body["author_brief"].update({"platform": novel.platform,
         "target_words": str(novel.target_words), "chapter_words": str(novel.chapter_words)})
     if request.task == "rewrite" and request.selection:
@@ -250,13 +273,16 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
     window = provider.context_window
     output = provider.max_output_tokens
     available = window - output - max(512, math.ceil(window * .08))
+    optional_count = len(optional_sources)
     while optional_sources and estimate() > available:
         optional_sources.pop()
         input_body["sources"] = prior_sources + fact_sources + optional_sources
     if estimate() > available:
         raise DomainError("CONTEXT_TOO_LARGE", "本章基线和必要参考超出模型上下文预算。"
-                          "请选择更大上下文的模型、减少近期长章或使用选段改写；未发送请求。", 422,
+                          "请选择更大上下文的模型、在“本章参考”减少必读资料，或使用选段改写；未发送请求。", 422,
                           estimated_tokens=estimate(), available_tokens=available)
+    if len(optional_sources) < optional_count:
+        notices.append(f"受上下文预算限制，自动召回的 {optional_count - len(optional_sources)} 段可选原文未纳入；本章必读已保留。")
     config = provider_config(provider)
     estimated_max = None
     if provider.input_price is not None and provider.output_price is not None:
@@ -264,6 +290,9 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
     preview = dto.ContextOut(novel_id=novel_id, chapter_id=chapter.id, task=request.task,
         base_version_id=version.id, canon_revision=novel.canon_revision,
         settings_revision=novel.settings_revision, author_brief=input_body["author_brief"],
+        references_revision=chapter.references_revision, pinned_entity_ids=reference_selection.entity_ids,
+        pinned_chapters=reference_selection.chapters, reference_notes=reference_selection.notes,
+        target_chars=request.target_chars,
         chapter_goal=chapter.goal, instruction=request.instruction,
         current_selection=request.selection, rewrite_surroundings=input_body.get("surrounding_text", {}),
         sources=[dto.Source(**s) for s in

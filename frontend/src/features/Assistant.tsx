@@ -5,8 +5,9 @@ import { ArrowRight, Check, FileText, Pause, Play, Stop, ArrowCounterClockwise, 
 import { activeStates, ApiError, api, countChars, dateLabel, downloadText, errorText, jobStateNames, number, uuid } from '../lib/api'
 import type { Chapter, Context, ContextInput, Evidence, JobInput, MemoryProposal, Novel, Provider, Roles, Selection, Task, Version } from '../lib/api'
 import { Badge, Button, Field, Modal, Notice } from '../components/ui'
-import { ContextDetails, JobResult } from './JobPresentation'
+import { AttemptHistory, ContextDetails, JobResult } from './JobPresentation'
 import { useJobStream } from '../lib/useJobStream'
+import { ChapterReferencesDialog } from './ChapterReferencesDialog'
 
 export type AssistantProps = {
   novel: Novel; chapter: Chapter; providers: Provider[]; roles: Roles;
@@ -16,6 +17,10 @@ export type AssistantProps = {
   onClose?: () => void;
   candidateHost?: HTMLElement | null; onCandidate?: (id: string, show: boolean, label?: string) => void; onShowCandidate?: () => void;
   blockedChapter?: string; onResolvePrevious?: () => void;
+}
+
+function roleFor(task: Task): keyof Roles {
+  return task === 'plan' || task === 'inspiration' ? 'planner' : task === 'review' ? 'reviewer' : task === 'extract' || task === 'handoff' ? 'extractor' : 'writer'
 }
 
 export function Assistant({ novel, chapter, providers, roles, flush, selection, onAdopt, onEvidence, onExtractReady, onClose, candidateHost, onCandidate, onShowCandidate, blockedChapter, onResolvePrevious }: AssistantProps) {
@@ -28,11 +33,13 @@ export function Assistant({ novel, chapter, providers, roles, flush, selection, 
   const [selectedDirection, setDirection] = useState<{ reference: NonNullable<ContextInput['inspiration']>; title: string } | null>(null)
   const [target, setTarget] = useState(novel.chapter_words)
   const [providerId, setProviderId] = useState(roles.writer || 'demo')
+  const providerChoices = useRef<Partial<Roles>>({})
   const [context, setContext] = useState<Context | null>(null)
   const [excluded, setExcluded] = useState<string[]>([])
   const [jobId, setJobId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [showCompare, setShowCompare] = useState(false)
+  const [referencesOpen, setReferencesOpen] = useState(false)
   const [adopting, setAdopting] = useState(false)
   const [budget, setBudget] = useState('')
   const [maxAttempts, setMaxAttempts] = useState(3)
@@ -50,7 +57,10 @@ export function Assistant({ novel, chapter, providers, roles, flush, selection, 
   useEffect(() => {
     if (!jobId && job.data && restored.current !== job.data.id) {
       restored.current = job.data.id
-      if (job.data.task === 'inspiration') { setTask('inspiration'); setProviderId(job.data.provider_id) }
+      if (job.data.task === 'inspiration') {
+        setTask('inspiration'); setProviderId(job.data.provider_id)
+        providerChoices.current.planner = job.data.provider_id
+      }
     }
   }, [jobId, job.data])
   useEffect(() => {
@@ -59,8 +69,8 @@ export function Assistant({ novel, chapter, providers, roles, flush, selection, 
   }, [job.data, onExtractReady])
   function changeTask(next: Task) {
     setTask(next); setContext(null); setError(''); setDirection(null)
-    const role = next === 'plan' || next === 'inspiration' ? 'planner' : next === 'review' ? 'reviewer' : next === 'extract' || next === 'handoff' ? 'extractor' : 'writer'
-    setProviderId(roles[role] || 'demo')
+    const role = roleFor(next)
+    setProviderId(providerChoices.current[role] || roles[role] || 'demo')
   }
   async function input(): Promise<ContextInput> {
     const version = await flush()
@@ -68,7 +78,7 @@ export function Assistant({ novel, chapter, providers, roles, flush, selection, 
     const effectiveTask = wholeChapter && version.text.trim() ? 'rewrite' : task
     const effectiveSelection = wholeChapter && version.text.trim() ? { start_codepoint: 0, end_codepoint: Array.from(version.text).length, text: version.text } : task === 'rewrite' ? selection : null
     const direction = wholeChapter ? `依据本章细纲创作完整一章，目标约 ${target} 字。包含完整场景推进和有意义的章末钩子；只输出正文，不重复章节标题。` : ''
-    return { chapter_id: chapter.id, base_version_id: version.id, task: effectiveTask, instruction: [direction, task === 'inspiration' ? `当前卡点：${problem}` : '', instruction || (task === 'inspiration' ? '' : chapter.goal || '推进本章剧情，保持视角和人物一致。')].filter(Boolean).join('\n'),
+    return { chapter_id: chapter.id, base_version_id: version.id, references_revision: chapter.references_revision, task: effectiveTask, instruction: [direction, task === 'inspiration' ? `当前卡点：${problem}` : '', instruction || (task === 'inspiration' ? '' : chapter.goal || '推进本章剧情，保持视角和人物一致。')].filter(Boolean).join('\n'),
       provider_id: providerId, target_chars: target, chapter_batch: 5, excluded_source_ids: excluded, selection: effectiveSelection,
       inspiration: selectedDirection?.reference || null }
   }
@@ -110,7 +120,7 @@ export function Assistant({ novel, chapter, providers, roles, flush, selection, 
     if (job.data?.result?.kind !== 'inspiration') return
     try {
       const version = await flush()
-      if (version.id !== job.data.base_version_id || job.data.context.settings_revision !== novel.settings_revision || job.data.context.canon_revision !== novel.canon_revision) {
+      if (version.id !== job.data.base_version_id || job.data.context.settings_revision !== novel.settings_revision || job.data.context.canon_revision !== novel.canon_revision || (job.data.context.references_revision || 0) !== chapter.references_revision) {
         setError('正文或参考已变化，请重新找灵感后选择方向。'); return
       }
       const title = job.data.result.options[index].title
@@ -138,16 +148,17 @@ export function Assistant({ novel, chapter, providers, roles, flush, selection, 
         {active && <div className="button-row"><span className="small muted" role="status">{connection || '正在生成…'}</span><Button variant="ghost" onClick={() => void control('cancel')}><Stop size={15} />停止</Button><Button variant="ghost" onClick={() => void control('pause')} disabled={job.data.state !== 'running' && job.data.state !== 'queued'}><Pause size={15} />暂停</Button></div>}
         {job.data.state === 'paused' && <Button onClick={() => void control('resume')}><Play size={15} />继续生成</Button>}
         {['failed', 'interrupted_uncertain'].includes(job.data.state) && <><Notice>{job.data.error_message || '生成未完成。'}{job.data.state === 'interrupted_uncertain' && <span className="block">请求可能已计费，核实后再重试。</span>}</Notice><Button onClick={() => void control('retry')} disabled={job.data.attempt_count >= job.data.max_attempts}><ArrowCounterClockwise size={16} />确认并重试</Button></>}
-        {job.data.output_text && <JobResult job={job.data} onEvidence={onEvidence} onChoose={index => void chooseDirection(index)} stale={!!active || submissionLocked || job.data.base_version_id !== chapter.working_version_id || job.data.context.settings_revision !== novel.settings_revision || job.data.context.canon_revision !== novel.canon_revision} />}
+        {job.data.output_text && <JobResult job={job.data} onEvidence={onEvidence} onChoose={index => void chooseDirection(index)} stale={!!active || submissionLocked || job.data.base_version_id !== chapter.working_version_id || job.data.context.settings_revision !== novel.settings_revision || job.data.context.canon_revision !== novel.canon_revision || (job.data.context.references_revision || 0) !== chapter.references_revision} />}
         {job.data.candidate_status === 'needs_rebase' && <Notice>原稿或参考已变化，请核对后重新生成。</Notice>}
         {error && <Notice>{error}</Notice>}{canAdopt && <div className="candidate-actions"><Button variant="primary" disabled={adopting} onClick={() => void adopt()}><Check size={17} />采纳正文</Button><Button onClick={() => setShowCompare(true)}>对比原稿</Button><Button variant="ghost" onClick={() => void control('reject')}>放弃</Button></div>}
         {job.data.context.inspiration_reference && <Button variant="ghost" disabled={!!active || submissionLocked} onClick={() => { const source = job.data?.context.inspiration_reference; if (source) { changeTask('inspiration'); setJobId(source.job_id) } }}>重新选择剧情方向<ArrowRight size={16} /></Button>}
-        {['continue', 'rewrite'].includes(job.data.task) && job.data.output_text && <p className="candidate-count">本次 {number(countChars(job.data.output_text))} 字<span>目标 {number(job.data.context.author_brief?.chapter_words ? Number(job.data.context.author_brief.chapter_words) : target)} 字</span></p>}
-        <details className="call-details"><summary>引用资料与调用记录</summary><button className="text-link" onClick={() => { setContext(job.data!.context); setTab('context') }}>查看引用资料<ArrowRight size={15} /></button><p className="small muted">{dateLabel(job.data.created_at)} · 第 {job.data.attempt_count} 次调用 · {job.data.is_demo ? '本地演示，不计费' : job.data.cost == null ? '实际费用未知' : `${job.data.cost.toFixed(4)} ${job.data.context.currency}`}</p><button className="text-link" onClick={() => downloadText(job.data!.output_text, `${chapter.title}-候选.txt`)}>下载本次结果</button></details>
+        {['continue', 'rewrite'].includes(job.data.task) && job.data.output_text && <p className="candidate-count">本次 {number(countChars(job.data.output_text))} 字<span>{job.data.context.target_chars == null ? '原任务目标未知' : `目标 ${number(job.data.context.target_chars)} 字`}</span></p>}
+        <details className="call-details"><summary>引用资料与调用记录</summary><button className="text-link" onClick={() => { setContext(job.data!.context); setTab('context') }}>查看引用资料<ArrowRight size={15} /></button><p className="small muted">{dateLabel(job.data.created_at)} · 第 {job.data.attempt_count} 次调用 · {job.data.is_demo ? '本地演示，不计费' : job.data.cost == null ? '实际费用未知' : `${job.data.cost.toFixed(4)} ${job.data.context.currency}`}</p><button className="text-link" onClick={() => downloadText(job.data!.output_text, `${chapter.title}-候选.txt`)}>下载本次结果</button><AttemptHistory attempts={job.data.attempts} currency={job.data.context.currency} /></details>
       </> : <div className="candidate-placeholder"><PenNib size={24} weight="light" /><p>生成的正文会显示在这里</p></div>}</section>
-  return <aside className="assistant-panel" aria-label="写作助手"><div className="assistant-heading"><strong>AI 写作</strong>{provider?.kind === 'demo' && <Badge tone="amber">演示</Badge>}<select disabled={submissionLocked} aria-label="写作模型" value={providerId} onChange={e => { setProviderId(e.target.value); setContext(null) }}>{providers.map(p => <option value={p.id} key={p.id}>{p.name}</option>)}</select>{onClose && <button className="icon-button mobile-only" aria-label="关闭写作助手" onClick={onClose}><X size={18} /></button>}</div>
+  return <aside className="assistant-panel" aria-label="写作助手"><div className="assistant-heading"><strong>AI 写作</strong>{provider?.kind === 'demo' && <Badge tone="amber">演示</Badge>}<select disabled={submissionLocked} aria-label="写作模型" value={providerId} onChange={e => { providerChoices.current[roleFor(task)] = e.target.value; setProviderId(e.target.value); setContext(null) }}>{providers.map(p => <option value={p.id} key={p.id}>{p.name}</option>)}</select>{onClose && <button className="icon-button mobile-only" aria-label="关闭写作助手" onClick={onClose}><X size={18} /></button>}</div>
     <div className="assistant-tabs"><button disabled={submissionLocked} className={!['review', 'inspiration'].includes(task) ? 'active' : ''} onClick={() => { changeTask('continue'); setTab('assistant') }}>写作</button><button disabled={submissionLocked} className={task === 'inspiration' ? 'active' : ''} onClick={() => { changeTask('inspiration'); setTab('assistant') }}>找灵感</button><button disabled={submissionLocked} className={task === 'review' ? 'active' : ''} onClick={() => { changeTask('review'); setTab('assistant') }}>审稿</button></div>
     <div className="assistant-scroll">
+      <Button className="chapter-references-trigger" variant="ghost" disabled={submissionLocked || !!active} onClick={() => setReferencesOpen(true)}><FileText size={17} />本章参考<span>{(chapter.references.entity_ids?.length || 0) + (chapter.references.chapters?.length || 0) ? `${(chapter.references.entity_ids?.length || 0) + (chapter.references.chapters?.length || 0)} 项必读` : chapter.references.notes?.trim() ? '含补充资料' : '自动召回'}</span></Button>
       {chapter.goal && <details className="assistant-outline"><summary><FileText size={18} /><span>本章细纲</span></summary><p>{chapter.goal}</p></details>}
       {!['review', 'inspiration'].includes(task) && <div className="writing-mode-tabs"><button disabled={submissionLocked} className={mode === 'chapter' && task === 'continue' ? 'active' : ''} onClick={() => { setMode('chapter'); changeTask('continue') }}>写完整章</button><button disabled={submissionLocked} className={mode === 'continue' && task === 'continue' ? 'active' : ''} onClick={() => { setMode('continue'); changeTask('continue') }}>续写</button><button disabled={submissionLocked} className={task === 'rewrite' ? 'active' : ''} onClick={() => { setMode('rewrite'); changeTask('rewrite') }}>润色选段</button></div>}
       <div className="assistant-form"><fieldset className="assistant-inputs" disabled={submissionLocked}>{blockedChapter && <Notice action={<Button onClick={onResolvePrevious}>去处理前章</Button>}>先完成《{blockedChapter}》的定稿，再写后文。</Notice>}{task === 'inspiration' && <Field label="卡在哪里？"><select value={problem} onChange={e => { setProblem(e.target.value); setContext(null) }}>{['不知道接下来发生什么', '知道要发生什么，但过渡生硬', '这段太平，缺少冲突', '人物没有理由行动', '剧情重复，想换一种走法'].map(value => <option key={value}>{value}</option>)}</select></Field>}{selectedDirection && <div className="selected-direction" role="status"><strong>已选：{selectedDirection.title}</strong><p className="small">点击下方按钮生成候选正文。</p><Button variant="ghost" onClick={() => setDirection(null)}>移除方向</Button></div>}<Field label={task === 'review' ? '审稿重点' : task === 'inspiration' ? '补充想法（可选）' : '补充要求'}><textarea aria-label="本次写作要求" rows={3} value={instruction} onChange={e => setInstruction(e.target.value)} placeholder={task === 'inspiration' ? '可留空，让 AI 根据本章给出三个不同走法' : task === 'review' ? '例如：检查人物动机、前后矛盾、重复和节奏' : '例如：加快节奏，让章末留下悬念'} maxLength={12000} /></Field>
@@ -162,6 +173,7 @@ export function Assistant({ novel, chapter, providers, roles, flush, selection, 
       {inDocument && createPortal(candidate, candidateHost!)}
       <button className="text-link context-trigger" onClick={() => preparing.mutate()} disabled={preparing.isPending}>查看将引用的资料<ArrowRight size={15} /></button>
     </div><footer className="assistant-footer">{provider?.kind === 'demo' ? '演示模式 · 固定样例' : `发送至 ${provider?.name || '所选模型服务'}`}</footer>
+    {referencesOpen && <ChapterReferencesDialog novelId={novel.id} chapter={chapter} onClose={() => setReferencesOpen(false)} onSaved={() => { setReferencesOpen(false); setContext(null); setExcluded([]); setDirection(null); setError('') }} />}
     <Modal open={tab === 'context'} onOpenChange={value => !value && setTab('assistant')} title="本次引用资料" wide>{context && <ContextDetails context={context} onEvidence={onEvidence} excluded={excluded} onToggle={id => setExcluded(previous => previous.includes(id) ? previous.filter(x => x !== id) : [...previous, id])} />}</Modal>
     <Modal open={showCompare} onOpenChange={setShowCompare} title="对比原稿" wide className="candidate-modal"><div className="comparison"><div><h4>当前原稿</h4><div className="comparison-text">{chapter.version.text || '空白'}</div></div><div><h4>{job.data?.task === 'rewrite' ? '替换内容' : '新增内容'}</h4><div className="comparison-text comparison-new">{job.data?.output_text}</div></div></div>{job.data && job.data.base_version_id !== chapter.working_version_id && <Notice>原稿已更新，请核对后重新生成。</Notice>}{error && <Notice>{error}</Notice>}<div className="modal-actions"><Button onClick={() => setShowCompare(false)}>返回</Button><Button variant="primary" disabled={adopting} onClick={() => void adopt()}>采纳正文</Button></div></Modal>
   </aside>

@@ -19,11 +19,12 @@ from .domain import (
     uid,
     validate_document,
 )
+from .references import validate_restored_references
 from .storage import Workspace
 
 FORMAT_VERSION = 1
-SCHEMA_REVISION = "a12c7e604bc9"
-SUPPORTED_REVISIONS = {"924486b5f963", SCHEMA_REVISION}
+SCHEMA_REVISION = "b73d2f809a61"
+SUPPORTED_REVISIONS = {"924486b5f963", "a12c7e604bc9", SCHEMA_REVISION}
 MAX_ARCHIVE = 64 * 1024 * 1024
 MAX_DATABASE = 256 * 1024 * 1024
 
@@ -124,6 +125,7 @@ def restore(workspace: Workspace, contents: bytes) -> dict:
         if connection.execute("SELECT c.id FROM chapters c LEFT JOIN versions v ON c.accepted_version_id=v.id "
                               "WHERE c.accepted_version_id IS NOT NULL AND (v.id IS NULL OR v.chapter_id!=c.id)").fetchone():
             raise DomainError("INVALID_DATABASE", "正史版本引用无效。")
+        validate_restored_references(connection, required=revision[0] == SCHEMA_REVISION)
         # Restored connections must be configured again, including environment references.
         connection.execute("UPDATE providers SET key_env='', revision=revision+1 WHERE kind!='demo'")
         for job_id, raw_context in connection.execute("SELECT id,context FROM jobs").fetchall():

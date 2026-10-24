@@ -1,8 +1,10 @@
 # 技术方案与关键契约
 
-> 当前 0.2 沿用模块化单体和 SQLite，在已有生成任务中增加全书方案、分卷章节细纲及事务采纳。新增数据迁移为 `a12c7e604bc9`。实际变更见 [连载工作流决策](decisions/0004-serial-production.md) 与 [实现记录](IMPLEMENTATION-V0.2.md)，以下保留最初的完整技术方案。
+> 当前 0.2 沿用模块化单体和 SQLite，在已有生成任务中增加全书方案、分卷章节细纲及事务采纳；该阶段迁移为 `a12c7e604bc9`，最新本章参考迁移为 `b73d2f809a61`。实际变更见 [连载工作流决策](decisions/0004-serial-production.md)、[0.2 实现记录](IMPLEMENTATION-V0.2.md) 与 [本章参考实现](IMPLEMENTATION-REFERENCES.md)，以下保留最初的完整技术方案。
 
 2026-10-24 增加结构化 `inspiration` 任务与选中方向引用，复用任务表，无数据库迁移。方向在服务端按同作品、同章节与上下文基线校验；列表查询按章节过滤且不加载冻结上下文。前端结果展示与 SSE Hook 从写作助手拆出，供编辑器、任务记录和规划页复用。契约见 [决策 0007](decisions/0007-in-chapter-inspiration.md)。
+
+2026-10-25 完成本章参考：`references.py` 负责选择修订、同书/前文章序/定稿版本校验和恢复校验，`context.py` 冻结必读与非正史材料；HTTP 层只转交契约。`ContextInput.references_revision` 为可选兼容字段，新前端始终发送，拒绝旧窗口继续生成。参考变更和迟到任务完成均检查基线；必读不参与可选裁剪。`AttemptHistory` 由助手与任务记录复用，历史片段只读下载。恢复兼容两份旧迁移和当前迁移，校验后在新目录升级。详见 [决策 0008](decisions/0008-chapter-references.md)。
 
 状态：**规划基线，已有 0.1.0 本地实现**。以下细分目录和部分字段仍是可演进设计，实际结构与取舍见 [ADR 0001](adr/0001-local-workspace.md)，验证范围见 [IMPLEMENTATION.md](IMPLEMENTATION.md)。技术调整不能绕开数据安全和作者控制原则。
 

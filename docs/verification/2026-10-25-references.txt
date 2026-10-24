@@ -1,0 +1,176 @@
+Inkloom：本章参考与失败恢复验证记录，2026-10-24 至 2026-10-25。
+以下为实际命令输出；仓库绝对路径前缀统一替换为 <repo>。测试数据为虚构资料，模型为 Demo 或本机协议模拟服务；未调用真实付费模型。
+
+命令/范围：Ruff: backend/app backend/tests 新迁移 evals（2026-10-24）
+All checks passed!
+
+命令/范围：pytest backend/tests -q --tb=short（2026-10-24，之后未修改后端实现）
+........................................................................ [ 65%]
+......................................                                   [100%]
+============================== warnings summary ===============================
+backend\.venv\Lib\site-packages\fastapi\testclient.py:1
+  <repo>\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+110 passed, 1 warning in 75.17s (0:01:15)
+
+命令/范围：npm --prefix frontend run check:api
+
+> story-workshop@0.2.0 check:api
+> node scripts/generate-api.mjs --check
+
+API declarations match the backend OpenAPI contract
+
+命令/范围：npm --prefix frontend test
+
+> story-workshop@0.2.0 test
+> vitest run
+
+
+ RUN  v5.0.5 <repo>/frontend
+
+
+ Test Files  4 passed (4)
+      Tests  19 passed (19)
+   Start at  01:07:19
+   Duration  6.19s (import 98%, transform 1%, tests 1%)
+
+命令/范围：npm --prefix frontend run build（最终前端源码）
+
+> story-workshop@0.2.0 build
+> tsc -b && vite build
+
+vite v8.3.4 building client environment for production...
+transforming...
+✓ 4733 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/assets/favicon-vYokD4zw.svg                0.30 kB │ gzip:   0.23 kB
+dist/index.html                                 0.74 kB │ gzip:   0.49 kB
+dist/assets/index-Czvf2v7Z.css                 91.55 kB │ gzip:  18.60 kB
+dist/assets/Check.es-C6ccL0E6.js                1.53 kB │ gzip:   0.57 kB
+dist/assets/DownloadSimple.es-Dq9yke0e.js       2.01 kB │ gzip:   0.67 kB
+dist/assets/useJobStream-3g5X1saU.js            2.14 kB │ gzip:   0.91 kB
+dist/assets/SlidersHorizontal.es-CaYjL4B3.js    2.37 kB │ gzip:   0.73 kB
+dist/assets/Play.es-DFDYcZve.js                 4.47 kB │ gzip:   1.24 kB
+dist/assets/JobsPage-CQL60yRi.js                4.62 kB │ gzip:   2.07 kB
+dist/assets/ProductionResults-B1BZXXFR.js       5.14 kB │ gzip:   1.55 kB
+dist/assets/BackupPage-DbxNJIs8.js              8.46 kB │ gzip:   3.31 kB
+dist/assets/SettingsPage-ByvxcDxP.js           11.46 kB │ gzip:   4.19 kB
+dist/assets/JobPresentation-DSyUftpj.js        15.17 kB │ gzip:   5.35 kB
+dist/assets/StoryPage-Dbxs0l4o.js              18.38 kB │ gzip:   6.62 kB
+dist/assets/PlanningPage-BfTY_okU.js           21.95 kB │ gzip:   7.24 kB
+dist/assets/ui-CZhm3pWv.js                     66.53 kB │ gzip:  22.04 kB
+dist/assets/index-C0cASRlh.js                 323.85 kB │ gzip:  97.46 kB
+dist/assets/EditorPage-DsojaI-O.js            472.43 kB │ gzip: 147.02 kB
+
+✓ built in 471ms
+
+命令/范围：npm --prefix frontend run test:e2e（完整桌面和手机）
+
+> story-workshop@0.2.0 test:e2e
+> playwright test
+
+[WebServer] INFO:     Started server process [2304]
+[WebServer] INFO:     Waiting for application startup.
+[WebServer] INFO:     Application startup complete.
+[WebServer] INFO:     Uvicorn running on http://127.0.0.1:9876 (Press CTRL+C to quit)
+
+Running 54 tests using 1 worker
+
+(node:24524) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  1 [desktop] › e2e\chapter-references.spec.ts:48:1 › 本章必读保存与刷新恢复，生成只采用保存的参考和任务目标 (6.3s)
+  ok  2 [desktop] › e2e\chapter-references.spec.ts:102:1 › 前文更新后不能默用旧参考，作者可明确改用当前定稿 (1.7s)
+  ok  3 [desktop] › e2e\chapter-references.spec.ts:133:1 › 双窗口修改参考发生冲突时保留输入，显式重新载入后再保存 (2.1s)
+  ok  4 [desktop] › e2e\chapter-references.spec.ts:157:1 › 生成截断后重试，前一次片段仍可查看和下载 (7.8s)
+  ok  5 [desktop] › e2e\inspiration-return.spec.ts:12:1 › 续写不满意可重新选择原方向，刷新后仍保留来源 (9.0s)
+  ok  6 [desktop] › e2e\workshop.spec.ts:7:1 › 卡剧情找灵感、选中方向续写、刷新恢复与采纳 (11.0s)
+  ok  7 [desktop] › e2e\workshop.spec.ts:53:1 › 改稿后旧灵感不能直接续写，找灵感前先保存 (12.7s)
+  ok  8 [desktop] › e2e\workshop.spec.ts:74:1 › 写作提交回执丢失时保留同一请求并锁定参数 (8.2s)
+  ok  9 [desktop] › e2e\workshop.spec.ts:142:1 › 百章目录搜索、状态筛选、折叠定位与切章保存 (5.4s)
+  ok 10 [desktop] › e2e\workshop.spec.ts:191:1 › 切章保存失败保留当前编辑内容 (2.9s)
+  ok 11 [desktop] › e2e\workshop.spec.ts:212:1 › 手写保存、刷新、版本、导出与正史确认 (4.7s)
+  ok 12 [desktop] › e2e\workshop.spec.ts:231:1 › 演示候选不会直接改稿，采纳后旧版本保留 (5.1s)
+  ok 13 [desktop] › e2e\workshop.spec.ts:248:1 › 生成后修改原稿，旧候选不能覆盖新文字 (6.6s)
+  ok 14 [desktop] › e2e\workshop.spec.ts:264:1 › 两页编辑冲突保留双方，显式另存解决 (8.1s)
+  ok 15 [desktop] › e2e\workshop.spec.ts:282:1 › 离线保存不报成功，恢复连接后重试原请求 (5.9s)
+  ok 16 [desktop] › e2e\workshop.spec.ts:296:1 › 提取只给提议，确认后可以定位来源与搜索 (6.1s)
+  ok 17 [desktop] › e2e\workshop.spec.ts:316:1 › 窄屏无横向溢出，助手和目录通过抽屉可达 (3.9s)
+  ok 18 [desktop] › e2e\workshop.spec.ts:332:1 › emoji 后选段改写保留其余原文 (5.2s)
+  ok 19 [desktop] › e2e\workshop.spec.ts:355:1 › 手稿切分预览与实际导入一致 (1.8s)
+  ok 20 [desktop] › e2e\workshop.spec.ts:371:1 › 备份下载、校验与新工作区恢复 (5.2s)
+  ok 21 [desktop] › e2e\workshop.spec.ts:398:1 › 编辑器与助手的自动可访问性检查 (5.8s)
+  ok 22 [desktop] › e2e\workshop.spec.ts:407:1 › 任务已提交但响应失败，重试复用同一任务 (4.1s)
+  ok 23 [desktop] › e2e\workshop.spec.ts:429:1 › AI 建书、章节细纲、整章生成、记忆定稿、下一章与连载导出 (14.9s)
+  ok 24 [desktop] › e2e\workshop.spec.ts:482:1 › 首个模型连接可同时用于全部创作环节 (912ms)
+  ok 25 [desktop] › e2e\workshop.spec.ts:507:1 › 模型目录读取、选择和就地错误反馈 (4.8s)
+  ok 26 [desktop] › e2e\workshop.spec.ts:558:1 › 开书方案刷新可恢复，采纳后页内进入细纲且不会自动调用 (6.1s)
+  ok 27 [desktop] › e2e\workshop.spec.ts:576:1 › 继续写作进入未完成章，前章未定稿有直接处理入口 (4.6s)
+(node:28240) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 28 [mobile] › e2e\chapter-references.spec.ts:48:1 › 本章必读保存与刷新恢复，生成只采用保存的参考和任务目标 (5.8s)
+  ok 29 [mobile] › e2e\chapter-references.spec.ts:102:1 › 前文更新后不能默用旧参考，作者可明确改用当前定稿 (1.5s)
+  ok 30 [mobile] › e2e\chapter-references.spec.ts:133:1 › 双窗口修改参考发生冲突时保留输入，显式重新载入后再保存 (2.1s)
+  ok 31 [mobile] › e2e\chapter-references.spec.ts:157:1 › 生成截断后重试，前一次片段仍可查看和下载 (6.8s)
+  ok 32 [mobile] › e2e\inspiration-return.spec.ts:12:1 › 续写不满意可重新选择原方向，刷新后仍保留来源 (8.9s)
+  ok 33 [mobile] › e2e\workshop.spec.ts:7:1 › 卡剧情找灵感、选中方向续写、刷新恢复与采纳 (10.2s)
+  ok 34 [mobile] › e2e\workshop.spec.ts:53:1 › 改稿后旧灵感不能直接续写，找灵感前先保存 (12.7s)
+  ok 35 [mobile] › e2e\workshop.spec.ts:74:1 › 写作提交回执丢失时保留同一请求并锁定参数 (7.8s)
+  ok 36 [mobile] › e2e\workshop.spec.ts:142:1 › 百章目录搜索、状态筛选、折叠定位与切章保存 (7.6s)
+  ok 37 [mobile] › e2e\workshop.spec.ts:191:1 › 切章保存失败保留当前编辑内容 (4.0s)
+  ok 38 [mobile] › e2e\workshop.spec.ts:212:1 › 手写保存、刷新、版本、导出与正史确认 (4.7s)
+  ok 39 [mobile] › e2e\workshop.spec.ts:231:1 › 演示候选不会直接改稿，采纳后旧版本保留 (5.2s)
+  ok 40 [mobile] › e2e\workshop.spec.ts:248:1 › 生成后修改原稿，旧候选不能覆盖新文字 (6.5s)
+  ok 41 [mobile] › e2e\workshop.spec.ts:264:1 › 两页编辑冲突保留双方，显式另存解决 (7.8s)
+  ok 42 [mobile] › e2e\workshop.spec.ts:282:1 › 离线保存不报成功，恢复连接后重试原请求 (5.7s)
+  ok 43 [mobile] › e2e\workshop.spec.ts:296:1 › 提取只给提议，确认后可以定位来源与搜索 (6.1s)
+  ok 44 [mobile] › e2e\workshop.spec.ts:316:1 › 窄屏无横向溢出，助手和目录通过抽屉可达 (4.1s)
+  ok 45 [mobile] › e2e\workshop.spec.ts:332:1 › emoji 后选段改写保留其余原文 (5.2s)
+  ok 46 [mobile] › e2e\workshop.spec.ts:355:1 › 手稿切分预览与实际导入一致 (1.9s)
+  ok 47 [mobile] › e2e\workshop.spec.ts:371:1 › 备份下载、校验与新工作区恢复 (5.1s)
+  ok 48 [mobile] › e2e\workshop.spec.ts:398:1 › 编辑器与助手的自动可访问性检查 (5.3s)
+  ok 49 [mobile] › e2e\workshop.spec.ts:407:1 › 任务已提交但响应失败，重试复用同一任务 (5.0s)
+  ok 50 [mobile] › e2e\workshop.spec.ts:429:1 › AI 建书、章节细纲、整章生成、记忆定稿、下一章与连载导出 (14.8s)
+  ok 51 [mobile] › e2e\workshop.spec.ts:482:1 › 首个模型连接可同时用于全部创作环节 (863ms)
+  ok 52 [mobile] › e2e\workshop.spec.ts:507:1 › 模型目录读取、选择和就地错误反馈 (5.8s)
+  ok 53 [mobile] › e2e\workshop.spec.ts:558:1 › 开书方案刷新可恢复，采纳后页内进入细纲且不会自动调用 (6.1s)
+  ok 54 [mobile] › e2e\workshop.spec.ts:576:1 › 继续写作进入未完成章，前章未定稿有直接处理入口 (4.8s)
+
+  54 passed (5.5m)
+
+命令/范围：npm --prefix frontend run test:e2e -- chapter-references.spec.ts（收紧失效保存条件后）
+
+> story-workshop@0.2.0 test:e2e
+> playwright test chapter-references.spec.ts
+
+[WebServer] INFO:     Started server process [25884]
+[WebServer] INFO:     Waiting for application startup.
+[WebServer] INFO:     Application startup complete.
+[WebServer] INFO:     Uvicorn running on http://127.0.0.1:9876 (Press CTRL+C to quit)
+
+Running 8 tests using 1 worker
+
+(node:3644) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 [desktop] › e2e\chapter-references.spec.ts:48:1 › 本章必读保存与刷新恢复，生成只采用保存的参考和任务目标 (5.8s)
+  ok 2 [desktop] › e2e\chapter-references.spec.ts:102:1 › 前文更新后不能默用旧参考，作者可明确改用当前定稿 (1.7s)
+  ok 3 [desktop] › e2e\chapter-references.spec.ts:135:1 › 双窗口修改参考发生冲突时保留输入，显式重新载入后再保存 (2.2s)
+  ok 4 [desktop] › e2e\chapter-references.spec.ts:159:1 › 生成截断后重试，前一次片段仍可查看和下载 (7.2s)
+(node:27868) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 5 [mobile] › e2e\chapter-references.spec.ts:48:1 › 本章必读保存与刷新恢复，生成只采用保存的参考和任务目标 (5.5s)
+  ok 6 [mobile] › e2e\chapter-references.spec.ts:102:1 › 前文更新后不能默用旧参考，作者可明确改用当前定稿 (1.6s)
+  ok 7 [mobile] › e2e\chapter-references.spec.ts:135:1 › 双窗口修改参考发生冲突时保留输入，显式重新载入后再保存 (2.4s)
+  ok 8 [mobile] › e2e\chapter-references.spec.ts:159:1 › 生成截断后重试，前一次片段仍可查看和下载 (8.7s)
+
+  8 passed (39.9s)
+
+命令/范围：python evals/run_context_eval.py --output .tmp/context-eval-review-1025.json
+Context engineering fixtures: 8/8 passed; model quality not evaluated
+
+额外人工检查：查看桌面 1440×900 和手机 390×844 的运行截图；窗口列表可滚动，操作区可见，无页面横向溢出。基础 axe 与 Escape 焦点检查包含在浏览器用例中，不代表完整 WCAG 人工验收。
+本机工作区只读元数据核验：schema_revision=b73d2f809a61，active_jobs=0，PRAGMA quick_check=ok。升级前的一致性备份保留在被忽略的数据目录，恢复和迁移先在独立目录验证。
+本机服务复查：127.0.0.1:8765，health.status=ok，version=0.2.0；公开 Provider 元数据仅有 demo，真实配置数量为 0。
+调试记录：新增引用来源的 pinned 展示字段曾污染严格 Evidence Schema，已改为来源字段白名单；参考窗口旧目录缓存已改为打开时重读；手选模型切换续写变成 demo 已先复现再修复；测试夹具新增服务后未刷新导致选项缺失，已修正夹具初始化；失效参考仍可点击保存先复现为 Expected disabled / Received enabled，再收紧条件并定向复验。失败未当作通过统计。

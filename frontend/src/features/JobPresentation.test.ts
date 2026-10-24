@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { describe, expect, it } from 'vitest'
 import type { JobDetail } from '../lib/api'
-import { JobResult } from './JobPresentation'
+import { AttemptHistory, JobResult } from './JobPresentation'
 
 function render(result: NonNullable<JobDetail['result']>) {
   const job = { task: result.kind, result } as JobDetail
@@ -31,5 +31,27 @@ describe('任务记录中的结构化规划结果', () => {
     expect(html).toContain('雨夜归港')
     expect(html).toContain('线索3')
     expect(html).toContain('账本中多了一页')
+  })
+})
+
+describe('重试后的历史调用内容', () => {
+  it('仍可阅读和下载第一次失败留下的片段', () => {
+    const html = renderToStaticMarkup(createElement(AttemptHistory, { currency: 'CNY', attempts: [{
+      id: 'attempt-one', number: 1, call_state: 'failed', output_text: '第一稿只写到这里。',
+      usage: null, cost: null, error_code: 'INCOMPLETE_OUTPUT', created_at: '', finished_at: '',
+    }] }))
+    expect(html).toContain('第一稿只写到这里。')
+    expect(html).toContain('下载第 1 次内容')
+    expect(html).toContain('调用失败')
+    expect(html).toContain('费用未知')
+  })
+
+  it('把模型返回的 HTML 当文字显示', () => {
+    const html = renderToStaticMarkup(createElement(AttemptHistory, { currency: 'CNY', attempts: [{
+      id: 'attempt-two', number: 2, call_state: 'completed', output_text: '<script>manuscript()</script>',
+      usage: { prompt_tokens: 10, completion_tokens: 20 }, cost: 0, error_code: null, created_at: '', finished_at: '',
+    }] }))
+    expect(html).toContain('&lt;script&gt;')
+    expect(html).not.toContain('<script>')
   })
 })

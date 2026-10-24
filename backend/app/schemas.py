@@ -105,8 +105,40 @@ class ChapterSummary(Schema):
     updated_at: str
 
 
+class ChapterReferenceVersion(Schema):
+    chapter_id: str = Field(min_length=1, max_length=160)
+    version_id: str = Field(min_length=1, max_length=160)
+
+
+class ReferenceSelection(Schema):
+    entity_ids: list[Annotated[str, Field(min_length=1, max_length=160)]] = Field(default_factory=list, max_length=40)
+    chapters: list[ChapterReferenceVersion] = Field(default_factory=list, max_length=8)
+    notes: str = Field(default="", max_length=12000)
+
+    @field_validator("entity_ids", "chapters")
+    @classmethod
+    def unique_references(cls, values):
+        keys = [value if isinstance(value, str) else value.chapter_id for value in values]
+        if len(keys) != len(set(keys)):
+            raise ValueError("参考项目不能重复。")
+        return values
+
+
+class ReferenceUpdate(Schema):
+    base_revision: int = Field(ge=0)
+    selection: ReferenceSelection
+
+
+class ReferenceState(Schema):
+    chapter_id: str
+    revision: int
+    selection: ReferenceSelection
+
+
 class ChapterOut(ChapterSummary):
     version: VersionOut
+    references: ReferenceSelection
+    references_revision: int
 
 
 class SaveInput(Schema):
@@ -157,6 +189,7 @@ class Source(Schema):
     content_hash: str
     text: str
     kind: str
+    pinned: bool = False
 
 
 class Evidence(Schema):
@@ -341,6 +374,7 @@ class Selection(Schema):
 class ContextInput(Schema):
     chapter_id: str
     base_version_id: str
+    references_revision: int | None = Field(default=None, ge=0)
     task: TaskName
     instruction: str = Field(default="", max_length=12000)
     provider_id: str = "demo"
@@ -359,6 +393,11 @@ class ContextOut(Schema):
     task: str
     canon_revision: int
     settings_revision: int
+    references_revision: int = 0
+    pinned_entity_ids: list[str] = Field(default_factory=list)
+    pinned_chapters: list[ChapterReferenceVersion] = Field(default_factory=list)
+    reference_notes: str = ""
+    target_chars: int | None = None
     author_brief: dict[str, str] = Field(default_factory=dict)
     chapter_goal: str = ""
     instruction: str = ""

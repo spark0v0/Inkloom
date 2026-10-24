@@ -1,0 +1,87 @@
+{
+  "fixture_version": 1,
+  "model_quality_evaluated": false,
+  "paid_model_calls": 0,
+  "passed": 8,
+  "total": 8,
+  "cases": [
+    {
+      "id": "old_injury_alias",
+      "description": "人物别名应召回较早的伤势",
+      "passed": true,
+      "checks": [
+        "book_isolation",
+        "narrative_order",
+        "required_old_source_present"
+      ]
+    },
+    {
+      "id": "short_chinese_term",
+      "description": "两字关键词召回一次性物件约束",
+      "passed": true,
+      "checks": [
+        "book_isolation",
+        "narrative_order",
+        "required_old_source_present"
+      ]
+    },
+    {
+      "id": "explicit_old_promise",
+      "description": "没有共同关键词的远期承诺仍可指定必读",
+      "passed": true,
+      "checks": [
+        "book_isolation",
+        "narrative_order",
+        "required_old_source_present"
+      ]
+    },
+    {
+      "id": "crowded_character_bible",
+      "description": "大量较新档案不能挤掉作者指定人物",
+      "passed": true,
+      "checks": [
+        "book_isolation",
+        "narrative_order",
+        "pinned_setting_present"
+      ]
+    },
+    {
+      "id": "future_secret_is_not_past",
+      "description": "审阅早章不能读到后续揭晓的秘密",
+      "passed": true,
+      "checks": [
+        "book_isolation",
+        "narrative_order",
+        "required_old_source_present"
+      ]
+    },
+    {
+      "id": "foreign_book_isolation",
+      "description": "其他作品的同名线索不进入本书",
+      "passed": true,
+      "checks": [
+        "book_isolation",
+        "narrative_order",
+        "required_old_source_present"
+      ]
+    },
+    {
+      "id": "changed_pin_is_stale",
+      "description": "指定前文变更后必须重新确认",
+      "passed": true,
+      "checks": [
+        "expected_stale_context_rejected"
+      ]
+    },
+    {
+      "id": "author_note_is_not_canon",
+      "description": "研究材料与已发生事实分开",
+      "passed": true,
+      "checks": [
+        "book_isolation",
+        "narrative_order",
+        "reference_note_separated_from_canon"
+      ]
+    }
+  ]
+}

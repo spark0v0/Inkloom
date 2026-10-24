@@ -221,7 +221,8 @@ def test_context_scales_by_selected_volume_and_keeps_older_relevant_memory(libra
     assert any(f.subject == "玄令" for f in recalled.facts)
 
 
-def test_old_workspace_migrates_and_old_backup_restores(tmp_path, workspace):
+@pytest.mark.parametrize("old_revision", ["924486b5f963", "a12c7e604bc9"])
+def test_old_workspace_migrates_and_old_backup_restores(tmp_path, workspace, old_revision):
     root = tmp_path / "old-workspace"
     old = Workspace(root)
     lib = Library(old)
@@ -235,11 +236,11 @@ def test_old_workspace_migrates_and_old_backup_restores(tmp_path, workspace):
     config.set_main_option("script_location", str(BACKEND_DIR / "alembic"))
     with engine.begin() as connection:
         config.attributes["connection"] = connection
-        command.downgrade(config, "924486b5f963")
+        command.downgrade(config, old_revision)
     engine.dispose()
     with sqlite3.connect(root / "workspace.db") as connection:
         raw = connection.serialize()
-    manifest = {"format": "story-workshop-backup", "format_version": 1, "schema_revision": "924486b5f963",
+    manifest = {"format": "story-workshop-backup", "format_version": 1, "schema_revision": old_revision,
         "files": {"workspace.db": {"bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}}}
     archive = io.BytesIO()
     with zipfile.ZipFile(archive, "w") as output:

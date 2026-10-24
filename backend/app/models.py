@@ -53,6 +53,8 @@ class Chapter(Base):
     volume: Mapped[str] = mapped_column(String(160), default="第一卷")
     position: Mapped[int] = mapped_column(Integer)
     goal: Mapped[str] = mapped_column(Text, default="")
+    references: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    references_revision: Mapped[int] = mapped_column(Integer, default=0)
     working_version_id: Mapped[str] = mapped_column(String)
     accepted_version_id: Mapped[str | None] = mapped_column(String, nullable=True)
     review_state: Mapped[str] = mapped_column(String, default="draft")

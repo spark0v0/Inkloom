@@ -105,6 +105,24 @@ export interface paths {
         patch: operations["edit_chapter_api_v1_novels__novel_id__chapters__chapter_id__patch"];
         trace?: never;
     };
+    "/api/v1/novels/{novel_id}/chapters/{chapter_id}/references": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get References */
+        get: operations["get_references_api_v1_novels__novel_id__chapters__chapter_id__references_get"];
+        /** Save References */
+        put: operations["save_references_api_v1_novels__novel_id__chapters__chapter_id__references_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/novels/{novel_id}/chapters/{chapter_id}/versions": {
         parameters: {
             query?: never;
@@ -766,6 +784,9 @@ export interface components {
             /** Updated At */
             updated_at: string;
             version: components["schemas"]["VersionOut"];
+            references: components["schemas"]["ReferenceSelection"];
+            /** References Revision */
+            references_revision: number;
         };
         /** ChapterOutline */
         ChapterOutline: {
@@ -790,6 +811,13 @@ export interface components {
             volume?: string | null;
             /** Goal */
             goal?: string | null;
+        };
+        /** ChapterReferenceVersion */
+        ChapterReferenceVersion: {
+            /** Chapter Id */
+            chapter_id: string;
+            /** Version Id */
+            version_id: string;
         };
         /** ChapterSummary */
         ChapterSummary: {
@@ -838,6 +866,8 @@ export interface components {
             chapter_id: string;
             /** Base Version Id */
             base_version_id: string;
+            /** References Revision */
+            references_revision?: number | null;
             /**
              * Task
              * @enum {string}
@@ -884,6 +914,22 @@ export interface components {
             canon_revision: number;
             /** Settings Revision */
             settings_revision: number;
+            /**
+             * References Revision
+             * @default 0
+             */
+            references_revision: number;
+            /** Pinned Entity Ids */
+            pinned_entity_ids?: string[];
+            /** Pinned Chapters */
+            pinned_chapters?: components["schemas"]["ChapterReferenceVersion"][];
+            /**
+             * Reference Notes
+             * @default
+             */
+            reference_notes: string;
+            /** Target Chars */
+            target_chars?: number | null;
             /** Author Brief */
             author_brief?: {
                 [key: string]: string;
@@ -1275,6 +1321,8 @@ export interface components {
             chapter_id: string;
             /** Base Version Id */
             base_version_id: string;
+            /** References Revision */
+            references_revision?: number | null;
             /**
              * Task
              * @enum {string}
@@ -1675,6 +1723,32 @@ export interface components {
             /** Secret Persistent */
             secret_persistent: boolean;
         };
+        /** ReferenceSelection */
+        ReferenceSelection: {
+            /** Entity Ids */
+            entity_ids?: string[];
+            /** Chapters */
+            chapters?: components["schemas"]["ChapterReferenceVersion"][];
+            /**
+             * Notes
+             * @default
+             */
+            notes: string;
+        };
+        /** ReferenceState */
+        ReferenceState: {
+            /** Chapter Id */
+            chapter_id: string;
+            /** Revision */
+            revision: number;
+            selection: components["schemas"]["ReferenceSelection"];
+        };
+        /** ReferenceUpdate */
+        ReferenceUpdate: {
+            /** Base Revision */
+            base_revision: number;
+            selection: components["schemas"]["ReferenceSelection"];
+        };
         /** RestoreOut */
         RestoreOut: {
             /** Restore Id */
@@ -1782,6 +1856,11 @@ export interface components {
             text: string;
             /** Kind */
             kind: string;
+            /**
+             * Pinned
+             * @default false
+             */
+            pinned: boolean;
         };
         /** ValidationError */
         ValidationError: {
@@ -2145,6 +2224,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChapterOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_references_api_v1_novels__novel_id__chapters__chapter_id__references_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                novel_id: string;
+                chapter_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReferenceState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_references_api_v1_novels__novel_id__chapters__chapter_id__references_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                novel_id: string;
+                chapter_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReferenceUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReferenceState"];
                 };
             };
             /** @description Validation Error */

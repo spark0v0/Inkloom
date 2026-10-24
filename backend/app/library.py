@@ -55,7 +55,9 @@ def chapter_out(session: Session, chapter: Chapter, detail: bool = True):
               if name != "char_count"}
     values["char_count"] = version.char_count
     if detail:
-        return dto.ChapterOut(**values, version=version_out(version))
+        return dto.ChapterOut(**values, version=version_out(version),
+                              references=dto.ReferenceSelection.model_validate(chapter.references),
+                              references_revision=chapter.references_revision)
     return dto.ChapterSummary(**values)
 
 

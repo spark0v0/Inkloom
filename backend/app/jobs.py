@@ -44,7 +44,7 @@ def emit(session, job: Job, kind: str, data: dict[str, Any]) -> None:
 def public_job(session, job: Job, detail: bool = False):
     values = {key: getattr(job, key) for key in dto.JobOut.model_fields}
     if detail:
-        values["context"] = job.context["preview"]
+        values["context"] = {"target_chars": job.context.get("target_chars"), **job.context["preview"]}
         values["attempts"] = [dto.AttemptOut.model_validate(a) for a in session.scalars(
             select(Attempt).where(Attempt.job_id == job.id).order_by(Attempt.number)).all()]
         return dto.JobDetail(**values)

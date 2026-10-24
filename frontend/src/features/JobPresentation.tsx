@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowRight, ClipboardText, FileText } from '@phosphor-icons/react'
-import { api, errorText, number } from '../lib/api'
+import { api, downloadText, errorText, number } from '../lib/api'
 import type { Context, Evidence, JobDetail } from '../lib/api'
 import { Badge, Button, Field, Notice } from '../components/ui'
 import { InspirationResult } from './InspirationResult'
@@ -9,6 +9,25 @@ import { BlueprintView, OutlineView } from './ProductionResults'
 
 export function SourceButton({ evidence, onEvidence, label }: { evidence: Evidence; onEvidence: (e: Evidence) => void; label?: string }) {
   return <button className="source-button" onClick={() => onEvidence(evidence)}><FileText size={16} /><span>{label || evidence.chapter_title || '查看原文'}</span><ArrowRight size={14} /></button>
+}
+
+export function AttemptHistory({ attempts, currency }: { attempts: JobDetail['attempts']; currency: string }) {
+  const states: Record<string, string> = {
+    request_prepared: '请求已准备', dispatch_started: '请求已发出', streaming: '正在接收', completed: '已完成',
+    failed: '调用失败', interrupted_uncertain: '响应中断，需核实上游状态',
+    cancelled_before_dispatch: '发送前已停止', cancelled_after_dispatch: '已停止，上游可能仍计费',
+  }
+  return <details className="attempt-history"><summary>调用记录与历史内容（{attempts.length}）</summary>
+    {attempts.map(attempt => <article className="attempt-entry" key={attempt.id}>
+      <div className="attempt-row"><strong>第 {attempt.number} 次</strong><span>{states[attempt.call_state] || '调用状态待核实'}</span>
+        <span>{attempt.usage ? `输入 ${attempt.usage.prompt_tokens ?? '未知'} / 输出 ${attempt.usage.completion_tokens ?? '未知'} tokens` : '用量未知'}</span>
+        <span>{attempt.cost == null ? '费用未知' : `${attempt.cost.toFixed(4)} ${currency}`}</span>
+      </div>
+      {attempt.output_text && <><details className="attempt-content"><summary>查看第 {attempt.number} 次保留内容</summary><pre>{attempt.output_text}</pre></details>
+        <Button variant="ghost" onClick={() => downloadText(attempt.output_text, `第${attempt.number}次调用-${attempt.id.slice(-8)}.txt`)}>下载第 {attempt.number} 次内容</Button></>}
+    </article>)}
+    <p className="small muted">未完成内容保留供查看与下载，不能直接当作完整候选采纳。</p>
+  </details>
 }
 
 export function JobResult({ job, onEvidence, onChoose, stale = false }: { job: JobDetail; onEvidence: (e: Evidence) => void; onChoose?: (index: number) => void; stale?: boolean }) {
@@ -45,8 +64,9 @@ export function ContextDetails({ context, onEvidence, excluded, onToggle }: { co
     {context.notices.map((s, i) => <p className="context-notice" key={i}>{s}</p>)}
     <details><summary>本次要求与作品方向</summary><p className="small">{context.instruction}</p><p className="small muted">本章意图：{context.chapter_goal || '未填写'}</p><p className="small muted">{context.author_brief?.premise || '未填写故事方向'}</p>{context.author_brief?.style && <p className="small muted">文风：{context.author_brief?.style}</p>}</details>
     {context.current_selection && <><h4>当前选段与附近原文</h4><div className="context-source"><p>{context.rewrite_surroundings?.before}</p><blockquote>{context.current_selection.text}</blockquote><p>{context.rewrite_surroundings?.after}</p></div></>}
-    {context.entities.length > 0 && <><h4>作者设定</h4>{context.entities.map(e => <div className="context-setting" key={e.id}><strong>{e.name}</strong><span>{e.summary}</span></div>)}</>}
-    <h4>原文来源 · {context.sources.length}</h4>{context.sources.map(source => <div className="context-source" key={source.source_id}><div className="context-source-title">{onToggle && source.kind !== 'draft' && <input type="checkbox" aria-label={`引用${source.chapter_title}的段落`} checked={!excluded?.includes(source.source_id)} onChange={() => onToggle(source.source_id)} />}<SourceButton evidence={{ ...source, quote: source.text }} onEvidence={onEvidence} /><Badge>{source.kind === 'draft' ? '当前稿' : '已确认'}</Badge></div><p>{source.text}</p></div>)}
+    {context.reference_notes && <details><summary>本章补充资料 · 非正史</summary><p className="reference-notes-preview">{context.reference_notes}</p></details>}
+    {context.entities.length > 0 && <><h4>作者设定</h4>{context.entities.map(e => <div className="context-setting" key={e.id}><strong>{e.name}{context.pinned_entity_ids?.includes(e.id) && <Badge>必读</Badge>}</strong><span>{e.summary}</span></div>)}</>}
+    <h4>原文来源 · {context.sources.length}</h4>{context.sources.map(source => <div className="context-source" key={source.source_id}><div className="context-source-title">{onToggle && source.kind !== 'draft' && <input type="checkbox" disabled={source.pinned} aria-label={`引用${source.chapter_title}的段落`} checked={source.pinned || !excluded?.includes(source.source_id)} onChange={() => onToggle(source.source_id)} />}<SourceButton evidence={{ ...source, quote: source.text }} onEvidence={onEvidence} /><Badge>{source.kind === 'draft' ? '当前稿' : source.pinned ? '本章必读' : '已确认'}</Badge></div><p>{source.text}</p></div>)}
     <h4>已确认事实 · {context.facts.length}</h4>{context.facts.map(f => <p className="small" key={f.id}>{f.claim}</p>)}
     {context.plans.length > 0 && <details><summary>未来规划 · 不作为已发生事实</summary>{context.plans.map(p => <p key={p.id}>{p.title}：{p.body}</p>)}</details>}
   </div>

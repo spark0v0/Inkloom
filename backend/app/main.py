@@ -22,6 +22,7 @@ from . import schemas as dto
 from .domain import TERMINAL_JOB_STATES, DomainError, split_manuscript
 from .jobs import Generation
 from .library import Library
+from .references import ChapterReferences
 from .seed import create_demo
 from .storage import PROJECT_DIR, Workspace
 from .workspace_io import activate_original, activate_restore, backup, restore
@@ -86,6 +87,7 @@ def create_app(data_dir: Path | None = None, *, worker: bool = True, port: int =
         workspace = Workspace(root)
         app.state.workspace = workspace
         app.state.library = Library(workspace)
+        app.state.references = ChapterReferences(workspace)
         app.state.generation = Generation(workspace)
         task = asyncio.create_task(app.state.generation.run()) if worker else None
         app.state.worker_task = task
@@ -164,6 +166,14 @@ def create_app(data_dir: Path | None = None, *, worker: bool = True, port: int =
     @app.patch(prefix + "/novels/{novel_id}/chapters/{chapter_id}", response_model=dto.ChapterOut)
     def edit_chapter(novel_id: str, chapter_id: str, data: dto.ChapterPatch, request: Request):
         return request.app.state.library.edit_chapter(novel_id, chapter_id, data)
+
+    @app.get(prefix + "/novels/{novel_id}/chapters/{chapter_id}/references", response_model=dto.ReferenceState)
+    def get_references(novel_id: str, chapter_id: str, request: Request):
+        return request.app.state.references.get(novel_id, chapter_id)
+
+    @app.put(prefix + "/novels/{novel_id}/chapters/{chapter_id}/references", response_model=dto.ReferenceState)
+    def save_references(novel_id: str, chapter_id: str, data: dto.ReferenceUpdate, request: Request):
+        return request.app.state.references.save(novel_id, chapter_id, data)
 
     @app.post(prefix + "/novels/{novel_id}/chapters/{chapter_id}/versions", response_model=dto.VersionOut)
     def save_version(novel_id: str, chapter_id: str, data: dto.SaveInput, request: Request):
