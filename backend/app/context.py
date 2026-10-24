@@ -20,6 +20,7 @@ RESULT_SCHEMAS = {
     "extract": dto.ExtractResult, "review": dto.ReviewResult,
     "plan": dto.PlanResult, "handoff": dto.HandoffResult,
     "blueprint": dto.BlueprintResult, "outline": dto.OutlineResult,
+    "inspiration": dto.InspirationResult,
 }
 
 
@@ -66,6 +67,8 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
     provider = session.get(Provider, request.provider_id)
     if provider is None:
         raise DomainError("PROVIDER_NOT_FOUND", "请先选择或配置模型连接。", 404)
+    from .inspiration import chosen_direction
+    direction = chosen_direction(session, novel_id, request)
     if request.task == "continue":
         if novel.dirty_from_order is not None and chapter.position > novel.dirty_from_order:
             raise DomainError("CANON_DIRTY", f"第 {novel.dirty_from_order} 章起的正史待复核。"
@@ -223,6 +226,8 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
     }
     if production is not None:
         input_body["production"] = production
+    if direction is not None:
+        input_body["inspiration_direction"] = direction
     input_body["author_brief"].update({"platform": novel.platform,
         "target_words": str(novel.target_words), "chapter_words": str(novel.chapter_words)})
     if request.task == "rewrite" and request.selection:
@@ -274,7 +279,9 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
                                              input_body["draft_sources"] + prior_sources + fact_sources + optional_sources]}),
         estimated_max_cost=estimated_max, currency=provider.currency,
         provider_name=provider.name, model=provider.model, is_demo=provider.kind == "demo",
-        provider_url=provider.base_url)
+        provider_url=provider.base_url,
+        inspiration_title=direction["direction"]["title"] if direction else None,
+        inspiration_reference=request.inspiration)
     return {"preview": preview.model_dump(), "messages": messages_for(), "provider": config,
             "base_text": version.text, "target_chars": request.target_chars,
             "canon_checkpoint": canon_checkpoint(session, novel_id, chapter.position),
@@ -294,6 +301,13 @@ def validate_result(task: str, raw: dict[str, Any], context: dict[str, Any]) -> 
             if any(character not in entity_ids for character in change["known_by"]):
                 raise DomainError("INVALID_EVIDENCE", "模型引用了不属于本书的人物。")
             change["evidence"] = [resolve_evidence(e, draft_sources) for e in change["evidence"]]
+    elif task == "inspiration":
+        from .domain import resolve_evidence
+        titles = [option["title"].strip() for option in result["options"]]
+        if any(not title for title in titles) or len(set(titles)) != 3:
+            raise DomainError("INVALID_INSPIRATION", "请提供三个标题明确且不同的剧情方向。")
+        for option in result["options"]:
+            option["evidence"] = [resolve_evidence(e, sources) for e in option["evidence"]]
     elif task == "review":
         from .domain import resolve_evidence
         for finding in result["findings"]:

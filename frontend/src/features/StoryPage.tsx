@@ -4,7 +4,7 @@ import { ArrowRight, BookOpen, MagnifyingGlass, Plus, User, GlobeHemisphereWest,
 import { api, dateLabel, errorText } from '../lib/api'
 import type { Entity, EntityInput, Evidence, Novel } from '../lib/api'
 import { Badge, Button, Empty, Field, Loading, Modal, Notice, PageHeading } from '../components/ui'
-import { SourceButton } from './Assistant'
+import { SourceButton } from './JobPresentation'
 
 const kinds = { character: '人物', world: '世界设定', thread: '伏笔', timeline: '时间线' } as const
 const icons = { character: User, world: GlobeHemisphereWest, thread: GitBranch, timeline: Clock }

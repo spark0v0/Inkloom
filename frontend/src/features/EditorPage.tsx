@@ -10,7 +10,9 @@ import type { Chapter, ChapterSummary, Evidence, JobInput, MemoryProposal, Novel
 import type { Navigate } from '../lib/route'
 import { useManuscript } from '../lib/useManuscript'
 import { Badge, Button, Field, Loading, Modal, Notice } from '../components/ui'
-import { Assistant, SourceButton, useJobStream } from './Assistant'
+import { Assistant } from './Assistant'
+import { SourceButton } from './JobPresentation'
+import { useJobStream } from '../lib/useJobStream'
 import { ChapterList } from './ChapterList'
 
 type Props = { novel: Novel; chapter: Chapter; chapters: ChapterSummary[]; workspaceId: string; providers: Provider[]; roles: Roles; navigate: Navigate; onEvidence: (e: Evidence) => void; registerGuard: (guard: (() => Promise<unknown>) | null) => void }
@@ -23,7 +25,8 @@ export function EditorPage({ novel, chapter, chapters, workspaceId, providers, r
   const [candidateHost, setCandidateHost] = useState<HTMLDivElement | null>(null)
   const [candidateView, setCandidateView] = useState(false)
   const [hasCandidate, setHasCandidate] = useState(false)
-  const candidateChanged = useCallback((_id: string, show: boolean) => { setHasCandidate(true); if (show) setCandidateView(true) }, [])
+  const [candidateLabel, setCandidateLabel] = useState('AI 草稿')
+  const candidateChanged = useCallback((_id: string, show: boolean, label = 'AI 草稿') => { setHasCandidate(true); setCandidateLabel(label); if (show) setCandidateView(true) }, [])
   useEffect(() => {
     const media = window.matchMedia('(max-width:1100px)')
     const change = () => { setCompact(media.matches); if (media.matches) setCandidateView(false) }
@@ -120,7 +123,7 @@ export function EditorPage({ novel, chapter, chapters, workspaceId, providers, r
   return <div className={`writing-layout ${!assistantOpen ? 'assistant-hidden' : ''} ${focused ? 'writing-focus' : ''}`}>
     <div className="desktop-directory"><ChapterList novel={novel} chapters={chapters} currentId={chapter.id} navigate={navigate} beforeCreate={manuscript.flush} /></div>
     <section className={`editor-panel ${candidateView ? 'viewing-candidate' : ''}`} aria-label="章节写作">
-      {!compact && <nav className="document-tabs" aria-label="稿件视图"><button aria-pressed={!candidateView} onClick={() => setCandidateView(false)}>正文</button><button aria-pressed={candidateView} disabled={!hasCandidate || !assistantOpen} onClick={() => setCandidateView(true)}>AI 草稿</button><span>{chapter.title}</span></nav>}
+      {!compact && <nav className="document-tabs" aria-label="稿件视图"><button aria-pressed={!candidateView} onClick={() => setCandidateView(false)}>正文</button><button aria-pressed={candidateView} disabled={!hasCandidate || !assistantOpen} onClick={() => setCandidateView(true)}>{candidateLabel}</button><span>{chapter.title}</span></nav>}
       <div className="editor-toolbar"><div className="button-row"><button className="icon-button mobile-directory-toggle" aria-label="打开章节目录" onClick={() => setDirectoryOpen(true)}><List size={20} /></button><span className="editor-volume">{chapter.volume}</span><span className="toolbar-divider" /><button className={`icon-button ${editor?.isActive('bold') ? 'selected' : ''}`} aria-label="加粗" aria-pressed={editor?.isActive('bold')} onMouseDown={e => e.preventDefault()} onClick={() => editor?.chain().focus().toggleBold().run()}><TextB size={18} /></button><button className="icon-button" aria-label="斜体" onMouseDown={e => e.preventDefault()} onClick={() => editor?.chain().focus().toggleItalic().run()}><TextItalic size={18} /></button><button className="icon-button" aria-label="撤销" onClick={() => editor?.chain().focus().undo().run()}><ArrowCounterClockwise size={17} /></button><button className="icon-button" aria-label="重做" onClick={() => editor?.chain().focus().redo().run()}><ArrowClockwise size={17} /></button></div><div className="button-row"><label className="font-size-label"><span className="sr-only">正文字号</span><select aria-label="正文字号" value={fontSize} onChange={e => setFontSize(Number(e.target.value))}><option value={16}>16</option><option value={18}>18</option><option value={20}>20</option><option value={22}>22</option></select></label><button className="icon-button focus-toggle" aria-label={focused ? '退出专注写作' : '专注写作'} onClick={() => setFocused(!focused)}><Article size={19} /></button><button className="icon-button desktop-assistant-toggle" aria-label={assistantOpen ? '收起写作助手' : '展开写作助手'} onClick={() => { setAssistantOpen(!assistantOpen); setCandidateView(false) }}><SidebarSimple size={19} /></button><button className="icon-button mobile-assistant-toggle" aria-label="打开写作助手" onClick={() => setMobileAssistant(true)}><Sparkle size={20} /></button></div></div>
       <div className="candidate-host" ref={setCandidateHost} hidden={!candidateView} />
       <div className="editor-scroll" hidden={candidateView}>
@@ -165,7 +168,7 @@ function CanonDialog({ novel, chapter, version, proposed: initialProposed, onEvi
   const [proposed, setProposed] = useState(initialProposed)
   const [providerId, setProviderId] = useState(roles.extractor || 'demo')
   const [jobId, setJobId] = useState<string | null>(null)
-  const jobs = useQuery({ queryKey: ['jobs', novel.id], queryFn: () => api.jobs(novel.id) })
+  const jobs = useQuery({ queryKey: ['jobs', novel.id, chapter.id, 'extract'], queryFn: () => api.jobs(novel.id, { chapter_id: chapter.id, task: 'extract' }) })
   const matching = jobId || jobs.data?.find(j => j.chapter_id === chapter.id && j.base_version_id === version.id && j.task === 'extract' && !['cancelled', 'failed'].includes(j.state))?.id
   const job = useQuery({ queryKey: ['job', matching], queryFn: () => api.job(matching!, novel.id), enabled: !!matching, refetchInterval: q => q.state.data && activeStates.has(q.state.data.state) ? 600 : false })
   useJobStream(job.data)

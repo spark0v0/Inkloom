@@ -250,6 +250,28 @@ class HandoffResult(Schema):
     next_suggestions: list[str] = Field(default_factory=list)
 
 
+class InspirationOption(Schema):
+    title: str = Field(min_length=1, max_length=160)
+    event: str = Field(min_length=1, max_length=1600)
+    motivation: str = Field(min_length=1, max_length=1200)
+    choice: str = Field(min_length=1, max_length=1200)
+    cost: str = Field(min_length=1, max_length=1200)
+    beats: list[Annotated[str, Field(min_length=1, max_length=600)]] = Field(min_length=2, max_length=4)
+    required_setup: list[Annotated[str, Field(min_length=1, max_length=600)]] = Field(default_factory=list, max_length=5)
+    evidence: list[Evidence] = Field(default_factory=list, max_length=5)
+
+
+class InspirationResult(Schema):
+    kind: Literal["inspiration"]
+    diagnosis: str = Field(min_length=1, max_length=1500)
+    options: list[InspirationOption] = Field(min_length=3, max_length=3)
+
+
+class InspirationReference(Schema):
+    job_id: str = Field(min_length=1, max_length=160)
+    option_index: int = Field(ge=0, le=2)
+
+
 class BlueprintCharacter(Schema):
     name: str = Field(min_length=1, max_length=160)
     role: str = Field(min_length=1, max_length=240)
@@ -305,7 +327,9 @@ class ProductionApplyOut(Schema):
     plan_ids: list[str]
 
 
-TaskResult = ExtractResult | ReviewResult | PlanResult | HandoffResult | BlueprintResult | OutlineResult
+TaskResult = ExtractResult | ReviewResult | PlanResult | HandoffResult | BlueprintResult | OutlineResult | InspirationResult
+
+TaskName = Literal["continue", "rewrite", "plan", "extract", "review", "handoff", "blueprint", "outline", "inspiration"]
 
 
 class Selection(Schema):
@@ -317,7 +341,7 @@ class Selection(Schema):
 class ContextInput(Schema):
     chapter_id: str
     base_version_id: str
-    task: Literal["continue", "rewrite", "plan", "extract", "review", "handoff", "blueprint", "outline"]
+    task: TaskName
     instruction: str = Field(default="", max_length=12000)
     provider_id: str = "demo"
     excluded_source_ids: list[str] = Field(default_factory=list, max_length=500)
@@ -325,6 +349,7 @@ class ContextInput(Schema):
     target_chars: int = Field(default=500, ge=100, le=6000)
     volume_plan_id: str | None = None
     chapter_batch: int = Field(default=5, ge=3, le=20)
+    inspiration: InspirationReference | None = None
 
 
 class ContextOut(Schema):
@@ -356,6 +381,8 @@ class ContextOut(Schema):
     model: str
     is_demo: bool
     provider_url: str = ""
+    inspiration_title: str | None = None
+    inspiration_reference: InspirationReference | None = None
 
 
 class JobInput(ContextInput):

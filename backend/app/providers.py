@@ -172,6 +172,24 @@ def demo_text(task: str, context: dict[str, Any]) -> str:
                 "ending_hook": "证据指向一个本不该出现的人。"} for number in range(
                     production["start_number"], production["start_number"] + production["chapter_count"])]}, ensure_ascii=False)
     sources = body.get("draft_sources", [])
+    if task == "inspiration":
+        evidence = [{"source_id": sources[0]["source_id"], "quote": sources[0]["text"][:100]}] if sources else []
+        return json.dumps({"kind": "inspiration",
+            "diagnosis": "演示诊断：可以从人物的选择、对手的行动或已有线索，寻找接下来的事件。这是固定样例。",
+            "options": [{"title": title, "event": event, "motivation": motivation,
+                "choice": choice, "cost": cost, "beats": beats, "evidence": evidence,
+                "required_setup": ["演示方向，请核对是否符合本书人物和设定，所需铺垫尚未确认为事实。"]}
+                for title, event, motivation, choice, cost, beats in [
+                    ("让线索带来代价", "下一条线索需要用一件主角不愿公开的事交换。",
+                     "知情者想先保护自己的利益。", "公开秘密换取线索，还是另找办法？",
+                     "获得信息的同时，失去一部分他人的信任。", ["提出交换条件", "主角权衡后作出选择", "选择带来新的阻力"]),
+                    ("让对手先一步行动", "主角准备行动时，对手抢先控制了关键去处。",
+                     "对手也有自己的目标，不会原地等待。", "正面交涉，还是迂回寻找机会？",
+                     "迂回会失去时间，正面交涉则暴露意图。", ["发现原路径被阻断", "寻找对手的顾虑", "用一次冒险换取突破"]),
+                    ("重新审视已有线索", "主角发现手中线索与自己先前的理解不同。",
+                     "主角为解决当前困难，主动回查已有信息。", "相信原来的判断，还是承担推翻判断的后果？",
+                     "需要承认此前的失误，并放弃一个看似可靠的机会。", ["回看原有线索", "核对另一种解释", "据此采取一个可验证的行动"])
+                ]]}, ensure_ascii=False)
     changes = []
     for source in sources[:3]:
         quote = source["text"][:100]

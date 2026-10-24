@@ -842,7 +842,7 @@ export interface components {
              * Task
              * @enum {string}
              */
-            task: "continue" | "rewrite" | "plan" | "extract" | "review" | "handoff" | "blueprint" | "outline";
+            task: "continue" | "rewrite" | "plan" | "extract" | "review" | "handoff" | "blueprint" | "outline" | "inspiration";
             /**
              * Instruction
              * @default
@@ -868,6 +868,7 @@ export interface components {
              * @default 5
              */
             chapter_batch: number;
+            inspiration?: components["schemas"]["InspirationReference"] | null;
         };
         /** ContextOut */
         ContextOut: {
@@ -939,6 +940,9 @@ export interface components {
              * @default
              */
             provider_url: string;
+            /** Inspiration Title */
+            inspiration_title?: string | null;
+            inspiration_reference?: components["schemas"]["InspirationReference"] | null;
         };
         /** EntityInput */
         EntityInput: {
@@ -1175,6 +1179,44 @@ export interface components {
             /** Text */
             text: string;
         };
+        /** InspirationOption */
+        InspirationOption: {
+            /** Title */
+            title: string;
+            /** Event */
+            event: string;
+            /** Motivation */
+            motivation: string;
+            /** Choice */
+            choice: string;
+            /** Cost */
+            cost: string;
+            /** Beats */
+            beats: string[];
+            /** Required Setup */
+            required_setup?: string[];
+            /** Evidence */
+            evidence?: components["schemas"]["Evidence"][];
+        };
+        /** InspirationReference */
+        InspirationReference: {
+            /** Job Id */
+            job_id: string;
+            /** Option Index */
+            option_index: number;
+        };
+        /** InspirationResult */
+        InspirationResult: {
+            /**
+             * Kind
+             * @constant
+             */
+            kind: "inspiration";
+            /** Diagnosis */
+            diagnosis: string;
+            /** Options */
+            options: components["schemas"]["InspirationOption"][];
+        };
         /** JobDetail */
         JobDetail: {
             /** Id */
@@ -1196,7 +1238,7 @@ export interface components {
             /** Output Text */
             output_text: string;
             /** Result */
-            result: components["schemas"]["ExtractResult"] | components["schemas"]["ReviewResult"] | components["schemas"]["PlanResult"] | components["schemas"]["HandoffResult"] | components["schemas"]["BlueprintResult"] | components["schemas"]["OutlineResult"] | null;
+            result: components["schemas"]["ExtractResult"] | components["schemas"]["ReviewResult"] | components["schemas"]["PlanResult"] | components["schemas"]["HandoffResult"] | components["schemas"]["BlueprintResult"] | components["schemas"]["OutlineResult"] | components["schemas"]["InspirationResult"] | null;
             /** Candidate Status */
             candidate_status: string;
             /** Adopted Version Id */
@@ -1237,7 +1279,7 @@ export interface components {
              * Task
              * @enum {string}
              */
-            task: "continue" | "rewrite" | "plan" | "extract" | "review" | "handoff" | "blueprint" | "outline";
+            task: "continue" | "rewrite" | "plan" | "extract" | "review" | "handoff" | "blueprint" | "outline" | "inspiration";
             /**
              * Instruction
              * @default
@@ -1263,6 +1305,7 @@ export interface components {
              * @default 5
              */
             chapter_batch: number;
+            inspiration?: components["schemas"]["InspirationReference"] | null;
             /** Idempotency Key */
             idempotency_key: string;
             /**
@@ -1294,7 +1337,7 @@ export interface components {
             /** Output Text */
             output_text: string;
             /** Result */
-            result: components["schemas"]["ExtractResult"] | components["schemas"]["ReviewResult"] | components["schemas"]["PlanResult"] | components["schemas"]["HandoffResult"] | components["schemas"]["BlueprintResult"] | components["schemas"]["OutlineResult"] | null;
+            result: components["schemas"]["ExtractResult"] | components["schemas"]["ReviewResult"] | components["schemas"]["PlanResult"] | components["schemas"]["HandoffResult"] | components["schemas"]["BlueprintResult"] | components["schemas"]["OutlineResult"] | components["schemas"]["InspirationResult"] | null;
             /** Candidate Status */
             candidate_status: string;
             /** Adopted Version Id */
@@ -2596,6 +2639,8 @@ export interface operations {
         parameters: {
             query?: {
                 novel_id?: string | null;
+                chapter_id?: string | null;
+                task?: ("continue" | "rewrite" | "plan" | "extract" | "review" | "handoff" | "blueprint" | "outline" | "inspiration") | null;
             };
             header?: never;
             path?: never;

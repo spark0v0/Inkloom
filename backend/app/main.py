@@ -222,8 +222,9 @@ def create_app(data_dir: Path | None = None, *, worker: bool = True, port: int =
         return request.app.state.generation.create(novel_id, data)
 
     @app.get(prefix + "/jobs", response_model=list[dto.JobOut])
-    def jobs(request: Request, novel_id: str | None = None):
-        return request.app.state.generation.list(novel_id)
+    def jobs(request: Request, novel_id: str | None = None, chapter_id: str | None = None,
+             task: dto.TaskName | None = None):
+        return request.app.state.generation.list(novel_id, chapter_id, task)
 
     @app.get(prefix + "/jobs/{job_id}", response_model=dto.JobDetail)
     def job(job_id: str, novel_id: str, request: Request):

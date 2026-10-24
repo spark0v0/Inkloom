@@ -4,6 +4,104 @@ import AxeBuilder from '@axe-core/playwright'
 import { resolve } from 'node:path'
 import { createServer } from 'node:http'
 
+test('卡剧情找灵感、选中方向续写、刷新恢复与采纳', async ({ page }, testInfo) => {
+  test.setTimeout(60000)
+  await create(page, '灵感闭环')
+  const original = '陈序拿到账本，发现里面夹着一封未署名的信。他不知道该先找谁。'
+  await write(page, original)
+  const submissions: Record<string, any>[] = []
+  page.on('request', request => {
+    if (request.method() === 'POST' && /\/novels\/[^/]+\/jobs$/.test(request.url())) submissions.push(request.postDataJSON())
+  })
+  let panel = await assistant(page)
+  await panel.getByRole('button', { name: '找灵感', exact: true }).click()
+  await panel.getByLabel('卡在哪里？').selectOption('人物没有理由行动')
+  await panel.getByRole('button', { name: '找三个走向', exact: true }).click()
+  await expect(page.locator('.inspiration-card:visible')).toHaveCount(3)
+  expect(submissions).toHaveLength(1)
+  expect(submissions[0].task).toBe('inspiration')
+  expect(submissions[0].instruction).toContain('人物没有理由行动')
+  if (testInfo.project.name === 'mobile') await expect(page.locator('.inspiration-card:visible').first().getByRole('heading')).toBeInViewport()
+  await page.screenshot({ path: resolve(`../docs/screenshots/inspiration-${testInfo.project.name}.png`) })
+  await page.locator('.inspiration-card:visible').first().getByText('展开情节与依据', { exact: true }).click()
+  await expect(page.locator('.inspiration-card:visible').first().getByText('需要补充或核对的铺垫', { exact: true })).toBeVisible()
+  await closeAssistant(page)
+  await expect(page.getByRole('textbox', { name: '小说正文' })).toHaveText(original)
+  await page.reload()
+  panel = await assistant(page)
+  if (await page.getByRole('button', { name: '剧情灵感', exact: true }).isVisible()) await page.getByRole('button', { name: '剧情灵感', exact: true }).click()
+  await expect(page.locator('.inspiration-card:visible')).toHaveCount(3)
+  expect(submissions).toHaveLength(1)
+  await page.locator('.inspiration-card:visible').nth(1).getByRole('button', { name: '用这个方向续写' }).click()
+  await expect(panel.getByText('已选：让对手先一步行动', { exact: true })).toBeVisible()
+  expect(submissions).toHaveLength(1) // Choosing is not a paid generation.
+  await panel.getByRole('button', { name: '按此方向续写', exact: true }).click()
+  const adopt = page.getByRole('button', { name: '采纳正文', exact: true })
+  await expect(adopt).toBeVisible()
+  expect(submissions).toHaveLength(2)
+  expect(submissions[1].task).toBe('continue')
+  expect(submissions[1].inspiration.option_index).toBe(1)
+  await adopt.click()
+  await closeAssistant(page)
+  await expect(page.getByRole('textbox', { name: '小说正文' })).toContainText(original)
+  await expect(page.getByRole('textbox', { name: '小说正文' })).toContainText('门外的脚步声停了')
+  await page.reload()
+  await expect(page.getByRole('textbox', { name: '小说正文' })).toContainText('门外的脚步声停了')
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+})
+
+test('改稿后旧灵感不能直接续写，找灵感前先保存', async ({ page }) => {
+  test.setTimeout(60000)
+  await create(page, '灵感基线保护')
+  const text = '这份刚输入的原稿必须先保存，再作为灵感参考。'
+  await page.getByRole('textbox', { name: '小说正文' }).fill(text)
+  let panel = await assistant(page)
+  await panel.getByRole('button', { name: '找灵感', exact: true }).click()
+  await panel.getByRole('button', { name: '找三个走向', exact: true }).click()
+  await expect(page.locator('.inspiration-card:visible')).toHaveCount(3)
+  await closeAssistant(page)
+  await expect(page.getByRole('textbox', { name: '小说正文' })).toHaveText(text)
+  await write(page, '主角烧掉了账本，原来的局面已经改变。')
+  panel = await assistant(page)
+  if (await page.getByRole('button', { name: '剧情灵感', exact: true }).isVisible()) await page.getByRole('button', { name: '剧情灵感', exact: true }).click()
+  await expect(page.locator('.inspiration-card:visible').first().getByRole('button', { name: '用这个方向续写' })).toBeDisabled()
+  await expect(page.getByText('正文或参考已变化，旧方向仍可阅读。请重新找灵感后再用于续写。', { exact: true })).toBeVisible()
+  await panel.getByRole('button', { name: '找灵感', exact: true }).click()
+  await panel.getByRole('button', { name: '找三个走向', exact: true }).click()
+  await expect(page.locator('.inspiration-card:visible').first().getByRole('button', { name: '用这个方向续写' })).toBeEnabled()
+})
+
+test('写作提交回执丢失时保留同一请求并锁定参数', async ({ page }) => {
+  test.setTimeout(60000)
+  await create(page, '提交保护')
+  await write(page, '陈序把账本放在桌上。')
+  const panel = await assistant(page)
+  await panel.getByRole('button', { name: '找灵感', exact: true }).click()
+  let lost = false
+  const bodies: Record<string, any>[] = []
+  await page.route('**/novels/*/jobs', async route => {
+    if (route.request().method() !== 'POST') return route.continue()
+    bodies.push(route.request().postDataJSON())
+    const response = await route.fetch()
+    if (!lost) { lost = true; return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ code: 'LOST_ACK', message: '测试：提交回执丢失' }) }) }
+    return route.fulfill({ response })
+  })
+  await panel.getByRole('button', { name: '找三个走向', exact: true }).click()
+  await expect(panel.getByRole('button', { name: '确认上次提交', exact: true })).toBeVisible()
+  await expect(panel.getByLabel('卡在哪里？')).toBeDisabled()
+  await expect(panel.getByRole('button', { name: '写作', exact: true })).toBeDisabled()
+  await expect(panel.getByRole('textbox', { name: '本次写作要求' })).toBeDisabled()
+  await panel.getByRole('button', { name: '确认上次提交', exact: true }).click()
+  await expect(page.locator('.inspiration-card:visible')).toHaveCount(3)
+  expect(bodies).toHaveLength(2)
+  expect(bodies[1]).toEqual(bodies[0])
+  const jobs = await page.evaluate(async () => {
+    const novelId = location.hash.split('/')[2]
+    return (await (await fetch('/api/v1/jobs?novel_id=' + novelId)).json())
+  })
+  expect(jobs.filter((job: any) => job.task === 'inspiration')).toHaveLength(1)
+})
+
 async function create(page: Page, name: string, enterEditor = true) {
   await page.goto('/')
   await page.getByRole('button', { name: '新建小说', exact: true }).click()
@@ -22,7 +120,7 @@ async function write(page: Page, text: string) {
   await expect(page.getByText('已保存', { exact: true })).toBeVisible()
 }
 async function assistant(page: Page) {
-  await expect(page.getByRole('textbox', { name: '小说正文' })).toBeVisible()
+  await expect(page.locator('.editor-panel')).toBeVisible()
   const opener = page.getByRole('button', { name: '打开写作助手', exact: true })
   if (await opener.isVisible()) await opener.click()
   return page.locator('.assistant-panel:visible')
@@ -320,7 +418,7 @@ test('任务已提交但响应失败，重试复用同一任务', async ({ page 
   const panel = await assistant(page)
   await panel.locator('.assistant-form').getByRole('button', { name: /^(重写本章正文|生成本章正文|润色选段)$/, exact: true }).click()
   await expect(panel.getByText('测试：提交已到达，响应未确认。')).toBeVisible()
-  await panel.locator('.assistant-form').getByRole('button', { name: /^(重写本章正文|生成本章正文|润色选段)$/, exact: true }).click()
+  await panel.locator('.assistant-form').getByRole('button', { name: '确认上次提交', exact: true }).click()
   await expect(page.getByRole('button', { name: '对比原稿', exact: true })).toBeVisible()
   const ids = new URL(page.url()).hash.split('/')
   const jobs = await page.evaluate(async novelId => (await (await fetch('/api/v1/jobs?novel_id=' + novelId)).json()), ids[2])
@@ -370,6 +468,15 @@ test('AI 建书、章节细纲、整章生成、记忆定稿、下一章与连�
   const download = page.waitForEvent('download')
   await exporting.getByRole('button', { name: '下载正文', exact: true }).click()
   expect((await download).suggestedFilename()).toMatch(/\.zip$/)
+  await expect(exporting).not.toBeVisible()
+  const novelId = new URL(page.url()).hash.split('/')[2]
+  await page.goto(`/#/jobs/${novelId}`)
+  await page.locator('.job-row').filter({ hasText: '全书方案' }).click()
+  const record = page.getByRole('dialog', { name: '任务记录', exact: true })
+  await expect(record.getByRole('heading', { name: '作品简介', exact: true })).toBeVisible()
+  await record.getByRole('button', { name: '关闭对话框', exact: true }).click()
+  await page.locator('.job-row').filter({ hasText: '章节细纲' }).click()
+  await expect(record.locator('.outline-preview')).toContainText('雨夜来信')
 })
 
 test('首个模型连接可同时用于全部创作环节', async ({ page }, testInfo) => {

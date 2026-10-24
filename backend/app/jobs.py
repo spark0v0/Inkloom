@@ -10,6 +10,7 @@ from typing import Any
 
 from pydantic import ValidationError
 from sqlalchemy import func, select
+from sqlalchemy.orm import load_only
 
 from . import schemas as dto
 from .context import RESULT_SCHEMAS, build_context, context_current, validate_result
@@ -182,13 +183,21 @@ class Generation:
         with self.ws.session() as s:
             return public_job(s, require_job(s, novel_id, job_id), True)
 
-    def list(self, novel_id: str | None = None) -> list[dto.JobOut]:
+    def list(self, novel_id: str | None = None, chapter_id: str | None = None,
+             task: dto.TaskName | None = None) -> list[dto.JobOut]:
         with self.ws.session() as s:
-            query = select(Job)
+            query = select(Job).options(load_only(*(getattr(Job, name) for name in dto.JobOut.model_fields)))
             if novel_id:
                 require_novel(s, novel_id)
                 query = query.where(Job.novel_id == novel_id)
-            return [public_job(s, j) for j in s.scalars(query.order_by(Job.created_at.desc()).limit(150)).all()]
+            if chapter_id:
+                if not novel_id:
+                    raise DomainError("NOVEL_REQUIRED", "按章节查询任务时需要指定作品。")
+                require_chapter(s, novel_id, chapter_id)
+                query = query.where(Job.chapter_id == chapter_id)
+            if task:
+                query = query.where(Job.task == task)
+            return [public_job(s, j) for j in s.scalars(query.order_by(Job.created_at.desc(), Job.id.desc()).limit(150)).all()]
 
     def events(self, novel_id: str, job_id: str, after: int) -> tuple[list[dto.JobEventOut], str]:
         with self.ws.session() as s:

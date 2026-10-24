@@ -2,11 +2,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { ArrowRight, BookOpen, CaretRight, Check, CheckCircle, FileText, PencilSimple, Plus, Sparkle, Stop } from '@phosphor-icons/react'
 import { activeStates, api, ApiError, errorText, jobStateNames, number, uuid } from '../lib/api'
-import type { Blueprint, ChapterSummary, JobInput, Novel, Outline, Plan, PlanInput, Provider } from '../lib/api'
+import type { Blueprint, ChapterSummary, JobInput, Novel, Plan, PlanInput, Provider } from '../lib/api'
 import type { Navigate } from '../lib/route'
 import { nextWritingChapter } from '../lib/workflow'
 import { Badge, Button, Empty, Field, Loading, Modal, Notice } from '../components/ui'
-import { useJobStream } from './Assistant'
+import { useJobStream } from '../lib/useJobStream'
+import { BlueprintView, OutlineView } from './ProductionResults'
 
 const labels = { book: '全书', volume: '分卷', chapter: '章节', scene: '场景' }
 
@@ -90,14 +91,6 @@ export function PlanningPage({ novel, navigate }: { novel: Novel; navigate: Navi
 
 function ChapterRow({ chapter, onOpen }: { chapter: ChapterSummary; onOpen: () => void }) {
   return <button className="chapter-table-row" onClick={onOpen}><strong>{chapter.title}</strong><p>{chapter.goal.split('\n')[0] || '尚未填写细纲'}</p><span className={`chapter-row-state ${chapter.review_state === 'confirmed' ? 'complete' : ''}`}>{chapter.review_state === 'confirmed' ? <CheckCircle size={17} weight="fill" /> : <FileText size={17} />}{chapter.review_state === 'confirmed' ? '已定稿' : chapter.review_state === 'needs_review' ? '待复核' : chapter.char_count ? '草稿' : '待创作'}</span><CaretRight size={17} /></button>
-}
-
-export function BlueprintView({ value }: { value: Blueprint }) {
-  return <div className="blueprint-document"><div className="blueprint-logline"><h2>{value.title}</h2><p>{value.logline}</p></div><section><h3>作品简介</h3><p>{value.blurb}</p></section><div className="blueprint-columns"><section><h3>阅读期待</h3><p>{value.reader_promise}</p></section><section><h3>主线冲突</h3><p>{value.main_conflict}</p></section></div><section><h3>主要人物</h3><div className="blueprint-characters">{value.characters.map((c, i) => <article key={i}><span className="character-initial">{Array.from(c.name)[0]}</span><div><h4>{c.name}<small>{c.role}</small></h4><p>{c.motivation}</p><p className="muted">{c.arc}</p></div></article>)}</div></section><section><h3>世界与规则</h3>{value.world.map((w, i) => <p key={i}><strong>{w.name}：</strong>{w.rule}</p>)}</section><section><h3>分卷</h3>{value.volumes.map((v, i) => <div className="blueprint-volume" key={i}><strong>{v.title}</strong><span>计划 {v.planned_chapters} 章</span><p>{v.summary}</p><p className="muted">高潮：{v.climax}</p><p className="muted">卷末：{v.ending_hook}</p></div>)}</section><details><summary>结局方向与文风</summary><p>{value.ending}</p><p>{value.style_guide}</p></details></div>
-}
-
-function OutlineView({ value }: { value: Outline }) {
-  return <div className="outline-preview"><h2>{value.volume_title}</h2>{value.chapters.map(c => <article key={c.number}><h3>第{c.number}章 {c.title}</h3><p>{c.goal}</p><dl><dt>冲突</dt><dd>{c.conflict}</dd><dt>情节</dt><dd><ol>{c.beats.map((b, i) => <li key={i}>{b}</li>)}</ol></dd><dt>章末</dt><dd>{c.ending_hook}</dd></dl></article>)}</div>
 }
 
 function ProductionPanel({ novel, kind, volume, resumeId, onSettings, onClose, onApplied }: { novel: Novel; kind: 'blueprint' | 'outline'; volume?: Plan; resumeId: string | null; onSettings: () => void; onClose: () => void; onApplied: (ids: string[]) => Promise<void> }) {

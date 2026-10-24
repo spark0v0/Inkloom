@@ -269,3 +269,34 @@ summary,.small,.field-help { font-size:13px; }
   .production-controls .form-row { grid-template-columns:1fr; }.setup-ready { flex-wrap:wrap; }
   .setup-ready .btn { width:100%; }.setup-alternative { flex-wrap:wrap; }
 }
+.inspiration-result { display:grid; gap:18px; font-size:15px; line-height:1.8; overflow-wrap:anywhere; padding-bottom:24px; }
+.inspiration-diagnosis { padding:20px; border-radius:8px; background:var(--accent-soft,#f0f5ff); }
+.inspiration-diagnosis h3,.inspiration-card h3 { margin:0; font-size:18px; line-height:1.5; }
+.inspiration-diagnosis p { margin:10px 0 0; }
+.inspiration-result > .small { margin:0; }
+.inspiration-card { border:1px solid var(--border,#e3e8f0); border-radius:8px; padding:22px; background:white; }
+.inspiration-card-heading { display:flex; align-items:flex-start; gap:12px; }
+.inspiration-number { flex-shrink:0; display:grid; place-items:center; width:32px; height:32px; border-radius:50%; color:var(--accent); background:var(--accent-soft,#f0f5ff); font-weight:700; }
+.inspiration-card > p { margin:14px 0; }
+.inspiration-card details { margin:14px 0; }
+.inspiration-card summary { min-height:44px; display:list-item; cursor:pointer; color:var(--muted,#596579); }
+.inspiration-card dl { margin:12px 0; }
+.inspiration-card dt { font-weight:600; margin-top:12px; }
+.inspiration-card dd { margin:4px 0 0; }
+.inspiration-card h4 { margin:18px 0 6px; font-size:15px; }
+.inspiration-card ul,.inspiration-card ol { margin:6px 0; padding-left:23px; }
+.inspiration-setup { padding:4px 12px 12px; background:#fff9ed; border-left:3px solid #c88318; }
+.inspiration-evidence blockquote { margin:10px 0 4px; padding:8px 12px; border-left:2px solid var(--border,#e3e8f0); color:var(--muted,#596579); }
+.selected-direction { padding:14px; border:1px solid #bfd1fa; border-radius:8px; background:#f4f7ff; font-size:14px; }
+.selected-direction p { margin:6px 0; }
+.assistant-tabs { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.assistant-tabs > button { flex:1; }
+.assistant-inputs { border:0; padding:0; margin:0; min-width:0; }
+.assistant-inputs > .field + .field,.assistant-inputs > .selected-direction + .field { margin-top:16px; }
+@media (max-width:600px) {
+  .inspiration-card { padding:16px; }
+  .inspiration-diagnosis { padding:16px; }
+  .inspiration-card > .btn { width:100%; min-height:44px; }
+  .assistant-modal .inspiration-result { font-size:15px; }
+  .inspiration-card h3 { font-size:17px; }
+}

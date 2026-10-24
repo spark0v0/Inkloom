@@ -88,7 +88,10 @@ export const api = {
   search: (id: string, q: string) => request<Schema['SearchResult'][]>(npath(id) + '/search?q=' + encodeURIComponent(q)),
   context: (id: string, data: ContextInput) => request<Context>(npath(id) + '/context', { method: 'POST', body: JSON.stringify(data) }),
   createJob: (id: string, data: JobInput) => request<JobDetail>(npath(id) + '/jobs', { method: 'POST', body: JSON.stringify(data) }),
-  jobs: (id?: string) => request<Job[]>('/jobs' + (id ? '?novel_id=' + id : '')),
+  jobs: (id?: string, filters: { chapter_id?: string; task?: Task } = {}) => {
+    const query = new URLSearchParams({ ...(id ? { novel_id: id } : {}), ...filters })
+    return request<Job[]>('/jobs?' + query)
+  },
   job: (id: string, novel: string) => request<JobDetail>(jpath(id, novel)),
   control: (id: string, novel: string, action: string) => request<JobDetail>(`/jobs/${id}/${action}?novel_id=${novel}`, { method: 'POST' }),
   adopt: (id: string, novel: string, base: string) => request<Version>(`/jobs/${id}/adopt?novel_id=${novel}`, { method: 'POST', body: JSON.stringify({ base_version_id: base }) }),
@@ -107,7 +110,7 @@ export const api = {
 }
 
 export const taskNames: Record<Task, string> = {
-  continue: '正文生成', rewrite: '改写', plan: '场景规划', extract: '本章记忆', review: '审稿', handoff: '章节交接', blueprint: '全书方案', outline: '章节细纲',
+  continue: '正文生成', rewrite: '改写', plan: '场景规划', extract: '本章记忆', review: '审稿', handoff: '章节交接', blueprint: '全书方案', outline: '章节细纲', inspiration: '剧情灵感',
 }
 export const jobStateNames: Record<string, string> = {
   queued: '等待执行', running: '正在生成', pausing: '等待本次调用结束', paused: '已暂停', cancelling: '正在取消',

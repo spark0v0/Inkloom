@@ -1,0 +1,153 @@
+Inkloom inspiration verification - 2026-10-24
+Final feature checks. Local workspace paths are redacted as <workspace>.
+Demo and isolated SQLite fixtures only; no paid model or literary-quality verification.
+
+
+Ruff: python -m ruff check backend/app backend/tests
+Backend: python -X utf8 -m pytest backend/tests -q --tb=short --basetemp=.tmp/inspiration-final-pytest-1024
+API: npm --prefix frontend run check:api
+Exit status: 0 for each command
+All checks passed!
+........................................................................ [ 80%]
+..................                                                       [100%]
+============================== warnings summary ===============================
+backend\.venv\Lib\site-packages\fastapi\testclient.py:1
+  <workspace>\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+90 passed, 1 warning in 69.94s (0:01:09)
+
+> story-workshop@0.2.0 check:api
+> node scripts/generate-api.mjs --check
+
+API declarations match the backend OpenAPI contract
+
+
+Frontend: npm --prefix frontend test
+Exit status: 0
+
+> story-workshop@0.2.0 test
+> vitest run
+
+
+ RUN  v5.0.5 <workspace>/frontend
+
+
+ Test Files  4 passed (4)
+      Tests  17 passed (17)
+   Start at  03:18:46
+   Duration  4.77s (import 98%, transform 1%, tests 1%, worker 1%)
+
+
+
+Build: npm --prefix frontend run build
+Exit status: 0
+
+> story-workshop@0.2.0 build
+> tsc -b && vite build
+
+vite v8.3.4 building client environment for production...
+transforming...
+✓ 4732 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/assets/favicon-vYokD4zw.svg                0.30 kB │ gzip:   0.23 kB
+dist/index.html                                 0.74 kB │ gzip:   0.49 kB
+dist/assets/index-CZ1ekh4G.css                 87.32 kB │ gzip:  17.93 kB
+dist/assets/Check.es-CM1oBsBg.js                1.53 kB │ gzip:   0.57 kB
+dist/assets/DownloadSimple.es-TP_aep68.js       2.01 kB │ gzip:   0.67 kB
+dist/assets/useJobStream-Ck3sVZo3.js            2.14 kB │ gzip:   0.91 kB
+dist/assets/SlidersHorizontal.es-81EZ9fd5.js    2.37 kB │ gzip:   0.73 kB
+dist/assets/Play.es-D1b1s6Cj.js                 4.47 kB │ gzip:   1.24 kB
+dist/assets/JobsPage-CR-0neao.js                5.07 kB │ gzip:   2.22 kB
+dist/assets/ProductionResults-C1BwenyE.js       5.14 kB │ gzip:   1.55 kB
+dist/assets/BackupPage-uWH61K5O.js              8.46 kB │ gzip:   3.31 kB
+dist/assets/SettingsPage-fZ8uaqdM.js           11.46 kB │ gzip:   4.20 kB
+dist/assets/JobPresentation-DiKw6YOF.js        13.32 kB │ gzip:   4.69 kB
+dist/assets/StoryPage-ComwwkA8.js              18.38 kB │ gzip:   6.62 kB
+dist/assets/PlanningPage-CSExBTJO.js           21.95 kB │ gzip:   7.23 kB
+dist/assets/ui-Bf9LZV2g.js                     66.40 kB │ gzip:  22.02 kB
+dist/assets/index-bMlf3jrq.js                 323.85 kB │ gzip:  97.46 kB
+dist/assets/EditorPage-CFE6Vsjn.js            462.86 kB │ gzip: 144.37 kB
+
+✓ built in 535ms
+
+
+Browser: npm --prefix frontend run test:e2e
+Exit status: 0
+
+> story-workshop@0.2.0 test:e2e
+> playwright test
+
+[WebServer] INFO:     Started server process [19920]
+[WebServer] INFO:     Waiting for application startup.
+[WebServer] INFO:     Application startup complete.
+[WebServer] INFO:     Uvicorn running on http://127.0.0.1:9876 (Press CTRL+C to quit)
+
+Running 46 tests using 1 worker
+
+(node:14228) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  1 [desktop] › e2e\inspiration-return.spec.ts:12:1 › 续写不满意可重新选择原方向，刷新后仍保留来源 (8.8s)
+  ok  2 [desktop] › e2e\workshop.spec.ts:7:1 › 卡剧情找灵感、选中方向续写、刷新恢复与采纳 (10.2s)
+  ok  3 [desktop] › e2e\workshop.spec.ts:53:1 › 改稿后旧灵感不能直接续写，找灵感前先保存 (11.2s)
+  ok  4 [desktop] › e2e\workshop.spec.ts:74:1 › 写作提交回执丢失时保留同一请求并锁定参数 (7.2s)
+  ok  5 [desktop] › e2e\workshop.spec.ts:142:1 › 百章目录搜索、状态筛选、折叠定位与切章保存 (5.4s)
+  ok  6 [desktop] › e2e\workshop.spec.ts:191:1 › 切章保存失败保留当前编辑内容 (2.7s)
+  ok  7 [desktop] › e2e\workshop.spec.ts:212:1 › 手写保存、刷新、版本、导出与正史确认 (4.3s)
+  ok  8 [desktop] › e2e\workshop.spec.ts:231:1 › 演示候选不会直接改稿，采纳后旧版本保留 (4.2s)
+  ok  9 [desktop] › e2e\workshop.spec.ts:248:1 › 生成后修改原稿，旧候选不能覆盖新文字 (6.1s)
+  ok 10 [desktop] › e2e\workshop.spec.ts:264:1 › 两页编辑冲突保留双方，显式另存解决 (7.4s)
+  ok 11 [desktop] › e2e\workshop.spec.ts:282:1 › 离线保存不报成功，恢复连接后重试原请求 (5.4s)
+  ok 12 [desktop] › e2e\workshop.spec.ts:296:1 › 提取只给提议，确认后可以定位来源与搜索 (5.7s)
+  ok 13 [desktop] › e2e\workshop.spec.ts:316:1 › 窄屏无横向溢出，助手和目录通过抽屉可达 (3.2s)
+  ok 14 [desktop] › e2e\workshop.spec.ts:332:1 › emoji 后选段改写保留其余原文 (4.8s)
+  ok 15 [desktop] › e2e\workshop.spec.ts:355:1 › 手稿切分预览与实际导入一致 (1.4s)
+  ok 16 [desktop] › e2e\workshop.spec.ts:371:1 › 备份下载、校验与新工作区恢复 (5.2s)
+  ok 17 [desktop] › e2e\workshop.spec.ts:398:1 › 编辑器与助手的自动可访问性检查 (4.8s)
+  ok 18 [desktop] › e2e\workshop.spec.ts:407:1 › 任务已提交但响应失败，重试复用同一任务 (4.6s)
+  ok 19 [desktop] › e2e\workshop.spec.ts:429:1 › AI 建书、章节细纲、整章生成、记忆定稿、下一章与连载导出 (13.8s)
+  ok 20 [desktop] › e2e\workshop.spec.ts:482:1 › 首个模型连接可同时用于全部创作环节 (573ms)
+  ok 21 [desktop] › e2e\workshop.spec.ts:507:1 › 模型目录读取、选择和就地错误反馈 (3.4s)
+  ok 22 [desktop] › e2e\workshop.spec.ts:558:1 › 开书方案刷新可恢复，采纳后页内进入细纲且不会自动调用 (5.9s)
+  ok 23 [desktop] › e2e\workshop.spec.ts:576:1 › 继续写作进入未完成章，前章未定稿有直接处理入口 (4.3s)
+(node:10060) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 24 [mobile] › e2e\inspiration-return.spec.ts:12:1 › 续写不满意可重新选择原方向，刷新后仍保留来源 (12.3s)
+  ok 25 [mobile] › e2e\workshop.spec.ts:7:1 › 卡剧情找灵感、选中方向续写、刷新恢复与采纳 (9.5s)
+  ok 26 [mobile] › e2e\workshop.spec.ts:53:1 › 改稿后旧灵感不能直接续写，找灵感前先保存 (12.2s)
+  ok 27 [mobile] › e2e\workshop.spec.ts:74:1 › 写作提交回执丢失时保留同一请求并锁定参数 (7.7s)
+  ok 28 [mobile] › e2e\workshop.spec.ts:142:1 › 百章目录搜索、状态筛选、折叠定位与切章保存 (4.4s)
+  ok 29 [mobile] › e2e\workshop.spec.ts:191:1 › 切章保存失败保留当前编辑内容 (3.2s)
+  ok 30 [mobile] › e2e\workshop.spec.ts:212:1 › 手写保存、刷新、版本、导出与正史确认 (4.3s)
+  ok 31 [mobile] › e2e\workshop.spec.ts:231:1 › 演示候选不会直接改稿，采纳后旧版本保留 (4.7s)
+  ok 32 [mobile] › e2e\workshop.spec.ts:248:1 › 生成后修改原稿，旧候选不能覆盖新文字 (6.0s)
+  ok 33 [mobile] › e2e\workshop.spec.ts:264:1 › 两页编辑冲突保留双方，显式另存解决 (7.3s)
+  ok 34 [mobile] › e2e\workshop.spec.ts:282:1 › 离线保存不报成功，恢复连接后重试原请求 (5.4s)
+  ok 35 [mobile] › e2e\workshop.spec.ts:296:1 › 提取只给提议，确认后可以定位来源与搜索 (5.6s)
+  ok 36 [mobile] › e2e\workshop.spec.ts:316:1 › 窄屏无横向溢出，助手和目录通过抽屉可达 (3.7s)
+  ok 37 [mobile] › e2e\workshop.spec.ts:332:1 › emoji 后选段改写保留其余原文 (4.8s)
+  ok 38 [mobile] › e2e\workshop.spec.ts:355:1 › 手稿切分预览与实际导入一致 (1.6s)
+  ok 39 [mobile] › e2e\workshop.spec.ts:371:1 › 备份下载、校验与新工作区恢复 (4.9s)
+  ok 40 [mobile] › e2e\workshop.spec.ts:398:1 › 编辑器与助手的自动可访问性检查 (4.6s)
+  ok 41 [mobile] › e2e\workshop.spec.ts:407:1 › 任务已提交但响应失败，重试复用同一任务 (4.7s)
+  ok 42 [mobile] › e2e\workshop.spec.ts:429:1 › AI 建书、章节细纲、整章生成、记忆定稿、下一章与连载导出 (13.2s)
+  ok 43 [mobile] › e2e\workshop.spec.ts:482:1 › 首个模型连接可同时用于全部创作环节 (571ms)
+  ok 44 [mobile] › e2e\workshop.spec.ts:507:1 › 模型目录读取、选择和就地错误反馈 (3.4s)
+  ok 45 [mobile] › e2e\workshop.spec.ts:558:1 › 开书方案刷新可恢复，采纳后页内进入细纲且不会自动调用 (5.7s)
+  ok 46 [mobile] › e2e\workshop.spec.ts:576:1 › 继续写作进入未完成章，前章未定稿有直接处理入口 (4.8s)
+
+  46 passed (4.5m)
+
+
+Additional lint probe: python -m ruff check backend
+Exit status: 1
+I001 backend/alembic/env.py:1
+I001 backend/alembic/versions/924486b5f963_initial_schema.py:2
+Both existing migration files are unchanged. Project lint scope (app and tests) passed.
+
+
+Manual visual inspection: inspiration-desktop.png (1440x900), inspiration-mobile.png (390x844).
+Local runtime health: status=ok, version=0.2.0; GET / returned HTTP 200.
+Earlier test-locator failures and repairs are documented in docs/IMPLEMENTATION-INSPIRATION.md.

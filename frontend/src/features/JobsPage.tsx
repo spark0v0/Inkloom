@@ -4,7 +4,8 @@ import { ArrowCounterClockwise, Clock, DownloadSimple, Pause, Play, Stop } from 
 import { activeStates, api, dateLabel, downloadText, errorText, jobStateNames, taskNames } from '../lib/api'
 import type { Evidence, Task } from '../lib/api'
 import { Badge, Button, Empty, Loading, Modal, Notice, PageHeading } from '../components/ui'
-import { ContextDetails, JobResult, useJobStream } from './Assistant'
+import { ContextDetails, JobResult } from './JobPresentation'
+import { useJobStream } from '../lib/useJobStream'
 
 export function JobsPage({ novelId, onEvidence }: { novelId?: string; onEvidence: (e: Evidence) => void }) {
   const jobs = useQuery({ queryKey: ['jobs', novelId], queryFn: () => api.jobs(novelId), refetchInterval: 1800 })
