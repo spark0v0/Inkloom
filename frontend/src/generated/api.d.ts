@@ -330,6 +330,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/jobs/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Job History */
+        get: operations["job_history_api_v1_jobs_page_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/jobs/{job_id}": {
         parameters: {
             query?: never;
@@ -409,6 +426,23 @@ export interface paths {
         put?: never;
         /** Apply Plan */
         post: operations["apply_plan_api_v1_jobs__job_id__apply_plan_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/{job_id}/prepare-rewrite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Prepare Rewrite */
+        post: operations["prepare_rewrite_api_v1_jobs__job_id__prepare_rewrite_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -899,6 +933,7 @@ export interface components {
              */
             chapter_batch: number;
             inspiration?: components["schemas"]["InspirationReference"] | null;
+            review_reference?: components["schemas"]["ReviewReference"] | null;
         };
         /** ContextOut */
         ContextOut: {
@@ -989,6 +1024,11 @@ export interface components {
             /** Inspiration Title */
             inspiration_title?: string | null;
             inspiration_reference?: components["schemas"]["InspirationReference"] | null;
+            review_reference?: components["schemas"]["ReviewReference"] | null;
+            /** Review Explanation */
+            review_explanation?: string | null;
+            /** Review Suggestion */
+            review_suggestion?: string | null;
         };
         /** EntityInput */
         EntityInput: {
@@ -1164,12 +1204,16 @@ export interface components {
              * Decision
              * @enum {string}
              */
-            decision: "confirmed" | "intentional" | "false_positive" | "later";
+            decision: "pending" | "confirmed" | "intentional" | "false_positive" | "later";
             /**
              * Note
              * @default
              */
             note: string;
+            /** Base Decision */
+            base_decision?: ("pending" | "confirmed" | "intentional" | "false_positive" | "later") | null;
+            /** Base Note */
+            base_note?: string | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1315,6 +1359,42 @@ export interface components {
             /** Attempts */
             attempts: components["schemas"]["AttemptOut"][];
         };
+        /** JobHistoryItem */
+        JobHistoryItem: {
+            /** Id */
+            id: string;
+            /** Novel Id */
+            novel_id: string;
+            /** Chapter Id */
+            chapter_id: string;
+            /** Novel Title */
+            novel_title: string;
+            /** Chapter Title */
+            chapter_title: string;
+            /** Task */
+            task: string;
+            /** State */
+            state: string;
+            /** Instruction Preview */
+            instruction_preview: string;
+            /** Candidate Status */
+            candidate_status: string;
+            /** Attempt Count */
+            attempt_count: number;
+            /** Max Attempts */
+            max_attempts: number;
+            /** Is Demo */
+            is_demo: boolean;
+            /** Created At */
+            created_at: string;
+        };
+        /** JobHistoryPage */
+        JobHistoryPage: {
+            /** Items */
+            items: components["schemas"]["JobHistoryItem"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** JobInput */
         JobInput: {
             /** Chapter Id */
@@ -1354,6 +1434,7 @@ export interface components {
              */
             chapter_batch: number;
             inspiration?: components["schemas"]["InspirationReference"] | null;
+            review_reference?: components["schemas"]["ReviewReference"] | null;
             /** Idempotency Key */
             idempotency_key: string;
             /**
@@ -1760,6 +1841,15 @@ export interface components {
             /** Message */
             message: string;
         };
+        /** ReviewReference */
+        ReviewReference: {
+            /** Job Id */
+            job_id: string;
+            /** Finding Index */
+            finding_index: number;
+            /** Finding Hash */
+            finding_hash: string;
+        };
         /** ReviewResult */
         ReviewResult: {
             /**
@@ -1771,6 +1861,23 @@ export interface components {
             findings: components["schemas"]["Finding"][];
             /** Summary */
             summary: string;
+        };
+        /** ReviewRewriteInput */
+        ReviewRewriteInput: {
+            /** Base Version Id */
+            base_version_id: string;
+            /** Index */
+            index: number;
+        };
+        /** ReviewRewritePreparation */
+        ReviewRewritePreparation: {
+            /** Base Version Id */
+            base_version_id: string;
+            reference: components["schemas"]["ReviewReference"];
+            selection: components["schemas"]["Selection"];
+            finding: components["schemas"]["Finding"];
+            /** Suggested Target Chars */
+            suggested_target_chars: number;
         };
         /** RoleConfig */
         RoleConfig: {
@@ -2815,6 +2922,43 @@ export interface operations {
             };
         };
     };
+    job_history_api_v1_jobs_page_get: {
+        parameters: {
+            query?: {
+                novel_id?: string | null;
+                chapter_id?: string | null;
+                task?: ("continue" | "rewrite" | "plan" | "extract" | "review" | "handoff" | "blueprint" | "outline" | "inspiration") | null;
+                state?: ("queued" | "running" | "pausing" | "paused" | "cancelling" | "succeeded" | "failed" | "cancelled" | "interrupted_uncertain") | null;
+                query?: string;
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobHistoryPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     job_api_v1_jobs__job_id__get: {
         parameters: {
             query: {
@@ -2978,6 +3122,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProductionApplyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    prepare_rewrite_api_v1_jobs__job_id__prepare_rewrite_post: {
+        parameters: {
+            query: {
+                novel_id: string;
+            };
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewRewriteInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewRewritePreparation"];
                 };
             };
             /** @description Validation Error */

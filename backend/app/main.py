@@ -236,6 +236,14 @@ def create_app(data_dir: Path | None = None, *, worker: bool = True, port: int =
              task: dto.TaskName | None = None):
         return request.app.state.generation.list(novel_id, chapter_id, task)
 
+    @app.get(prefix + "/jobs/page", response_model=dto.JobHistoryPage)
+    def job_history(request: Request, novel_id: str | None = None, chapter_id: str | None = None,
+                    task: dto.TaskName | None = None, state: dto.JobStateName | None = None,
+                    query: str = Query(default="", max_length=200), cursor: str | None = Query(default=None, max_length=1024),
+                    limit: int = Query(default=30, ge=1, le=100)):
+        return request.app.state.generation.history(novel_id=novel_id, chapter_id=chapter_id,
+            task=task, state=state, query=query, cursor=cursor, limit=limit)
+
     @app.get(prefix + "/jobs/{job_id}", response_model=dto.JobDetail)
     def job(job_id: str, novel_id: str, request: Request):
         return request.app.state.generation.get(novel_id, job_id)
@@ -278,6 +286,10 @@ def create_app(data_dir: Path | None = None, *, worker: bool = True, port: int =
     @app.post(prefix + "/jobs/{job_id}/apply-plan", response_model=dto.ProductionApplyOut)
     def apply_plan(job_id: str, novel_id: str, request: Request):
         return request.app.state.generation.apply_plan(novel_id, job_id)
+
+    @app.post(prefix + "/jobs/{job_id}/prepare-rewrite", response_model=dto.ReviewRewritePreparation)
+    def prepare_rewrite(job_id: str, novel_id: str, data: dto.ReviewRewriteInput, request: Request):
+        return request.app.state.generation.prepare_rewrite(novel_id, job_id, data)
 
     @app.post(prefix + "/jobs/{job_id}/{action}", response_model=dto.JobDetail)
     def control(job_id: str, action: str, novel_id: str, request: Request):

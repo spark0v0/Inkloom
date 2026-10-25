@@ -305,6 +305,12 @@ class InspirationReference(Schema):
     option_index: int = Field(ge=0, le=2)
 
 
+class ReviewReference(Schema):
+    job_id: str = Field(min_length=1, max_length=160)
+    finding_index: int = Field(ge=0, le=49)
+    finding_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
 class BlueprintCharacter(Schema):
     name: str = Field(min_length=1, max_length=160)
     role: str = Field(min_length=1, max_length=240)
@@ -371,6 +377,19 @@ class Selection(Schema):
     text: str = Field(min_length=1, max_length=200000)
 
 
+class ReviewRewriteInput(Schema):
+    base_version_id: str = Field(min_length=1, max_length=160)
+    index: int = Field(ge=0, le=49)
+
+
+class ReviewRewritePreparation(Schema):
+    base_version_id: str
+    reference: ReviewReference
+    selection: Selection
+    finding: Finding
+    suggested_target_chars: int = Field(ge=100, le=6000)
+
+
 class ContextInput(Schema):
     chapter_id: str
     base_version_id: str
@@ -384,6 +403,7 @@ class ContextInput(Schema):
     volume_plan_id: str | None = None
     chapter_batch: int = Field(default=5, ge=3, le=20)
     inspiration: InspirationReference | None = None
+    review_reference: ReviewReference | None = None
 
 
 class ContextOut(Schema):
@@ -422,6 +442,9 @@ class ContextOut(Schema):
     provider_url: str = ""
     inspiration_title: str | None = None
     inspiration_reference: InspirationReference | None = None
+    review_reference: ReviewReference | None = None
+    review_explanation: str | None = None
+    review_suggestion: str | None = None
 
 
 class JobInput(ContextInput):
@@ -473,6 +496,30 @@ class JobDetail(JobOut):
     attempts: list[AttemptOut]
 
 
+JobStateName = Literal["queued", "running", "pausing", "paused", "cancelling", "succeeded", "failed", "cancelled", "interrupted_uncertain"]
+
+
+class JobHistoryItem(Schema):
+    id: str
+    novel_id: str
+    chapter_id: str
+    novel_title: str
+    chapter_title: str
+    task: str
+    state: str
+    instruction_preview: str
+    candidate_status: str
+    attempt_count: int
+    max_attempts: int
+    is_demo: bool
+    created_at: str
+
+
+class JobHistoryPage(Schema):
+    items: list[JobHistoryItem]
+    next_cursor: str | None = None
+
+
 class JobEventOut(Schema):
     seq: int
     kind: str
@@ -486,8 +533,10 @@ class AdoptInput(Schema):
 
 class FindingDecision(Schema):
     index: int = Field(ge=0)
-    decision: Literal["confirmed", "intentional", "false_positive", "later"]
+    decision: Literal["pending", "confirmed", "intentional", "false_positive", "later"]
     note: str = Field(default="", max_length=2000)
+    base_decision: Literal["pending", "confirmed", "intentional", "false_positive", "later"] | None = None
+    base_note: str | None = Field(default=None, max_length=2000)
 
 
 class ProviderInput(Schema):

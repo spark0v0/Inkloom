@@ -6,6 +6,8 @@
 
 2026-10-25 完成本章参考：`references.py` 负责选择修订、同书/前文章序/定稿版本校验和恢复校验，`context.py` 冻结必读与非正史材料；HTTP 层只转交契约。`ContextInput.references_revision` 为可选兼容字段，新前端始终发送，拒绝旧窗口继续生成。参考变更和迟到任务完成均检查基线；必读不参与可选裁剪。`AttemptHistory` 由助手与任务记录复用，历史片段只读下载。恢复兼容两份旧迁移和当前迁移，校验后在新目录升级。详见 [决策 0008](decisions/0008-chapter-references.md)。
 
+同日新增审稿修稿与历史分页，无新迁移：`review_rewrite.py` 从有效审稿的指定意见解析真实版本和稳定段落 ID，准备只读；`ContextInput.review_reference` 冻结来源哈希，完成与采纳同时检查意见、作者判断、依据和整段选区。`FindingDecision` 的可选基线字段保护新客户端的并发说明。`job_history.py` 提供绑定筛选作用域的 `(created_at, id)` 游标分页，SQL 只选有限摘要；原 `/jobs` 接口保留 150 条及旧响应供兼容入口使用。`ReviewFindings` 与 `SourceButton` 供编辑器和历史详情复用。契约见 [决策 0009](decisions/0009-review-rewrite-history.md)，验证见 [实现记录](IMPLEMENTATION-REVIEW-REVISION.md)。
+
 状态：**规划基线，已有 0.1.0 本地实现**。以下细分目录和部分字段仍是可演进设计，实际结构与取舍见 [ADR 0001](adr/0001-local-workspace.md)，验证范围见 [IMPLEMENTATION.md](IMPLEMENTATION.md)。技术调整不能绕开数据安全和作者控制原则。
 
 ## 架构选择

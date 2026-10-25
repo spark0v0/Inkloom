@@ -14,6 +14,8 @@ Inkloom 是中文 AI 小说创作工作台。接入自己的大模型，让 AI �
 
 需要 AI 记住远处的伏笔、人物或特殊约束时，打开 **本章参考**，搜索并勾选必读设定、此前定稿，或粘贴本章补充资料。选择按章保存，保存不调用模型；前文修改后须重新确认，必读超出上下文容量时会在发送前提示。切换写作方式保留所选模型；生成截断并重试后，可在调用记录中取回前一次片段。详见 [本轮实现](docs/IMPLEMENTATION-REFERENCES.md) 与 [竞品对照和后续缺口](docs/REVIEW-2026-10-24.md)。
 
+审稿后，在具体意见下点 **准备改写这一段**，检查原文、建议和写作模型，再点 **按建议改写**。准备不调用模型，生成后可返回原审稿比较，采纳仅修改对应段落。**生成记录** 支持搜索、类型和状态筛选，以及加载更早记录。详见 [实现与验证](docs/IMPLEMENTATION-REVIEW-REVISION.md) 和 [最新开源项目对照](docs/REVIEW-2026-10-25.md)。
+
 ## 开始创作
 
 1. **连接模型**：在“模型设置”填写服务地址、模型 ID 和 API Key；首次保存可同时设为策划、写作、记忆与审稿的默认模型。
@@ -34,6 +36,8 @@ Inkloom 是中文 AI 小说创作工作台。接入自己的大模型，让 AI �
 ![AI 草稿阅读](docs/screenshots/draft-v4-desktop.png)
 
 ![本章参考](docs/screenshots/references-desktop.png)
+
+![按审稿意见准备局部改写](docs/screenshots/review-rewrite-desktop.png)
 
 ## 本地运行
 
@@ -87,6 +91,7 @@ pwsh -File .\scripts\start.ps1 -Port 8766 -DataDirectory D:\StoryWorkspace
 - [新增热门项目调研与长篇改进取舍](docs/decisions/0006-longform-navigation-context.md)
 - [模型接入审查、开源反馈与后续优先级](docs/REVIEW-2026-10-23.md)
 - [本章必读参考、重试恢复与验证](docs/IMPLEMENTATION-REFERENCES.md) / [连续性工程评测](evals/README.md)
+- [审稿修稿、完整生成历史与验证](docs/IMPLEMENTATION-REVIEW-REVISION.md) / [热门项目对照与剩余缺口](docs/REVIEW-2026-10-25.md)
 - [开发启动提示词](START_PROMPT.md) / [运行时提示词](prompts/)
 
 真实云模型的长篇质量、完整 Windows 输入法人工体验、跨浏览器与百万字性能仍待独立验证。当前不提供云同步、多人协作或完整剧情分支。项目独立实现，运行数据和密钥不进入源码仓库。

@@ -9,7 +9,7 @@ from contextlib import suppress
 from typing import Any
 
 from pydantic import ValidationError
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import load_only
 
 from . import schemas as dto
@@ -199,6 +199,16 @@ class Generation:
                 query = query.where(Job.task == task)
             return [public_job(s, j) for j in s.scalars(query.order_by(Job.created_at.desc(), Job.id.desc()).limit(150)).all()]
 
+    def history(self, **filters) -> dto.JobHistoryPage:
+        from .job_history import history_page
+        with self.ws.session() as session:
+            return history_page(session, **filters)
+
+    def prepare_rewrite(self, novel_id: str, job_id: str, data: dto.ReviewRewriteInput) -> dto.ReviewRewritePreparation:
+        from .review_rewrite import prepare_rewrite
+        with self.ws.session() as session:
+            return prepare_rewrite(session, novel_id, job_id, data)
+
     def events(self, novel_id: str, job_id: str, after: int) -> tuple[list[dto.JobEventOut], str]:
         with self.ws.session() as s:
             job = require_job(s, novel_id, job_id)
@@ -275,7 +285,7 @@ class Generation:
                 raise DomainError("VERSION_CONFLICT", "原稿已更新。请比较两份文字，再手动合并为新版本。", 409,
                                   current_version_id=chapter.working_version_id)
             if not context_current(s, job):
-                raise DomainError("CONTEXT_STALE", "正史或设定已更新，请核对候选后手动合并或重新生成。", 409)
+                raise DomainError("CONTEXT_STALE", "生成依据已变化，请核对候选后重新生成。", 409)
             current = s.get(Version, job.base_version_id)
             if job.task == "rewrite":
                 selection = job.selection
@@ -318,8 +328,20 @@ class Generation:
             if not job.result or job.task != "review" or decision.index >= len(job.result["findings"]):
                 raise DomainError("FINDING_NOT_FOUND", "找不到该审稿意见。", 404)
             result = json.loads(json.dumps(job.result))
+            previous = result["findings"][decision.index]
+            if decision.base_decision is not None or decision.base_note is not None:
+                if (decision.base_decision != previous.get("decision", "pending")
+                        or decision.base_note != previous.get("decision_note", "")):
+                    raise DomainError("REVIEW_DECISION_CONFLICT", "作者判断已在其他窗口更新。输入已保留，请读取最新判断后比较。", 409)
+            changed = previous.get("decision", "pending") != decision.decision or previous.get("decision_note", "") != decision.note
             result["findings"][decision.index].update(decision=decision.decision, decision_note=decision.note)
             job.result = result
+            if changed:
+                s.execute(update(Job).where(Job.novel_id == novel_id, Job.chapter_id == job.chapter_id,
+                    Job.task == "rewrite", Job.candidate_status == "ready",
+                    Job.context["preview"]["review_reference"]["job_id"].as_string() == job.id,
+                    Job.context["preview"]["review_reference"]["finding_index"].as_integer() == decision.index
+                ).values(candidate_status="needs_rebase"), execution_options={"synchronize_session": False})
             emit(s, job, "review_decision", {"index": decision.index, "decision": decision.decision})
             return public_job(s, job, True)
 

@@ -1,0 +1,222 @@
+2026-10-25 Inkloom review revision and complete job history
+Windows; Python 3.13; installed Chrome via Playwright; 1440x900 desktop and 390x844 mobile.
+Backend/API/browser workspaces are isolated under .tmp; built-in Demo and an owned loopback HTTP/SSE fixture only.
+User chose engineering verification only. No real model call or literature-quality evaluation was performed.
+The full browser server loaded before the final persisted-selection guard; a new isolated server then ran the two valid rewrite/adopt flows after the guard.
+Known warnings remain visible: Starlette/httpx deprecation; one Windows asyncio connection-reset callback in the simulated retry test; Node color-env warning.
+Earlier browser failures were locator expectations and an incorrect cache-reset assertion; only the final runs below are counted as passing.
+An optional local app restart was rejected by automatic safety review with only "blocked by policy". No restart was performed; the running backend needs manual restart for the final guard.
+
+Ruff (exit 0)
+> backend/.venv/Scripts/ruff.exe check backend/app backend/tests
+All checks passed!
+
+Backend after final selection fix (exit 0)
+> backend/.venv/Scripts/python.exe -X utf8 -m pytest backend/tests -q --tb=short --basetemp=.tmp/review-final-backend
+........................................................................ [ 53%]
+..............................................................           [100%]
+============================== warnings summary ===============================
+backend\.venv\Lib\site-packages\fastapi\testclient.py:1
+  <repo>\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+134 passed, 1 warning in 87.64s (0:01:27)
+
+API contract (exit 0)
+> npm --prefix frontend run check:api
+
+> story-workshop@0.2.0 check:api
+> node scripts/generate-api.mjs --check
+
+API declarations match the backend OpenAPI contract
+
+Frontend tests (exit 0)
+> npm --prefix frontend test
+
+> story-workshop@0.2.0 test
+> vitest run
+
+
+ RUN  v5.0.5 <repo>/frontend
+
+
+ Test Files  4 passed (4)
+      Tests  19 passed (19)
+   Start at  18:18:30
+   Duration  7.55s (import 96%, transform 3%, tests 1%)
+
+Typecheck (exit 0)
+> npm --prefix frontend run typecheck
+
+> story-workshop@0.2.0 typecheck
+> tsc -b --pretty false
+
+Production build (exit 0)
+> npm --prefix frontend run build
+
+> story-workshop@0.2.0 build
+> tsc -b && vite build
+
+vite v8.3.4 building client environment for production...
+transforming...
+✓ 4735 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/assets/favicon-vYokD4zw.svg                0.30 kB │ gzip:   0.23 kB
+dist/index.html                                 0.74 kB │ gzip:   0.49 kB
+dist/assets/index-CWoKfTgY.css                 94.36 kB │ gzip:  19.01 kB
+dist/assets/Check.es-CVAPkyL1.js                1.53 kB │ gzip:   0.57 kB
+dist/assets/DownloadSimple.es-CSsHnlWm.js       2.01 kB │ gzip:   0.67 kB
+dist/assets/useJobStream-GwlEeab7.js            2.14 kB │ gzip:   0.91 kB
+dist/assets/SlidersHorizontal.es-BQB0-bGG.js    2.37 kB │ gzip:   0.73 kB
+dist/assets/Play.es-De3MtuT8.js                 4.47 kB │ gzip:   1.24 kB
+dist/assets/ProductionResults-D4BhfHju.js       5.14 kB │ gzip:   1.55 kB
+dist/assets/JobsPage-Cz9H3jkZ.js                7.58 kB │ gzip:   3.12 kB
+dist/assets/BackupPage-BUVGEFLe.js              8.46 kB │ gzip:   3.31 kB
+dist/assets/SettingsPage-C0_eoboZ.js           11.46 kB │ gzip:   4.19 kB
+dist/assets/JobPresentation-Cdx7giWV.js        17.62 kB │ gzip:   6.16 kB
+dist/assets/StoryPage-pwXsf7Wp.js              18.38 kB │ gzip:   6.62 kB
+dist/assets/PlanningPage-DCaQBrgI.js           21.95 kB │ gzip:   7.24 kB
+dist/assets/ui-BboSId3S.js                     66.79 kB │ gzip:  22.12 kB
+dist/assets/index-DDA4GvdB.js                 323.99 kB │ gzip:  97.52 kB
+dist/assets/EditorPage-BXBZMQ2w.js            474.81 kB │ gzip: 147.66 kB
+
+✓ built in 476ms
+
+Full Chrome desktop and mobile (exit 0)
+> npm --prefix frontend run test:e2e
+
+> story-workshop@0.2.0 test:e2e
+> playwright test
+
+[WebServer] INFO:     Started server process [19904]
+[WebServer] INFO:     Waiting for application startup.
+[WebServer] INFO:     Application startup complete.
+[WebServer] INFO:     Uvicorn running on http://127.0.0.1:9876 (Press CTRL+C to quit)
+
+Running 62 tests using 1 worker
+
+(node:10540) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  1 [desktop] › e2e\chapter-references.spec.ts:48:1 › 本章必读保存与刷新恢复，生成只采用保存的参考和任务目标 (5.6s)
+  ok  2 [desktop] › e2e\chapter-references.spec.ts:102:1 › 前文更新后不能默用旧参考，作者可明确改用当前定稿 (1.5s)
+  ok  3 [desktop] › e2e\chapter-references.spec.ts:135:1 › 双窗口修改参考发生冲突时保留输入，显式重新载入后再保存 (2.1s)
+  ok  4 [desktop] › e2e\chapter-references.spec.ts:159:1 › 生成截断后重试，前一次片段仍可查看和下载 (7.6s)
+  ok  5 [desktop] › e2e\inspiration-return.spec.ts:12:1 › 续写不满意可重新选择原方向，刷新后仍保留来源 (9.4s)
+  ok  6 [desktop] › e2e\review-rewrite.spec.ts:87:1 › 审稿后准备段落改写不调用模型，明确生成、往返原建议并局部采纳 (7.1s)
+  ok  7 [desktop] › e2e\review-rewrite.spec.ts:122:1 › 准备修稿后另一窗口更新正文，旧建议不会覆盖新稿或再次调用模型 (2.5s)
+  ok  8 [desktop] › e2e\review-rewrite.spec.ts:138:1 › 作者判断冲突保留说明，误报不能准备修稿 (3.9s)
+  ok  9 [desktop] › e2e\review-rewrite.spec.ts:160:1 › 完整生成历史可加载150条之前的记录，分页失败保留列表并可搜索筛选 (13.4s)
+  ok 10 [desktop] › e2e\workshop.spec.ts:7:1 › 卡剧情找灵感、选中方向续写、刷新恢复与采纳 (10.7s)
+  ok 11 [desktop] › e2e\workshop.spec.ts:53:1 › 改稿后旧灵感不能直接续写，找灵感前先保存 (12.0s)
+  ok 12 [desktop] › e2e\workshop.spec.ts:74:1 › 写作提交回执丢失时保留同一请求并锁定参数 (8.0s)
+  ok 13 [desktop] › e2e\workshop.spec.ts:142:1 › 百章目录搜索、状态筛选、折叠定位与切章保存 (5.3s)
+  ok 14 [desktop] › e2e\workshop.spec.ts:191:1 › 切章保存失败保留当前编辑内容 (3.5s)
+  ok 15 [desktop] › e2e\workshop.spec.ts:212:1 › 手写保存、刷新、版本、导出与正史确认 (4.7s)
+  ok 16 [desktop] › e2e\workshop.spec.ts:231:1 › 演示候选不会直接改稿，采纳后旧版本保留 (5.1s)
+  ok 17 [desktop] › e2e\workshop.spec.ts:248:1 › 生成后修改原稿，旧候选不能覆盖新文字 (6.5s)
+  ok 18 [desktop] › e2e\workshop.spec.ts:264:1 › 两页编辑冲突保留双方，显式另存解决 (8.0s)
+  ok 19 [desktop] › e2e\workshop.spec.ts:282:1 › 离线保存不报成功，恢复连接后重试原请求 (5.7s)
+  ok 20 [desktop] › e2e\workshop.spec.ts:296:1 › 提取只给提议，确认后可以定位来源与搜索 (6.1s)
+  ok 21 [desktop] › e2e\workshop.spec.ts:316:1 › 窄屏无横向溢出，助手和目录通过抽屉可达 (3.8s)
+  ok 22 [desktop] › e2e\workshop.spec.ts:332:1 › emoji 后选段改写保留其余原文 (5.1s)
+  ok 23 [desktop] › e2e\workshop.spec.ts:355:1 › 手稿切分预览与实际导入一致 (1.7s)
+  ok 24 [desktop] › e2e\workshop.spec.ts:371:1 › 备份下载、校验与新工作区恢复 (5.4s)
+  ok 25 [desktop] › e2e\workshop.spec.ts:398:1 › 编辑器与助手的自动可访问性检查 (5.8s)
+  ok 26 [desktop] › e2e\workshop.spec.ts:407:1 › 任务已提交但响应失败，重试复用同一任务 (4.9s)
+  ok 27 [desktop] › e2e\workshop.spec.ts:429:1 › AI 建书、章节细纲、整章生成、记忆定稿、下一章与连载导出 (14.8s)
+  ok 28 [desktop] › e2e\workshop.spec.ts:482:1 › 首个模型连接可同时用于全部创作环节 (879ms)
+  ok 29 [desktop] › e2e\workshop.spec.ts:507:1 › 模型目录读取、选择和就地错误反馈 (6.6s)
+  ok 30 [desktop] › e2e\workshop.spec.ts:558:1 › 开书方案刷新可恢复，采纳后页内进入细纲且不会自动调用 (6.1s)
+  ok 31 [desktop] › e2e\workshop.spec.ts:576:1 › 继续写作进入未完成章，前章未定稿有直接处理入口 (4.8s)
+(node:26200) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 32 [mobile] › e2e\chapter-references.spec.ts:48:1 › 本章必读保存与刷新恢复，生成只采用保存的参考和任务目标 (5.8s)
+  ok 33 [mobile] › e2e\chapter-references.spec.ts:102:1 › 前文更新后不能默用旧参考，作者可明确改用当前定稿 (1.7s)
+  ok 34 [mobile] › e2e\chapter-references.spec.ts:135:1 › 双窗口修改参考发生冲突时保留输入，显式重新载入后再保存 (2.3s)
+[WebServer] Exception in callback _ProactorBasePipeTransport._call_connection_lost()
+[WebServer] handle: <Handle _ProactorBasePipeTransport._call_connection_lost()>
+[WebServer] Traceback (most recent call last):
+[WebServer]   File "<user>\AppData\Local\Programs\Python\Python313\Lib\asyncio\events.py", line 89, in _run
+[WebServer]     self._context.run(self._callback, *self._args)
+[WebServer]     ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[WebServer]   File "<user>\AppData\Local\Programs\Python\Python313\Lib\asyncio\proactor_events.py", line 165, in _call_connection_lost
+[WebServer]     self._sock.shutdown(socket.SHUT_RDWR)
+[WebServer]     ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+[WebServer] ConnectionResetError: [WinError 10054] 远程主机强迫关闭了一个现有的连接。
+  ok 35 [mobile] › e2e\chapter-references.spec.ts:159:1 › 生成截断后重试，前一次片段仍可查看和下载 (8.2s)
+  ok 36 [mobile] › e2e\inspiration-return.spec.ts:12:1 › 续写不满意可重新选择原方向，刷新后仍保留来源 (8.9s)
+  ok 37 [mobile] › e2e\review-rewrite.spec.ts:87:1 › 审稿后准备段落改写不调用模型，明确生成、往返原建议并局部采纳 (9.8s)
+  ok 38 [mobile] › e2e\review-rewrite.spec.ts:122:1 › 准备修稿后另一窗口更新正文，旧建议不会覆盖新稿或再次调用模型 (4.3s)
+  ok 39 [mobile] › e2e\review-rewrite.spec.ts:138:1 › 作者判断冲突保留说明，误报不能准备修稿 (5.3s)
+  ok 40 [mobile] › e2e\review-rewrite.spec.ts:160:1 › 完整生成历史可加载150条之前的记录，分页失败保留列表并可搜索筛选 (13.7s)
+  ok 41 [mobile] › e2e\workshop.spec.ts:7:1 › 卡剧情找灵感、选中方向续写、刷新恢复与采纳 (10.8s)
+  ok 42 [mobile] › e2e\workshop.spec.ts:53:1 › 改稿后旧灵感不能直接续写，找灵感前先保存 (11.9s)
+  ok 43 [mobile] › e2e\workshop.spec.ts:74:1 › 写作提交回执丢失时保留同一请求并锁定参数 (7.5s)
+  ok 44 [mobile] › e2e\workshop.spec.ts:142:1 › 百章目录搜索、状态筛选、折叠定位与切章保存 (5.9s)
+  ok 45 [mobile] › e2e\workshop.spec.ts:191:1 › 切章保存失败保留当前编辑内容 (3.0s)
+  ok 46 [mobile] › e2e\workshop.spec.ts:212:1 › 手写保存、刷新、版本、导出与正史确认 (4.6s)
+  ok 47 [mobile] › e2e\workshop.spec.ts:231:1 › 演示候选不会直接改稿，采纳后旧版本保留 (5.1s)
+  ok 48 [mobile] › e2e\workshop.spec.ts:248:1 › 生成后修改原稿，旧候选不能覆盖新文字 (6.4s)
+  ok 49 [mobile] › e2e\workshop.spec.ts:264:1 › 两页编辑冲突保留双方，显式另存解决 (7.7s)
+  ok 50 [mobile] › e2e\workshop.spec.ts:282:1 › 离线保存不报成功，恢复连接后重试原请求 (5.6s)
+  ok 51 [mobile] › e2e\workshop.spec.ts:296:1 › 提取只给提议，确认后可以定位来源与搜索 (6.0s)
+  ok 52 [mobile] › e2e\workshop.spec.ts:316:1 › 窄屏无横向溢出，助手和目录通过抽屉可达 (4.0s)
+  ok 53 [mobile] › e2e\workshop.spec.ts:332:1 › emoji 后选段改写保留其余原文 (5.0s)
+  ok 54 [mobile] › e2e\workshop.spec.ts:355:1 › 手稿切分预览与实际导入一致 (1.8s)
+  ok 55 [mobile] › e2e\workshop.spec.ts:371:1 › 备份下载、校验与新工作区恢复 (6.3s)
+  ok 56 [mobile] › e2e\workshop.spec.ts:398:1 › 编辑器与助手的自动可访问性检查 (5.2s)
+  ok 57 [mobile] › e2e\workshop.spec.ts:407:1 › 任务已提交但响应失败，重试复用同一任务 (4.9s)
+  ok 58 [mobile] › e2e\workshop.spec.ts:429:1 › AI 建书、章节细纲、整章生成、记忆定稿、下一章与连载导出 (15.1s)
+  ok 59 [mobile] › e2e\workshop.spec.ts:482:1 › 首个模型连接可同时用于全部创作环节 (783ms)
+  ok 60 [mobile] › e2e\workshop.spec.ts:507:1 › 模型目录读取、选择和就地错误反馈 (5.9s)
+  ok 61 [mobile] › e2e\workshop.spec.ts:558:1 › 开书方案刷新可恢复，采纳后页内进入细纲且不会自动调用 (6.0s)
+  ok 62 [mobile] › e2e\workshop.spec.ts:576:1 › 继续写作进入未完成章，前章未定稿有直接处理入口 (4.7s)
+
+  62 passed (6.5m)
+
+Fresh browser server after final backend selection fix (exit 0)
+> npm --prefix frontend run test:e2e -- review-rewrite.spec.ts --grep '审稿后准备'
+
+> story-workshop@0.2.0 test:e2e
+> playwright test review-rewrite.spec.ts --grep 审稿后准备
+
+[WebServer] INFO:     Started server process [12848]
+[WebServer] INFO:     Waiting for application startup.
+[WebServer] INFO:     Application startup complete.
+[WebServer] INFO:     Uvicorn running on http://127.0.0.1:9876 (Press CTRL+C to quit)
+
+Running 2 tests using 1 worker
+
+(node:12896) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 [desktop] › e2e\review-rewrite.spec.ts:87:1 › 审稿后准备段落改写不调用模型，明确生成、往返原建议并局部采纳 (9.1s)
+(node:13668) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 2 [mobile] › e2e\review-rewrite.spec.ts:87:1 › 审稿后准备段落改写不调用模型，明确生成、往返原建议并局部采纳 (9.8s)
+
+  2 passed (23.6s)
+
+Context engineering fixtures (exit 0)
+> backend/.venv/Scripts/python.exe -X utf8 evals/run_context_eval.py --output .tmp/review-revision-context-eval.json
+Context engineering fixtures: 8/8 passed; model quality not evaluated
+
+Expected RED regression before fix (exit 1, not a passing run)
+Targeted test: backend/tests/test_review_rewrite.py::test_adoption_rechecks_persisted_selection_against_review_target (captured before fix; invocation flags omitted)
+F                                                                        [100%]
+================================== FAILURES ===================================
+______ test_adoption_rechecks_persisted_selection_against_review_target _______
+backend\tests\test_review_rewrite.py:200: in test_adoption_rechecks_persisted_selection_against_review_target
+    with pytest.raises(DomainError) as error:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE DomainError
+============================== warnings summary ===============================
+backend\.venv\Lib\site-packages\fastapi\testclient.py:1
+  <repo>\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED backend\tests\test_review_rewrite.py::test_adoption_rechecks_persisted_selection_against_review_target
+1 failed, 15 deselected, 1 warning in 1.04s

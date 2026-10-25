@@ -53,7 +53,8 @@ def context_current(session: Session, job: Job) -> bool:
         expected = job.context.get("catalog_signature")
         if (expected and expected != digest(catalog)) or (not expected and job.context.get("catalog") != catalog):
             return False
-    return True
+    from .review_rewrite import review_reference_current
+    return review_reference_current(session, job)
 
 
 def provider_config(provider: Provider) -> dict[str, Any]:
@@ -77,6 +78,8 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
         raise DomainError("PROTECTED_CONTEXT", "本章必读不能在预览中排除，请先调整“本章参考”。")
     from .inspiration import chosen_direction
     direction = chosen_direction(session, novel_id, request)
+    from .review_rewrite import review_guidance
+    revision = review_guidance(session, novel_id, request)
     if request.task == "continue":
         if novel.dirty_from_order is not None and chapter.position > novel.dirty_from_order:
             raise DomainError("CANON_DIRTY", f"第 {novel.dirty_from_order} 章起的正史待复核。"
@@ -247,6 +250,8 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
         input_body["production"] = production
     if direction is not None:
         input_body["inspiration_direction"] = direction
+    if revision is not None:
+        input_body["review_guidance"] = revision
     input_body["reference_selection"] = {"entity_ids": reference_selection.entity_ids,
         "chapters": [pin.model_dump() for pin in reference_selection.chapters], "revision": chapter.references_revision}
     if reference_selection.notes:
@@ -310,7 +315,9 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
         provider_name=provider.name, model=provider.model, is_demo=provider.kind == "demo",
         provider_url=provider.base_url,
         inspiration_title=direction["direction"]["title"] if direction else None,
-        inspiration_reference=request.inspiration)
+        inspiration_reference=request.inspiration, review_reference=request.review_reference,
+        review_explanation=revision["finding"]["explanation"] if revision else None,
+        review_suggestion=revision["finding"]["suggestion"] if revision else None)
     return {"preview": preview.model_dump(), "messages": messages_for(), "provider": config,
             "base_text": version.text, "target_chars": request.target_chars,
             "canon_checkpoint": canon_checkpoint(session, novel_id, chapter.position),

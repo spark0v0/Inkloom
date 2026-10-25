@@ -1,4 +1,4 @@
-import type { components } from '../generated/api'
+import type { components, operations } from '../generated/api'
 
 type Schema = components['schemas']
 export type Novel = Schema['NovelOut']
@@ -19,6 +19,9 @@ export type MemoryProposal = Schema['MemoryProposal']
 export type Job = Schema['JobOut']
 export type JobDetail = Schema['JobDetail']
 export type JobInput = Schema['JobInput']
+export type ReviewRewritePreparation = Schema['ReviewRewritePreparation']
+export type ReviewFinding = Schema['Finding']
+export type JobHistoryFilters = NonNullable<operations['job_history_api_v1_jobs_page_get']['parameters']['query']>
 export type ContextInput = Schema['ContextInput']
 export type Context = Schema['ContextOut']
 export type Provider = Schema['ProviderOut']
@@ -96,6 +99,12 @@ export const api = {
     const query = new URLSearchParams({ ...(id ? { novel_id: id } : {}), ...filters })
     return request<Job[]>('/jobs?' + query)
   },
+  jobHistory: (filters: JobHistoryFilters = {}) => {
+    const query = new URLSearchParams()
+    Object.entries(filters).forEach(([key, value]) => { if (value != null && value !== '') query.set(key, String(value)) })
+    return request<Schema['JobHistoryPage']>('/jobs/page?' + query)
+  },
+  prepareReviewRewrite: (id: string, novel: string, data: Schema['ReviewRewriteInput']) => request<ReviewRewritePreparation>(`/jobs/${id}/prepare-rewrite?novel_id=${novel}`, { method: 'POST', body: JSON.stringify(data) }),
   job: (id: string, novel: string) => request<JobDetail>(jpath(id, novel)),
   control: (id: string, novel: string, action: string) => request<JobDetail>(`/jobs/${id}/${action}?novel_id=${novel}`, { method: 'POST' }),
   adopt: (id: string, novel: string, base: string) => request<Version>(`/jobs/${id}/adopt?novel_id=${novel}`, { method: 'POST', body: JSON.stringify({ base_version_id: base }) }),
