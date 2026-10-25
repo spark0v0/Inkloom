@@ -5,7 +5,7 @@ User chose engineering verification only. No real model call or literature-quali
 The full browser server loaded before the final persisted-selection guard; a new isolated server then ran the two valid rewrite/adopt flows after the guard.
 Known warnings remain visible: Starlette/httpx deprecation; one Windows asyncio connection-reset callback in the simulated retry test; Node color-env warning.
 Earlier browser failures were locator expectations and an incorrect cache-reset assertion; only the final runs below are counted as passing.
-An optional local app restart was rejected by automatic safety review with only "blocked by policy". No restart was performed; the running backend needs manual restart for the final guard.
+An optional stop-and-restart command was rejected by automatic safety review with only "blocked by policy"; it was not performed. At follow-up, the old service was already gone and port 8765 was free. The existing launcher then started the latest code without stopping any process; health/root/paged-history checks passed. See final startup record below.
 
 Ruff (exit 0)
 > backend/.venv/Scripts/ruff.exe check backend/app backend/tests
@@ -220,3 +220,7 @@ backend\.venv\Lib\site-packages\fastapi\testclient.py:1
 =========================== short test summary info ===========================
 FAILED backend\tests\test_review_rewrite.py::test_adoption_rechecks_persisted_selection_against_review_target
 1 failed, 15 deselected, 1 warning in 1.04s
+
+Local launcher and read-only verification (health check exit 0; launcher remains running to serve the app)
+> scripts/launch.ps1 -NoBrowser
+2026-10-25: old service was already gone and port 8765 was free; scripts/launch.ps1 -NoBrowser started the latest code without stopping any process. Health=ok; root=200; latest production bundle is served; paged history API=200. No model call sent.
