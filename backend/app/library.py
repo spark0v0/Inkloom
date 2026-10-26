@@ -231,19 +231,24 @@ class Library:
                 Entity.novel_id == novel_id).order_by(Entity.updated_at.desc())).all()]
 
     def put_entity(self, novel_id: str, data: dto.EntityInput, entity_id: str | None = None):
+        values = data.model_dump(exclude={"base_updated_at"})
         with self.ws.session(write=True) as s:
             novel = require_novel(s, novel_id)
             entity = s.get(Entity, entity_id) if entity_id else None
             if entity_id and (entity is None or entity.novel_id != novel_id):
                 raise DomainError("ENTITY_NOT_FOUND", "此作品中没有该档案。", 404)
             if entity is None:
-                entity = Entity(id=uid("entity"), novel_id=novel_id, **data.model_dump())
+                entity = Entity(id=uid("entity"), novel_id=novel_id, **values)
                 s.add(entity)
             else:
+                if isinstance(data, dto.EntityUpdate) and entity.updated_at != data.base_updated_at:
+                    if all(getattr(entity, key) == value for key, value in values.items()):
+                        return dto.EntityOut.model_validate(entity)
+                    raise DomainError("ENTITY_CONFLICT", "档案已在其他窗口更新。你的输入已保留，请读取最新档案后比较。", 409)
                 from .models import ThreadTrack
                 if data.kind != "thread" and s.get(ThreadTrack, entity.id):
                     raise DomainError("TRACKED_THREAD", "这条伏笔已有跟进安排，请保留伏笔类型或另建其他档案。", 409)
-                for key, value in data.model_dump().items():
+                for key, value in values.items():
                     setattr(entity, key, value)
             entity.updated_at = now()
             novel.settings_revision += 1

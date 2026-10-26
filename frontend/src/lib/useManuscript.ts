@@ -37,16 +37,18 @@ export function useManuscript(novelId: string, chapterId: string, workspaceId: s
   }, [key])
 
   const flush = useCallback((): Promise<Version> => {
+    if (!alive.current) return Promise.reject(new Error('页面已切换，草稿保留在原工作区的浏览器恢复副本。'))
     if (composing.current) return Promise.reject(new Error('请先完成当前中文输入，再执行此操作。'))
     clearTimeout(timer.current)
     if (inFlight.current) return inFlight.current
     const run = async () => {
       try {
         while (pending.current || signature(current.current) !== saved.current) {
+          if (!alive.current) throw new Error('页面已切换，未继续保存原页面的草稿。')
           if (!pending.current) pending.current = { base_version_id: base.current.id, operation_id: uuid(), text: current.current.text, editor_doc: current.current.doc }
           const body = pending.current
           if (alive.current) { setStatus('saving'); setMessage('') }
-          const version = await api.save(novelId, chapterId, body)
+          const version = await api.save(novelId, chapterId, body, workspaceId)
           base.current = version
           saved.current = signature({ text: body.text, doc: body.editor_doc! })
           pending.current = null
@@ -63,6 +65,7 @@ export function useManuscript(novelId: string, chapterId: string, workspaceId: s
             if (alive.current) setStatus('dirty')
           }
         } else if (alive.current) setStatus('dirty')
+        if (!alive.current) throw new Error('页面已切换，未继续执行原页面的操作。')
         return base.current
       } catch (error) {
         await persistRecovery()
@@ -78,7 +81,7 @@ export function useManuscript(novelId: string, chapterId: string, workspaceId: s
     }
     inFlight.current = run()
     return inFlight.current
-  }, [chapterId, key, novelId, persistRecovery])
+  }, [chapterId, key, novelId, persistRecovery, workspaceId])
 
   const change = useCallback((value: Buffer) => {
     current.current = value
@@ -92,7 +95,15 @@ export function useManuscript(novelId: string, chapterId: string, workspaceId: s
     }
   }, [flush, persistRecovery])
 
-  const accept = useCallback((version: Version) => {
+  const accept = useCallback((version: Version, expected?: Version) => {
+    if (!alive.current) return false
+    if (expected && (composing.current || signature(current.current) !== signature({ text: expected.text, doc: expected.editor_doc }))) {
+      clearTimeout(timer.current)
+      setConflict(version); setStatus('conflict'); setMessage('操作期间正文又有修改，已保留本页输入，请比较工作区版本。')
+      void persistRecovery()
+      onCommitRef.current(version)
+      return false
+    }
     base.current = version
     current.current = { text: version.text, doc: version.editor_doc }
     saved.current = signature(current.current)
@@ -100,7 +111,8 @@ export function useManuscript(novelId: string, chapterId: string, workspaceId: s
     setLocalText(version.text); setSavedAt(version.created_at); setStatus('saved'); setMessage(''); setConflict(null)
     void drafts.remove(key).catch(() => undefined)
     onCommitRef.current(version)
-  }, [key])
+    return true
+  }, [key, persistRecovery])
 
   const rebase = useCallback(async () => {
     if (!conflict) return

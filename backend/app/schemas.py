@@ -163,6 +163,10 @@ class EntityOut(EntityInput):
     updated_at: str
 
 
+class EntityUpdate(EntityInput):
+    base_updated_at: str = Field(min_length=1, max_length=60)
+
+
 class PlanInput(Schema):
     title: str = Field(min_length=1, max_length=240)
     level: Literal["book", "volume", "chapter", "scene"] = "chapter"

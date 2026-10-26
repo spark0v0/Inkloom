@@ -1162,6 +1162,36 @@ export interface components {
             /** Updated At */
             updated_at: string;
         };
+        /** EntityUpdate */
+        EntityUpdate: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "character" | "world" | "thread" | "timeline";
+            /** Name */
+            name: string;
+            /**
+             * Summary
+             * @default
+             */
+            summary: string;
+            /**
+             * Body
+             * @default
+             */
+            body: string;
+            /** Aliases */
+            aliases?: string[];
+            /**
+             * Status
+             * @default author
+             * @enum {string}
+             */
+            status: "author" | "proposed";
+            /** Base Updated At */
+            base_updated_at: string;
+        };
         /** Evidence */
         Evidence: {
             /** Source Id */
@@ -2819,7 +2849,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["EntityInput"];
+                "application/json": components["schemas"]["EntityUpdate"];
             };
         };
         responses: {

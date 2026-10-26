@@ -12,7 +12,7 @@ import { ChapterReferencesDialog } from './ChapterReferencesDialog'
 export type AssistantProps = {
   novel: Novel; chapter: Chapter; providers: Provider[]; roles: Roles;
   flush: () => Promise<Version>; selection: Selection | null;
-  onAdopt: (version: Version) => void; onEvidence: (e: Evidence) => void;
+  onAdopt: (version: Version, expected: Version) => void; onEvidence: (e: Evidence) => void;
   onExtractReady: (changes: MemoryProposal[], versionId: string) => void;
   onClose?: () => void;
   candidateHost?: HTMLElement | null; onCandidate?: (id: string, show: boolean, label?: string) => void; onShowCandidate?: () => void;
@@ -120,7 +120,7 @@ export function Assistant({ novel, chapter, providers, roles, flush, selection, 
     try {
       const version = await flush()
       const adopted = await api.adopt(job.data.id, novel.id, version.id)
-      onAdopt(adopted); setShowCompare(false); setError('')
+      onAdopt(adopted, version); setShowCompare(false); setError('')
       await cache.invalidateQueries({ queryKey: ['job', job.data.id] }); await cache.invalidateQueries({ queryKey: ['chapters', novel.id] }); await cache.invalidateQueries({ queryKey: ['novel', novel.id] })
     } catch (e) { setError(errorText(e)) } finally { setAdopting(false) }
   }

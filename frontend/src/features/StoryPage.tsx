@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { ArrowRight, BookOpen, MagnifyingGlass, Plus, User, GlobeHemisphereWest, GitBranch, Clock } from '@phosphor-icons/react'
-import { api, dateLabel, errorText } from '../lib/api'
+import { ApiError, api, dateLabel, errorText } from '../lib/api'
 import type { Entity, EntityInput, Evidence, Novel } from '../lib/api'
 import { Badge, Button, Empty, Field, Loading, Modal, Notice, PageHeading } from '../components/ui'
 import { SourceButton } from './JobPresentation'
@@ -32,12 +32,23 @@ export function StoryPage({ novel, onEvidence }: { novel: Novel; onEvidence: (e:
 function EntityDialog({ novelId, entity, initialKind, onClose, onSaved }: { novelId: string; entity: Entity | null; initialKind: EntityInput['kind']; onClose: () => void; onSaved: () => void }) {
   const [form, setForm] = useState<EntityInput>(entity ? { kind: entity.kind, name: entity.name, summary: entity.summary, body: entity.body, aliases: entity.aliases, status: entity.status } : { kind: initialKind, name: '', summary: '', body: '', aliases: [], status: 'author' })
   const [aliases, setAliases] = useState(entity?.aliases?.join('、') || '')
+  const [baseline, setBaseline] = useState(entity?.updated_at)
+  const [latest, setLatest] = useState<Entity | null>(null)
+  const [conflicted, setConflicted] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   async function save() {
     setBusy(true)
-    try { await api.saveEntity(novelId, { ...form, aliases: aliases.split(/[、,，\n]/).map(s => s.trim()).filter(Boolean) }, entity?.id); onSaved() }
-    catch (e) { setError(errorText(e)) } finally { setBusy(false) }
+    try { await api.saveEntity(novelId, { ...form, aliases: aliases.split(/[、,，\n]/).map(s => s.trim()).filter(Boolean) }, entity?.id, baseline); onSaved() }
+    catch (e) { setError(errorText(e)); setConflicted(e instanceof ApiError && e.code === 'ENTITY_CONFLICT') } finally { setBusy(false) }
   }
-  return <Modal open onOpenChange={value => !value && onClose()} title={entity ? entity.name : '新建设定'} description="这里记录作者意图。角色在故事中何时获知信息，应在正史中单独确认。" wide><form onSubmit={e => { e.preventDefault(); void save() }} className="form-stack"><div className="form-row"><Field label="类型"><select value={form.kind} onChange={e => setForm({ ...form, kind: e.target.value as EntityInput['kind'] })}>{Object.entries(kinds).map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></Field><Field label="状态"><select value={form.status} onChange={e => setForm({ ...form, status: e.target.value as EntityInput['status'] })}><option value="author">作者已确认的设定</option><option value="proposed">待确认提议</option></select></Field></div><Field label="名称"><input required maxLength={160} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></Field><Field label="一句话简述"><textarea rows={2} maxLength={4000} value={form.summary} onChange={e => setForm({ ...form, summary: e.target.value })} /></Field><Field label="别名" help="使用顿号或逗号分隔；例如：沈砚、沈先生。"><input value={aliases} onChange={e => setAliases(e.target.value)} maxLength={2000} /></Field><Field label="详细档案"><textarea rows={9} maxLength={16000} value={form.body} onChange={e => setForm({ ...form, body: e.target.value })} placeholder="身份、动机、关系、限制，以及你希望保持的细节…" /></Field>{error && <Notice>{error}</Notice>}<div className="modal-actions"><Button onClick={onClose}>取消</Button><Button type="submit" variant="primary" disabled={busy || !form.name.trim()}>{busy ? '正在保存…' : '保存档案'}</Button></div></form></Modal>
+  async function readLatest() {
+    setBusy(true)
+    try {
+      const value = (await api.entities(novelId)).find(item => item.id === entity?.id)
+      if (!value) throw new Error('档案已不存在，请另建档案保存当前输入。')
+      setLatest(value); setBaseline(value.updated_at); setConflicted(false); setError('')
+    } catch (e) { setError(errorText(e)) } finally { setBusy(false) }
+  }
+  return <Modal open onOpenChange={value => !value && onClose()} title={entity ? entity.name : '新建设定'} description="这里记录作者意图。角色在故事中何时获知信息，应在正史中单独确认。" wide><form onSubmit={e => { e.preventDefault(); void save() }} className="form-stack"><div className="form-row"><Field label="类型"><select value={form.kind} onChange={e => setForm({ ...form, kind: e.target.value as EntityInput['kind'] })}>{Object.entries(kinds).map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></Field><Field label="状态"><select value={form.status} onChange={e => setForm({ ...form, status: e.target.value as EntityInput['status'] })}><option value="author">作者已确认的设定</option><option value="proposed">待确认提议</option></select></Field></div><Field label="名称"><input required maxLength={160} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></Field><Field label="一句话简述"><textarea rows={2} maxLength={4000} value={form.summary} onChange={e => setForm({ ...form, summary: e.target.value })} /></Field><Field label="别名" help="使用顿号或逗号分隔；例如：沈砚、沈先生。"><input value={aliases} onChange={e => setAliases(e.target.value)} maxLength={2000} /></Field><Field label="详细档案"><textarea rows={9} maxLength={16000} value={form.body} onChange={e => setForm({ ...form, body: e.target.value })} placeholder="身份、动机、关系、限制，以及你希望保持的细节…" /></Field>{latest && <Notice tone="neutral">你的输入仍保留，请比较后再保存。<details><summary>查看当前已保存档案</summary><strong>{latest.name} · {kinds[latest.kind]} · {latest.status === 'author' ? '已确认' : '待确认'}</strong><p>{latest.summary}</p><p>{latest.aliases?.join('、')}</p><div className="comparison-text">{latest.body}</div></details></Notice>}{error && <Notice>{error}{conflicted && <Button disabled={busy} onClick={() => void readLatest()}>读取最新档案</Button>}</Notice>}<div className="modal-actions"><Button onClick={onClose}>取消</Button><Button type="submit" variant="primary" disabled={busy || !form.name.trim()}>{busy ? '正在保存…' : '保存档案'}</Button></div></form></Modal>
 }

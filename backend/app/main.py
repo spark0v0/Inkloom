@@ -24,9 +24,9 @@ from .jobs import Generation
 from .library import Library
 from .references import ChapterReferences
 from .seed import create_demo
-from .storage import PROJECT_DIR, Workspace
+from .storage import PROJECT_DIR, Workspace, expected_workspace
 from .threads import ThreadTracking
-from .workspace_io import activate_original, activate_restore, backup, restore
+from .workspace_io import MAX_ARCHIVE, activate_original, activate_restore, backup, restore
 
 logger = logging.getLogger("story_workshop")
 
@@ -62,7 +62,7 @@ class LocalSessionMiddleware(BaseHTTPMiddleware):
         if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
             if not origin or not self.local_url(origin, True):
                 return JSONResponse({"code": "ORIGIN_REQUIRED", "message": "写入操作需要本地页面来源。", "details": {}}, status_code=403)
-            maximum = 64 * 1024 * 1024 if request.url.path == "/api/v1/workspace/restore" else 8 * 1024 * 1024
+            maximum = MAX_ARCHIVE if request.url.path == "/api/v1/workspace/restore" else 8 * 1024 * 1024
             try:
                 declared = int(request.headers.get("content-length", "0"))
             except ValueError:
@@ -72,7 +72,11 @@ class LocalSessionMiddleware(BaseHTTPMiddleware):
             body = await request.body()
             if len(body) > maximum:
                 return JSONResponse({"code": "BODY_TOO_LARGE", "message": "请求内容超过限制。", "details": {}}, status_code=413)
-        response = await call_next(request)
+        token = expected_workspace.set(None if bootstrap else request.headers.get("x-inkloom-workspace"))
+        try:
+            response = await call_next(request)
+        finally:
+            expected_workspace.reset(token)
         if bootstrap:
             response.set_cookie("story_session", self.token, httponly=True, samesite="strict", path="/api")
         response.headers["X-Content-Type-Options"] = "nosniff"
@@ -202,7 +206,7 @@ def create_app(data_dir: Path | None = None, *, worker: bool = True, port: int =
         return request.app.state.library.put_entity(novel_id, data)
 
     @app.put(prefix + "/novels/{novel_id}/entities/{entity_id}", response_model=dto.EntityOut)
-    def edit_entity(novel_id: str, entity_id: str, data: dto.EntityInput, request: Request):
+    def edit_entity(novel_id: str, entity_id: str, data: dto.EntityUpdate, request: Request):
         return request.app.state.library.put_entity(novel_id, data, entity_id)
 
     @app.get(prefix + "/novels/{novel_id}/threads", response_model=list[dto.ThreadOut])

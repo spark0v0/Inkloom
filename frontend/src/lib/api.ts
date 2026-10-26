@@ -54,22 +54,38 @@ export const npath = (id: string) => `/novels/${encodeURIComponent(id)}`
 export const cpath = (novel: string, chapter: string) => `${npath(novel)}/chapters/${encodeURIComponent(chapter)}`
 export const jpath = (job: string, novel: string) => `/jobs/${encodeURIComponent(job)}?novel_id=${encodeURIComponent(novel)}`
 
-export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+let activeWorkspace: string | undefined
+export function bindWorkspace(id: string) { activeWorkspace = id }
+const workspaceChanged = () => new ApiError('WORKSPACE_CHANGED', '工作区已切换，请重新载入。原页面的修改未写入当前工作区。', {}, 409)
+
+async function workspaceFetch(path: string, init?: RequestInit, expected = activeWorkspace): Promise<Response> {
+  const scoped = path !== '/health'
+  if (scoped && expected !== activeWorkspace) throw workspaceChanged()
+  const headers = new Headers(init?.headers)
+  if (init?.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
+  if (scoped && expected) headers.set('X-Inkloom-Workspace', expected)
   let response: Response
   try {
     response = await fetch('/api/v1' + path, {
       ...init,
-      headers: { ...(init?.body ? { 'Content-Type': 'application/json' } : {}), ...init?.headers },
+      headers,
       credentials: 'same-origin',
     })
   } catch {
     throw new ApiError('NETWORK_ERROR', '无法连接工作区。当前操作尚未确认，请保留页面内容后重试。')
   }
+  if (scoped && expected !== activeWorkspace) throw workspaceChanged()
   if (!response.ok) {
     const value = await response.json().catch(() => null)
     throw new ApiError(value?.code ?? 'REQUEST_FAILED', value?.message ?? '操作未完成，请重试。', value?.details ?? {}, response.status)
   }
-  return response.json() as Promise<T>
+  return response
+}
+
+export async function request<T>(path: string, init?: RequestInit, expected = activeWorkspace): Promise<T> {
+  const value = await (await workspaceFetch(path, init, expected)).json() as T
+  if (path !== '/health' && expected !== activeWorkspace) throw workspaceChanged()
+  return value
 }
 
 export const api = {
@@ -85,12 +101,12 @@ export const api = {
   editChapter: (id: string, chapter: string, data: Schema['ChapterPatch']) => request<Chapter>(cpath(id, chapter), { method: 'PATCH', body: JSON.stringify(data) }),
   references: (id: string, chapter: string) => request<ReferenceState>(cpath(id, chapter) + '/references'),
   saveReferences: (id: string, chapter: string, data: Schema['ReferenceUpdate']) => request<ReferenceState>(cpath(id, chapter) + '/references', { method: 'PUT', body: JSON.stringify(data) }),
-  save: (id: string, chapter: string, data: Schema['SaveInput']) => request<Version>(cpath(id, chapter) + '/versions', { method: 'POST', body: JSON.stringify(data) }),
+  save: (id: string, chapter: string, data: Schema['SaveInput'], workspace?: string) => request<Version>(cpath(id, chapter) + '/versions', { method: 'POST', body: JSON.stringify(data) }, workspace),
   versions: (id: string, chapter: string) => request<VersionSummary[]>(cpath(id, chapter) + '/versions'),
   version: (id: string, chapter: string, version: string) => request<Version>(cpath(id, chapter) + '/versions/' + encodeURIComponent(version)),
   confirm: (id: string, chapter: string, data: Schema['CanonInput']) => request<Schema['CanonOut']>(cpath(id, chapter) + '/canon', { method: 'POST', body: JSON.stringify(data) }),
   entities: (id: string) => request<Entity[]>(npath(id) + '/entities'),
-  saveEntity: (id: string, data: EntityInput, entity?: string) => request<Entity>(npath(id) + '/entities' + (entity ? '/' + entity : ''), { method: entity ? 'PUT' : 'POST', body: JSON.stringify(data) }),
+  saveEntity: (id: string, data: EntityInput, entity?: string, baseUpdatedAt?: string) => request<Entity>(npath(id) + '/entities' + (entity ? '/' + entity : ''), { method: entity ? 'PUT' : 'POST', body: JSON.stringify(entity ? { ...data, base_updated_at: baseUpdatedAt } : data) }),
   plans: (id: string) => request<Plan[]>(npath(id) + '/plans'),
   savePlan: (id: string, data: PlanInput, plan?: string) => request<Plan>(npath(id) + '/plans' + (plan ? '/' + plan : ''), { method: plan ? 'PUT' : 'POST', body: JSON.stringify(data) }),
   facts: (id: string, inactive = false) => request<Fact[]>(npath(id) + '/facts?include_inactive=' + inactive),
@@ -153,7 +169,7 @@ export function downloadText(text: string, name: string) {
 }
 
 export async function downloadFile(path: string, name: string) {
-  const response = await fetch('/api/v1' + path)
+  const response = await workspaceFetch(path)
   if (!response.ok) {
     const error = await response.json().catch(() => ({}))
     throw new ApiError(error.code ?? 'DOWNLOAD_FAILED', error.message ?? '下载未完成，请重试。')

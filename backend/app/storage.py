@@ -8,6 +8,7 @@ import json
 import os
 import threading
 from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,8 @@ from sqlalchemy.orm import Session
 from alembic import command
 
 from .domain import DomainError, uid
+
+expected_workspace: ContextVar[str | None] = ContextVar("expected_workspace", default=None)
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 PROJECT_DIR = BACKEND_DIR.parent
@@ -170,10 +173,17 @@ class Workspace:
                 active = candidate
         self.db = Database(active)
 
+    def ensure_current(self):
+        expected = expected_workspace.get()
+        if expected is not None and expected != self.db.workspace_id:
+            raise DomainError("WORKSPACE_CHANGED", "工作区已在其他页面切换，请重新载入。原页面的修改未写入当前工作区。", 409)
+
     @contextmanager
     def session(self, write: bool = False):
-        with self.lock, self.db.session(write=write) as session:
-            yield session
+        with self.lock:
+            self.ensure_current()
+            with self.db.session(write=write) as session:
+                yield session
 
     def activate(self, root: Path) -> None:
         with self.lock:

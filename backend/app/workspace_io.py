@@ -31,6 +31,7 @@ MAX_DATABASE = 256 * 1024 * 1024
 
 def backup(workspace: Workspace) -> bytes:
     with workspace.lock:
+        workspace.ensure_current()
         source = sqlite3.connect(workspace.db.path)
         snapshot = sqlite3.connect(":memory:")
         try:
@@ -54,7 +55,10 @@ def backup(workspace: Workspace) -> bytes:
     with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
         archive.writestr("workspace.db", database)
-    return buffer.getvalue()
+    contents = buffer.getvalue()
+    if len(contents) > MAX_ARCHIVE:
+        raise DomainError("BACKUP_TOO_LARGE", "压缩后的备份超过当前恢复上限，未生成不可恢复的下载文件。请联系维护者扩展备份容量。", 413)
+    return contents
 
 
 def restore(workspace: Workspace, contents: bytes) -> dict:
