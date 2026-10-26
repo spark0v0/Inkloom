@@ -25,6 +25,7 @@ from .library import Library
 from .references import ChapterReferences
 from .seed import create_demo
 from .storage import PROJECT_DIR, Workspace
+from .threads import ThreadTracking
 from .workspace_io import activate_original, activate_restore, backup, restore
 
 logger = logging.getLogger("story_workshop")
@@ -88,6 +89,7 @@ def create_app(data_dir: Path | None = None, *, worker: bool = True, port: int =
         app.state.workspace = workspace
         app.state.library = Library(workspace)
         app.state.references = ChapterReferences(workspace)
+        app.state.threads = ThreadTracking(workspace)
         app.state.generation = Generation(workspace)
         task = asyncio.create_task(app.state.generation.run()) if worker else None
         app.state.worker_task = task
@@ -202,6 +204,22 @@ def create_app(data_dir: Path | None = None, *, worker: bool = True, port: int =
     @app.put(prefix + "/novels/{novel_id}/entities/{entity_id}", response_model=dto.EntityOut)
     def edit_entity(novel_id: str, entity_id: str, data: dto.EntityInput, request: Request):
         return request.app.state.library.put_entity(novel_id, data, entity_id)
+
+    @app.get(prefix + "/novels/{novel_id}/threads", response_model=list[dto.ThreadOut])
+    def threads(novel_id: str, request: Request):
+        return request.app.state.threads.list(novel_id)
+
+    @app.put(prefix + "/novels/{novel_id}/threads/{entity_id}", response_model=dto.ThreadOut)
+    def thread_plan(novel_id: str, entity_id: str, data: dto.ThreadPlanInput, request: Request):
+        return request.app.state.threads.save_plan(novel_id, entity_id, data)
+
+    @app.post(prefix + "/novels/{novel_id}/threads/{entity_id}/progress", response_model=dto.ThreadOut)
+    def thread_progress(novel_id: str, entity_id: str, data: dto.ThreadProgressInput, request: Request):
+        return request.app.state.threads.add(novel_id, entity_id, data)
+
+    @app.patch(prefix + "/novels/{novel_id}/threads/{entity_id}/progress/{progress_id}", response_model=dto.ThreadOut)
+    def change_thread_progress(novel_id: str, entity_id: str, progress_id: str, data: dto.ThreadProgressChange, request: Request):
+        return request.app.state.threads.change(novel_id, entity_id, progress_id, data)
 
     @app.get(prefix + "/novels/{novel_id}/plans", response_model=list[dto.PlanOut])
     def plans(novel_id: str, request: Request):

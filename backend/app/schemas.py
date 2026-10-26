@@ -207,6 +207,71 @@ class Evidence(Schema):
     end_codepoint: int | None = None
 
 
+ThreadStage = Literal["planted", "advanced", "resolved"]
+ThreadStatus = Literal["planned", "planted", "advanced", "resolved", "needs_review"]
+
+
+class ThreadPlanInput(Schema):
+    base_revision: int = Field(ge=0)
+    target_chapter_id: str | None = Field(default=None, max_length=160)
+    intent: str = Field(default="", max_length=2000)
+    paused: bool = False
+
+
+class ThreadProgressInput(Schema):
+    base_revision: int = Field(ge=0)
+    operation_id: str = Field(min_length=8, max_length=160)
+    chapter_id: str = Field(min_length=1, max_length=160)
+    version_id: str = Field(min_length=1, max_length=160)
+    stage: ThreadStage
+    evidence: Evidence
+    note: str = Field(default="", max_length=2000)
+
+
+class ThreadProgressChange(Schema):
+    base_revision: int = Field(ge=0)
+    voided: bool
+
+
+class ThreadProgressOut(Schema):
+    id: str
+    chapter_id: str
+    version_id: str
+    chapter_title: str
+    chapter_position: int
+    paragraph_ordinal: int
+    stage: ThreadStage
+    evidence: Evidence
+    note: str
+    voided: bool
+    valid: bool
+    invalid_reason: str
+    created_at: str
+
+
+class ThreadOut(Schema):
+    entity: EntityOut
+    revision: int
+    target_chapter_id: str | None
+    target_chapter_title: str | None
+    target_position: int | None
+    intent: str
+    paused: bool
+    status: ThreadStatus
+    progress: list[ThreadProgressOut]
+
+
+class ThreadGuidance(Schema):
+    entity_id: str
+    name: str
+    status: ThreadStatus
+    author_plan: str
+    target_chapter_title: str | None
+    due: bool
+    progress: list[ThreadProgressOut]
+    omitted_records: int
+
+
 class MemoryProposal(Schema):
     kind: Literal["event", "state", "knowledge", "thread"] = "event"
     subject: str = Field(default="", max_length=160)
@@ -407,6 +472,7 @@ class ContextInput(Schema):
 
 
 class ContextOut(Schema):
+    thread_guidance: list[ThreadGuidance] = Field(default_factory=list)
     novel_id: str
     chapter_id: str
     base_version_id: str

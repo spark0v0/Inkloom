@@ -210,6 +210,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/novels/{novel_id}/threads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Threads */
+        get: operations["threads_api_v1_novels__novel_id__threads_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/novels/{novel_id}/threads/{entity_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Thread Plan */
+        put: operations["thread_plan_api_v1_novels__novel_id__threads__entity_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/novels/{novel_id}/threads/{entity_id}/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Thread Progress */
+        post: operations["thread_progress_api_v1_novels__novel_id__threads__entity_id__progress_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/novels/{novel_id}/threads/{entity_id}/progress/{progress_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change Thread Progress */
+        patch: operations["change_thread_progress_api_v1_novels__novel_id__threads__entity_id__progress__progress_id__patch"];
+        trace?: never;
+    };
     "/api/v1/novels/{novel_id}/plans": {
         parameters: {
             query?: never;
@@ -937,6 +1005,8 @@ export interface components {
         };
         /** ContextOut */
         ContextOut: {
+            /** Thread Guidance */
+            thread_guidance?: components["schemas"]["ThreadGuidance"][];
             /** Novel Id */
             novel_id: string;
             /** Chapter Id */
@@ -1969,6 +2039,128 @@ export interface components {
              */
             pinned: boolean;
         };
+        /** ThreadGuidance */
+        ThreadGuidance: {
+            /** Entity Id */
+            entity_id: string;
+            /** Name */
+            name: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "planned" | "planted" | "advanced" | "resolved" | "needs_review";
+            /** Author Plan */
+            author_plan: string;
+            /** Target Chapter Title */
+            target_chapter_title: string | null;
+            /** Due */
+            due: boolean;
+            /** Progress */
+            progress: components["schemas"]["ThreadProgressOut"][];
+            /** Omitted Records */
+            omitted_records: number;
+        };
+        /** ThreadOut */
+        ThreadOut: {
+            entity: components["schemas"]["EntityOut"];
+            /** Revision */
+            revision: number;
+            /** Target Chapter Id */
+            target_chapter_id: string | null;
+            /** Target Chapter Title */
+            target_chapter_title: string | null;
+            /** Target Position */
+            target_position: number | null;
+            /** Intent */
+            intent: string;
+            /** Paused */
+            paused: boolean;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "planned" | "planted" | "advanced" | "resolved" | "needs_review";
+            /** Progress */
+            progress: components["schemas"]["ThreadProgressOut"][];
+        };
+        /** ThreadPlanInput */
+        ThreadPlanInput: {
+            /** Base Revision */
+            base_revision: number;
+            /** Target Chapter Id */
+            target_chapter_id?: string | null;
+            /**
+             * Intent
+             * @default
+             */
+            intent: string;
+            /**
+             * Paused
+             * @default false
+             */
+            paused: boolean;
+        };
+        /** ThreadProgressChange */
+        ThreadProgressChange: {
+            /** Base Revision */
+            base_revision: number;
+            /** Voided */
+            voided: boolean;
+        };
+        /** ThreadProgressInput */
+        ThreadProgressInput: {
+            /** Base Revision */
+            base_revision: number;
+            /** Operation Id */
+            operation_id: string;
+            /** Chapter Id */
+            chapter_id: string;
+            /** Version Id */
+            version_id: string;
+            /**
+             * Stage
+             * @enum {string}
+             */
+            stage: "planted" | "advanced" | "resolved";
+            evidence: components["schemas"]["Evidence"];
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
+        /** ThreadProgressOut */
+        ThreadProgressOut: {
+            /** Id */
+            id: string;
+            /** Chapter Id */
+            chapter_id: string;
+            /** Version Id */
+            version_id: string;
+            /** Chapter Title */
+            chapter_title: string;
+            /** Chapter Position */
+            chapter_position: number;
+            /** Paragraph Ordinal */
+            paragraph_ordinal: number;
+            /**
+             * Stage
+             * @enum {string}
+             */
+            stage: "planted" | "advanced" | "resolved";
+            evidence: components["schemas"]["Evidence"];
+            /** Note */
+            note: string;
+            /** Voided */
+            voided: boolean;
+            /** Valid */
+            valid: boolean;
+            /** Invalid Reason */
+            invalid_reason: string;
+            /** Created At */
+            created_at: string;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -2638,6 +2830,146 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EntityOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    threads_api_v1_novels__novel_id__threads_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                novel_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    thread_plan_api_v1_novels__novel_id__threads__entity_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                novel_id: string;
+                entity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ThreadPlanInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    thread_progress_api_v1_novels__novel_id__threads__entity_id__progress_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                novel_id: string;
+                entity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ThreadProgressInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_thread_progress_api_v1_novels__novel_id__threads__entity_id__progress__progress_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                novel_id: string;
+                entity_id: string;
+                progress_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ThreadProgressChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadOut"];
                 };
             };
             /** @description Validation Error */

@@ -16,6 +16,8 @@ Inkloom 是中文 AI 小说创作工作台。接入自己的大模型，让 AI �
 
 审稿后，在具体意见下点 **准备改写这一段**，检查原文、建议和写作模型，再点 **按建议改写**。准备不调用模型，生成后可返回原审稿比较，采纳仅修改对应段落。**生成记录** 支持搜索、类型和状态筛选，以及加载更早记录。详见 [实现与验证](docs/IMPLEMENTATION-REVIEW-REVISION.md) 和 [最新开源项目对照](docs/REVIEW-2026-10-25.md)。
 
+长篇伏笔可在 **人物与设定 → 伏笔** 安排回收章节，关联定稿段落记录埋设、推进和回收。改稿后旧依据显示待复核；关联可撤销、恢复，正文不变。写作会带入到期或命中的伏笔及此前有效依据，未来回收不会倒灌前章。详见 [伏笔跟进与验证](docs/IMPLEMENTATION-THREAD-TRACKING.md)。
+
 ## 开始创作
 
 1. **连接模型**：在“模型设置”填写服务地址、模型 ID 和 API Key；首次保存可同时设为策划、写作、记忆与审稿的默认模型。
@@ -92,6 +94,7 @@ pwsh -File .\scripts\start.ps1 -Port 8766 -DataDirectory D:\StoryWorkspace
 - [模型接入审查、开源反馈与后续优先级](docs/REVIEW-2026-10-23.md)
 - [本章必读参考、重试恢复与验证](docs/IMPLEMENTATION-REFERENCES.md) / [连续性工程评测](evals/README.md)
 - [审稿修稿、完整生成历史与验证](docs/IMPLEMENTATION-REVIEW-REVISION.md) / [热门项目对照与剩余缺口](docs/REVIEW-2026-10-25.md)
+- [伏笔计划、正文进展与验证](docs/IMPLEMENTATION-THREAD-TRACKING.md)
 - [开发启动提示词](START_PROMPT.md) / [运行时提示词](prompts/)
 
 真实云模型的长篇质量、完整 Windows 输入法人工体验、跨浏览器与百万字性能仍待独立验证。当前不提供云同步、多人协作或完整剧情分支。项目独立实现，运行数据和密钥不进入源码仓库。

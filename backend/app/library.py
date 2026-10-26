@@ -240,6 +240,9 @@ class Library:
                 entity = Entity(id=uid("entity"), novel_id=novel_id, **data.model_dump())
                 s.add(entity)
             else:
+                from .models import ThreadTrack
+                if data.kind != "thread" and s.get(ThreadTrack, entity.id):
+                    raise DomainError("TRACKED_THREAD", "这条伏笔已有跟进安排，请保留伏笔类型或另建其他档案。", 409)
                 for key, value in data.model_dump().items():
                     setattr(entity, key, value)
             entity.updated_at = now()

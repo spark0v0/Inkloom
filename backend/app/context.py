@@ -115,6 +115,11 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
     # the context budget rejects an oversized request instead of silently dropping them.
     required_ids = {e.id for e in matched} | {e.id for e in all_entities if e.kind == "world"} | {
         e.id for e in pinned_entities}
+    from .threads import thread_context
+    thread_guidance, thread_sources = thread_context(session, novel_id, chapter.position, required_ids)
+    if any(source["source_id"] in request.excluded_source_ids for source in thread_sources):
+        raise DomainError("PROTECTED_CONTEXT", "本次伏笔跟进的原文依据不能排除，请先调整伏笔安排或暂缓跟进。")
+    required_ids.update(item.entity_id for item in thread_guidance)
     required = [e for e in all_entities if e.id in required_ids]
     entities = required + [e for e in all_entities if e.id not in required_ids][:max(0, 60 - len(required))]
     entity_terms = [name.casefold() for e in matched for name in [e.name, *e.aliases] if len(name) >= 2]
@@ -158,6 +163,7 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
     # Explicit pins are mandatory and de-duplicated against recent/retrieved text.
     prior_by_id = {source["source_id"]: source for source in prior_sources}
     prior_by_id.update({source["source_id"]: source for source in pinned_sources})
+    prior_by_id.update({source["source_id"]: source for source in thread_sources})
     prior_sources = list(prior_by_id.values())
     volume_id = request.volume_plan_id if request.task == "outline" else next(
         (p.id for p in all_plans if p.level == "volume" and p.title == chapter.volume), None)
@@ -252,6 +258,8 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
         input_body["inspiration_direction"] = direction
     if revision is not None:
         input_body["review_guidance"] = revision
+    if thread_guidance:
+        input_body["thread_guidance"] = [item.model_dump() for item in thread_guidance]
     input_body["reference_selection"] = {"entity_ids": reference_selection.entity_ids,
         "chapters": [pin.model_dump() for pin in reference_selection.chapters], "revision": chapter.references_revision}
     if reference_selection.notes:
@@ -293,6 +301,7 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
     if provider.input_price is not None and provider.output_price is not None:
         estimated_max = (estimate() * provider.input_price + output * provider.output_price) / 1_000_000
     preview = dto.ContextOut(novel_id=novel_id, chapter_id=chapter.id, task=request.task,
+        thread_guidance=thread_guidance,
         base_version_id=version.id, canon_revision=novel.canon_revision,
         settings_revision=novel.settings_revision, author_brief=input_body["author_brief"],
         references_revision=chapter.references_revision, pinned_entity_ids=reference_selection.entity_ids,

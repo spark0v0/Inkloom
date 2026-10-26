@@ -91,6 +91,31 @@ class Entity(Base):
     updated_at: Mapped[str] = mapped_column(String, default=now)
 
 
+class ThreadTrack(Base):
+    __tablename__ = "thread_tracks"
+    entity_id: Mapped[str] = mapped_column(ForeignKey("entities.id"), primary_key=True)
+    revision: Mapped[int] = mapped_column(Integer, default=0)
+    target_chapter_id: Mapped[str | None] = mapped_column(ForeignKey("chapters.id"), nullable=True)
+    intent: Mapped[str] = mapped_column(Text, default="")
+    paused: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class ThreadProgress(Base):
+    __tablename__ = "thread_progress"
+    __table_args__ = (UniqueConstraint("entity_id", "operation_id"),)
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    entity_id: Mapped[str] = mapped_column(ForeignKey("thread_tracks.entity_id"), index=True)
+    chapter_id: Mapped[str] = mapped_column(ForeignKey("chapters.id"))
+    version_id: Mapped[str] = mapped_column(ForeignKey("versions.id"))
+    stage: Mapped[str] = mapped_column(String)
+    evidence: Mapped[dict[str, Any]] = mapped_column(JSON)
+    note: Mapped[str] = mapped_column(Text, default="")
+    voided: Mapped[bool] = mapped_column(Boolean, default=False)
+    operation_id: Mapped[str] = mapped_column(String)
+    request_hash: Mapped[str] = mapped_column(String)
+    created_at: Mapped[str] = mapped_column(String, default=now)
+
+
 class Plan(Base):
     __tablename__ = "plans"
     id: Mapped[str] = mapped_column(String, primary_key=True)

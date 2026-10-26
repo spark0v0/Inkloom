@@ -1,0 +1,389 @@
+Inkloom thread tracking — 2026-10-26 development / 2026-10-27 final verification
+Windows, Python 3.13, Chrome desktop 1440x900 and emulated mobile 390x844.
+No real provider calls. Demo and loopback mocks only in isolated test workspaces.
+Browser coverage: 56 successful results before interruption + remaining 14 passed; final 8 thread scenarios rerun. 70 unique project/file/line scenarios.
+Early setup corrections: test helper used dict access on ParagraphOut; desktop tab selector matched book title; mobile assistant checked before editor loaded; system Temp permission failure avoided using project .tmp. These were not recorded as passing runs.
+Source paths sanitized; runtime data, backup contents and credentials excluded.
+
+=== Backend final regression: python -X utf8 -m pytest backend/tests -q --basetemp .tmp/thread-final-<unique> ===
+........................................................................ [ 48%]
+........................................................................ [ 97%]
+...                                                                      [100%]
+============================== warnings summary ===============================
+backend\.venv\Lib\site-packages\fastapi\testclient.py:1
+  <PROJECT>\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+147 passed, 1 warning in 78.50s (0:01:18)
+
+=== Static check: ruff check backend/app backend/tests backend/alembic/versions/c84e3a190b72_thread_tracking.py ===
+All checks passed!
+
+=== Broader historical migration check: ruff check backend (2 pre-existing failures, not fixed) ===
+I001 [*] Import block is un-sorted or un-formatted
+ --> backend\alembic\env.py:1:1
+  |
+1 | / from alembic import context
+2 | | from sqlalchemy import engine_from_config, pool
+3 | |
+4 | | from app.models import Base
+  | |___________________________^
+5 |
+6 |   config = context.config
+  |
+help: Organize imports
+  |
+  - from alembic import context
+1 | from sqlalchemy import engine_from_config, pool
+2 |
+3 + from alembic import context
+4 | from app.models import Base
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> backend\alembic\versions\924486b5f963_initial_schema.py:2:1
+  |
+1 |   """initial_schema"""
+2 | / from alembic import op
+3 | | import sqlalchemy as sa
+  | |_______________________^
+help: Organize imports
+  |
+1 | """initial_schema"""
+  - from alembic import op
+2 | import sqlalchemy as sa
+3 |
+4 + from alembic import op
+5 |
+  |
+
+Found 2 errors.
+[*] 2 fixable with `--fix`.
+
+=== API contract: npm --prefix frontend run check:api ===
+
+> story-workshop@0.2.0 check:api
+> node scripts/generate-api.mjs --check
+
+API declarations match the backend OpenAPI contract
+
+=== Unit tests: npm --prefix frontend run test ===
+
+> story-workshop@0.2.0 test
+> vitest run
+
+
+ RUN  v5.0.5 <PROJECT>/frontend
+
+
+ Test Files  4 passed (4)
+      Tests  19 passed (19)
+   Start at  19:14:17
+   Duration  8.96s (import 97%, transform 2%, tests 1%)
+
+=== Final production build: npm --prefix frontend run build ===
+
+> story-workshop@0.2.0 build
+> tsc -b && vite build
+
+vite v8.3.4 building client environment for production...
+transforming...
+✓ 4737 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/assets/favicon-vYokD4zw.svg                0.30 kB │ gzip:   0.23 kB
+dist/index.html                                 0.74 kB │ gzip:   0.49 kB
+dist/assets/index-DY-9rwfF.css                 98.03 kB │ gzip:  19.66 kB
+dist/assets/Check.es-BmmoTLXm.js                1.53 kB │ gzip:   0.57 kB
+dist/assets/DownloadSimple.es-C9zquNG-.js       2.01 kB │ gzip:   0.67 kB
+dist/assets/useJobStream-gG9yARuc.js            2.14 kB │ gzip:   0.91 kB
+dist/assets/SlidersHorizontal.es-BRNA-51w.js    2.37 kB │ gzip:   0.73 kB
+dist/assets/Play.es-Csp4i0tt.js                 4.47 kB │ gzip:   1.24 kB
+dist/assets/ProductionResults-DO3Z7eyE.js       5.14 kB │ gzip:   1.55 kB
+dist/assets/JobsPage-C8s9g2wM.js                7.58 kB │ gzip:   3.12 kB
+dist/assets/BackupPage-D136Vi83.js              8.46 kB │ gzip:   3.31 kB
+dist/assets/SettingsPage-oz0PzJEb.js           11.46 kB │ gzip:   4.19 kB
+dist/assets/JobPresentation-B_qihVLT.js        18.87 kB │ gzip:   6.55 kB
+dist/assets/PlanningPage-DnNohsmH.js           21.95 kB │ gzip:   7.24 kB
+dist/assets/StoryPage-D5bTFm-y.js              32.56 kB │ gzip:  10.59 kB
+dist/assets/ui-h4OKnPuz.js                     67.11 kB │ gzip:  22.19 kB
+dist/assets/index-BrqgiGZN.js                 323.99 kB │ gzip:  97.52 kB
+dist/assets/EditorPage-D_HbFWla.js            474.81 kB │ gzip: 147.65 kB
+
+✓ built in 735ms
+
+=== Backend restore-order defect reproduced before fix (expected failure) ===
+F                                                                        [100%]
+================================== FAILURES ===================================
+________ test_restoring_old_planting_cannot_invalidate_its_replacement ________
+
+library = <app.library.Library object at 0x000002343305A7B0>
+
+    def test_restoring_old_planting_cannot_invalidate_its_replacement(library):
+        novel, entity, chapters, tracking = setup(library)
+        original = tracking.add(novel.id, entity.id, progress(tracking, novel, entity, chapters[0], "planted"))
+        original_id = original.progress[0].id
+        tracking.change(novel.id, entity.id, original_id, dto.ThreadProgressChange(base_revision=original.revision, voided=True))
+        replacement = tracking.add(novel.id, entity.id, progress(tracking, novel, entity, chapters[1], "planted"))
+>       with pytest.raises(DomainError) as error:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE DomainError
+
+backend\tests\test_threads.py:97: Failed
+============================== warnings summary ===============================
+backend\.venv\Lib\site-packages\fastapi\testclient.py:1
+  <PROJECT>\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED backend\tests\test_threads.py::test_restoring_old_planting_cannot_invalidate_its_replacement
+1 failed, 12 deselected, 1 warning in 0.56s
+
+=== Frontend retry/revision defect reproduced against previous build: test:e2e -- thread-tracking.spec.ts --project=desktop --grep 关联保存回执 (expected failure) ===
+
+> story-workshop@0.2.0 test:e2e
+> playwright test thread-tracking.spec.ts --project=desktop --grep 关联保存回执
+
+[WebServer] INFO:     Started server process [9004]
+[WebServer] INFO:     Waiting for application startup.
+[WebServer] INFO:     Application startup complete.
+[WebServer] INFO:     Uvicorn running on http://127.0.0.1:9876 (Press CTRL+C to quit)
+
+Running 1 test using 1 worker
+
+(node:14272) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x  1 [desktop] › e2e\thread-tracking.spec.ts:139:1 › 关联保存回执丢失后重试不重复，也不覆盖其他窗口的新计划 (10.1s)
+
+
+  1) [desktop] › e2e\thread-tracking.spec.ts:139:1 › 关联保存回执丢失后重试不重复，也不覆盖其他窗口的新计划 ───────────────────
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('alert').filter({ hasText: '伏笔跟进已在其他窗口更新' })
+    Expected: visible
+    Timeout: 8000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" getByRole('alert').filter({ hasText: '伏笔跟进已在其他窗口更新' }) with timeout 8000ms
+      - waiting for getByRole('alert').filter({ hasText: '伏笔跟进已在其他窗口更新' })
+
+
+      165 |   await expect(page.getByLabel('届时如何推进或回收', { exact: true })).toHaveValue('当前窗口尚未保存的安排。')
+      166 |   await page.getByRole('button', { name: '保存安排', exact: true }).click()
+    > 167 |   await expect(page.getByRole('alert').filter({ hasText: '伏笔跟进已在其他窗口更新' })).toBeVisible()
+          |                                                                             ^
+      168 |   expect((await readThreads(page, ids.novel))[0].intent).toBe('另一个窗口刚刚保存的安排。')
+      169 | })
+      170 |
+        at <PROJECT>\frontend\e2e\thread-tracking.spec.ts:167:77
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\thread-tracking-关联保存回执丢失后重试不重复，也不覆盖其他窗口的新计划-desktop\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\thread-tracking-关联保存回执丢失后重试不重复，也不覆盖其他窗口的新计划-desktop\error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\thread-tracking-关联保存回执丢失后重试不重复，也不覆盖其他窗口的新计划-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\thread-tracking-关联保存回执丢失后重试不重复，也不覆盖其他窗口的新计划-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    [desktop] › e2e\thread-tracking.spec.ts:139:1 › 关联保存回执丢失后重试不重复，也不覆盖其他窗口的新计划 ────────────────────
+
+=== Full browser suite: npm --prefix frontend run test:e2e (INTERRUPTED after 56 successful scenarios, no final exit result) ===
+
+> story-workshop@0.2.0 test:e2e
+> playwright test
+
+[WebServer] INFO:     Started server process [9004]
+[WebServer] INFO:     Waiting for application startup.
+[WebServer] INFO:     Application startup complete.
+[WebServer] INFO:     Uvicorn running on http://127.0.0.1:9876 (Press CTRL+C to quit)
+
+Running 70 tests using 1 worker
+
+(node:4744) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  1 [desktop] › e2e\chapter-references.spec.ts:48:1 › 本章必读保存与刷新恢复，生成只采用保存的参考和任务目标 (5.7s)
+  ok  2 [desktop] › e2e\chapter-references.spec.ts:102:1 › 前文更新后不能默用旧参考，作者可明确改用当前定稿 (1.7s)
+  ok  3 [desktop] › e2e\chapter-references.spec.ts:135:1 › 双窗口修改参考发生冲突时保留输入，显式重新载入后再保存 (2.1s)
+  ok  4 [desktop] › e2e\chapter-references.spec.ts:159:1 › 生成截断后重试，前一次片段仍可查看和下载 (6.9s)
+  ok  5 [desktop] › e2e\inspiration-return.spec.ts:12:1 › 续写不满意可重新选择原方向，刷新后仍保留来源 (8.7s)
+  ok  6 [desktop] › e2e\review-rewrite.spec.ts:87:1 › 审稿后准备段落改写不调用模型，明确生成、往返原建议并局部采纳 (6.0s)
+  ok  7 [desktop] › e2e\review-rewrite.spec.ts:122:1 › 准备修稿后另一窗口更新正文，旧建议不会覆盖新稿或再次调用模型 (2.7s)
+[WebServer] Exception in callback _ProactorBasePipeTransport._call_connection_lost()
+[WebServer] handle: <Handle _ProactorBasePipeTransport._call_connection_lost()>
+[WebServer] Traceback (most recent call last):
+[WebServer]   File "<USER_HOME>\AppData\Local\Programs\Python\Python313\Lib\asyncio\events.py", line 89, in _run
+[WebServer]     self._context.run(self._callback, *self._args)
+[WebServer]     ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[WebServer]   File "<USER_HOME>\AppData\Local\Programs\Python\Python313\Lib\asyncio\proactor_events.py", line 165, in _call_connection_lost
+[WebServer]     self._sock.shutdown(socket.SHUT_RDWR)
+[WebServer]     ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+[WebServer] ConnectionResetError: [WinError 10054] 远程主机强迫关闭了一个现有的连接。
+  ok  8 [desktop] › e2e\review-rewrite.spec.ts:138:1 › 作者判断冲突保留说明，误报不能准备修稿 (3.9s)
+  ok  9 [desktop] › e2e\review-rewrite.spec.ts:160:1 › 完整生成历史可加载150条之前的记录，分页失败保留列表并可搜索筛选 (10.6s)
+  ok 10 [desktop] › e2e\thread-tracking.spec.ts:45:1 › 伏笔计划、原文关联与撤销恢复，写作只看到当时有效进展 (4.1s)
+  ok 11 [desktop] › e2e\thread-tracking.spec.ts:95:1 › 伏笔双窗口保存冲突保留输入，读取最新安排后可明确保存 (1.8s)
+  ok 12 [desktop] › e2e\thread-tracking.spec.ts:116:1 › 正文改稿后旧伏笔待复核，打开的关联表单拒绝旧版本并保留说明 (1.9s)
+  ok 13 [desktop] › e2e\thread-tracking.spec.ts:139:1 › 关联保存回执丢失后重试复用同一请求，不重复添加记录 (1.2s)
+  ok 14 [desktop] › e2e\workshop.spec.ts:7:1 › 卡剧情找灵感、选中方向续写、刷新恢复与采纳 (10.5s)
+  ok 15 [desktop] › e2e\workshop.spec.ts:53:1 › 改稿后旧灵感不能直接续写，找灵感前先保存 (12.4s)
+  ok 16 [desktop] › e2e\workshop.spec.ts:74:1 › 写作提交回执丢失时保留同一请求并锁定参数 (7.8s)
+  ok 17 [desktop] › e2e\workshop.spec.ts:142:1 › 百章目录搜索、状态筛选、折叠定位与切章保存 (4.7s)
+  ok 18 [desktop] › e2e\workshop.spec.ts:191:1 › 切章保存失败保留当前编辑内容 (3.4s)
+  ok 19 [desktop] › e2e\workshop.spec.ts:212:1 › 手写保存、刷新、版本、导出与正史确认 (4.5s)
+  ok 20 [desktop] › e2e\workshop.spec.ts:231:1 › 演示候选不会直接改稿，采纳后旧版本保留 (4.9s)
+  ok 21 [desktop] › e2e\workshop.spec.ts:248:1 › 生成后修改原稿，旧候选不能覆盖新文字 (6.3s)
+  ok 22 [desktop] › e2e\workshop.spec.ts:264:1 › 两页编辑冲突保留双方，显式另存解决 (7.6s)
+  ok 23 [desktop] › e2e\workshop.spec.ts:282:1 › 离线保存不报成功，恢复连接后重试原请求 (5.2s)
+  ok 24 [desktop] › e2e\workshop.spec.ts:296:1 › 提取只给提议，确认后可以定位来源与搜索 (5.8s)
+  ok 25 [desktop] › e2e\workshop.spec.ts:316:1 › 窄屏无横向溢出，助手和目录通过抽屉可达 (3.7s)
+  ok 26 [desktop] › e2e\workshop.spec.ts:332:1 › emoji 后选段改写保留其余原文 (4.9s)
+  ok 27 [desktop] › e2e\workshop.spec.ts:355:1 › 手稿切分预览与实际导入一致 (1.6s)
+  ok 28 [desktop] › e2e\workshop.spec.ts:371:1 › 备份下载、校验与新工作区恢复 (5.1s)
+  ok 29 [desktop] › e2e\workshop.spec.ts:398:1 › 编辑器与助手的自动可访问性检查 (5.2s)
+  ok 30 [desktop] › e2e\workshop.spec.ts:407:1 › 任务已提交但响应失败，重试复用同一任务 (4.9s)
+  ok 31 [desktop] › e2e\workshop.spec.ts:429:1 › AI 建书、章节细纲、整章生成、记忆定稿、下一章与连载导出 (14.8s)
+  ok 32 [desktop] › e2e\workshop.spec.ts:482:1 › 首个模型连接可同时用于全部创作环节 (694ms)
+  ok 33 [desktop] › e2e\workshop.spec.ts:507:1 › 模型目录读取、选择和就地错误反馈 (3.6s)
+  ok 34 [desktop] › e2e\workshop.spec.ts:558:1 › 开书方案刷新可恢复，采纳后页内进入细纲且不会自动调用 (6.0s)
+  ok 35 [desktop] › e2e\workshop.spec.ts:576:1 › 继续写作进入未完成章，前章未定稿有直接处理入口 (4.4s)
+(node:26596) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 36 [mobile] › e2e\chapter-references.spec.ts:48:1 › 本章必读保存与刷新恢复，生成只采用保存的参考和任务目标 (9.2s)
+  ok 37 [mobile] › e2e\chapter-references.spec.ts:102:1 › 前文更新后不能默用旧参考，作者可明确改用当前定稿 (1.6s)
+  ok 38 [mobile] › e2e\chapter-references.spec.ts:135:1 › 双窗口修改参考发生冲突时保留输入，显式重新载入后再保存 (2.1s)
+  ok 39 [mobile] › e2e\chapter-references.spec.ts:159:1 › 生成截断后重试，前一次片段仍可查看和下载 (6.8s)
+  ok 40 [mobile] › e2e\inspiration-return.spec.ts:12:1 › 续写不满意可重新选择原方向，刷新后仍保留来源 (9.2s)
+  ok 41 [mobile] › e2e\review-rewrite.spec.ts:87:1 › 审稿后准备段落改写不调用模型，明确生成、往返原建议并局部采纳 (6.4s)
+  ok 42 [mobile] › e2e\review-rewrite.spec.ts:122:1 › 准备修稿后另一窗口更新正文，旧建议不会覆盖新稿或再次调用模型 (3.1s)
+  ok 43 [mobile] › e2e\review-rewrite.spec.ts:138:1 › 作者判断冲突保留说明，误报不能准备修稿 (3.8s)
+  ok 44 [mobile] › e2e\review-rewrite.spec.ts:160:1 › 完整生成历史可加载150条之前的记录，分页失败保留列表并可搜索筛选 (10.5s)
+  ok 45 [mobile] › e2e\thread-tracking.spec.ts:45:1 › 伏笔计划、原文关联与撤销恢复，写作只看到当时有效进展 (3.7s)
+  ok 46 [mobile] › e2e\thread-tracking.spec.ts:95:1 › 伏笔双窗口保存冲突保留输入，读取最新安排后可明确保存 (1.7s)
+  ok 47 [mobile] › e2e\thread-tracking.spec.ts:116:1 › 正文改稿后旧伏笔待复核，打开的关联表单拒绝旧版本并保留说明 (2.2s)
+  ok 48 [mobile] › e2e\thread-tracking.spec.ts:139:1 › 关联保存回执丢失后重试复用同一请求，不重复添加记录 (1.1s)
+  ok 49 [mobile] › e2e\workshop.spec.ts:7:1 › 卡剧情找灵感、选中方向续写、刷新恢复与采纳 (10.4s)
+  ok 50 [mobile] › e2e\workshop.spec.ts:53:1 › 改稿后旧灵感不能直接续写，找灵感前先保存 (12.3s)
+  ok 51 [mobile] › e2e\workshop.spec.ts:74:1 › 写作提交回执丢失时保留同一请求并锁定参数 (7.9s)
+  ok 52 [mobile] › e2e\workshop.spec.ts:142:1 › 百章目录搜索、状态筛选、折叠定位与切章保存 (5.2s)
+  ok 53 [mobile] › e2e\workshop.spec.ts:191:1 › 切章保存失败保留当前编辑内容 (3.3s)
+  ok 54 [mobile] › e2e\workshop.spec.ts:212:1 › 手写保存、刷新、版本、导出与正史确认 (4.4s)
+  ok 55 [mobile] › e2e\workshop.spec.ts:231:1 › 演示候选不会直接改稿，采纳后旧版本保留 (4.9s)
+  ok 56 [mobile] › e2e\workshop.spec.ts:248:1 › 生成后修改原稿，旧候选不能覆盖新文字 (6.3s)
+
+=== Final thread scenarios: npm --prefix frontend run test:e2e -- thread-tracking.spec.ts ===
+
+> story-workshop@0.2.0 test:e2e
+> playwright test thread-tracking.spec.ts
+
+[WebServer] INFO:     Started server process [26004]
+[WebServer] INFO:     Waiting for application startup.
+[WebServer] INFO:     Application startup complete.
+[WebServer] INFO:     Uvicorn running on http://127.0.0.1:9876 (Press CTRL+C to quit)
+
+Running 8 tests using 1 worker
+
+(node:10908) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 [desktop] › e2e\thread-tracking.spec.ts:45:1 › 伏笔计划、原文关联与撤销恢复，写作只看到当时有效进展 (4.2s)
+  ok 2 [desktop] › e2e\thread-tracking.spec.ts:95:1 › 伏笔双窗口保存冲突保留输入，读取最新安排后可明确保存 (1.8s)
+  ok 3 [desktop] › e2e\thread-tracking.spec.ts:116:1 › 正文改稿后旧伏笔待复核，打开的关联表单拒绝旧版本并保留说明 (1.8s)
+  ok 4 [desktop] › e2e\thread-tracking.spec.ts:139:1 › 关联保存回执丢失后重试不重复，也不覆盖其他窗口的新计划 (1.4s)
+(node:26892) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 5 [mobile] › e2e\thread-tracking.spec.ts:45:1 › 伏笔计划、原文关联与撤销恢复，写作只看到当时有效进展 (4.2s)
+  ok 6 [mobile] › e2e\thread-tracking.spec.ts:95:1 › 伏笔双窗口保存冲突保留输入，读取最新安排后可明确保存 (1.8s)
+  ok 7 [mobile] › e2e\thread-tracking.spec.ts:116:1 › 正文改稿后旧伏笔待复核，打开的关联表单拒绝旧版本并保留说明 (2.0s)
+  ok 8 [mobile] › e2e\thread-tracking.spec.ts:139:1 › 关联保存回执丢失后重试不重复，也不覆盖其他窗口的新计划 (1.3s)
+
+  8 passed (23.4s)
+
+=== Remaining mobile scenarios: npm --prefix frontend run test:e2e -- --project=mobile workshop.spec.ts:264 workshop.spec.ts:282 workshop.spec.ts:296 workshop.spec.ts:316 workshop.spec.ts:332 workshop.spec.ts:355 workshop.spec.ts:371 workshop.spec.ts:398 workshop.spec.ts:407 workshop.spec.ts:429 workshop.spec.ts:482 workshop.spec.ts:507 workshop.spec.ts:558 workshop.spec.ts:576 ===
+
+> story-workshop@0.2.0 test:e2e
+> playwright test --project=mobile workshop.spec.ts:264 workshop.spec.ts:282 workshop.spec.ts:296 workshop.spec.ts:316 workshop.spec.ts:332 workshop.spec.ts:355 workshop.spec.ts:371 workshop.spec.ts:398 workshop.spec.ts:407 workshop.spec.ts:429 workshop.spec.ts:482 workshop.spec.ts:507 workshop.spec.ts:558 workshop.spec.ts:576
+
+[WebServer] INFO:     Started server process [26860]
+[WebServer] INFO:     Waiting for application startup.
+[WebServer] INFO:     Application startup complete.
+[WebServer] INFO:     Uvicorn running on http://127.0.0.1:9876 (Press CTRL+C to quit)
+
+Running 14 tests using 1 worker
+
+(node:22396) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  1 [mobile] › e2e\workshop.spec.ts:264:1 › 两页编辑冲突保留双方，显式另存解决 (7.9s)
+  ok  2 [mobile] › e2e\workshop.spec.ts:282:1 › 离线保存不报成功，恢复连接后重试原请求 (5.6s)
+  ok  3 [mobile] › e2e\workshop.spec.ts:296:1 › 提取只给提议，确认后可以定位来源与搜索 (6.0s)
+  ok  4 [mobile] › e2e\workshop.spec.ts:316:1 › 窄屏无横向溢出，助手和目录通过抽屉可达 (4.1s)
+  ok  5 [mobile] › e2e\workshop.spec.ts:332:1 › emoji 后选段改写保留其余原文 (5.0s)
+  ok  6 [mobile] › e2e\workshop.spec.ts:355:1 › 手稿切分预览与实际导入一致 (1.7s)
+  ok  7 [mobile] › e2e\workshop.spec.ts:371:1 › 备份下载、校验与新工作区恢复 (5.2s)
+  ok  8 [mobile] › e2e\workshop.spec.ts:398:1 › 编辑器与助手的自动可访问性检查 (5.2s)
+  ok  9 [mobile] › e2e\workshop.spec.ts:407:1 › 任务已提交但响应失败，重试复用同一任务 (4.1s)
+  ok 10 [mobile] › e2e\workshop.spec.ts:429:1 › AI 建书、章节细纲、整章生成、记忆定稿、下一章与连载导出 (15.2s)
+  ok 11 [mobile] › e2e\workshop.spec.ts:482:1 › 首个模型连接可同时用于全部创作环节 (686ms)
+  ok 12 [mobile] › e2e\workshop.spec.ts:507:1 › 模型目录读取、选择和就地错误反馈 (5.7s)
+  ok 13 [mobile] › e2e\workshop.spec.ts:558:1 › 开书方案刷新可恢复，采纳后页内进入细纲且不会自动调用 (6.0s)
+  ok 14 [mobile] › e2e\workshop.spec.ts:576:1 › 继续写作进入未完成章，前章未定稿有直接处理入口 (4.5s)
+
+  14 passed (1.3m)
+
+=== Local consistent snapshot before migration ===
+Consistent pre-migration ZIP created and checked; schema=b73d2f809a61; active_jobs=0
+Backup: data\backups\before-thread-tracking-8156e9a5c7d5418e857ce4bec334ddcf.zip
+
+=== Actual snapshot restore/upgrade in isolated .tmp workspace ===
+Actual pre-migration backup restored and upgraded in isolated .tmp workspace
+Selected author-data table counts/hashes preserved; live workspace pointer unchanged; no worker started
+
+=== Local launch: scripts/launch.ps1 -NoBrowser (service kept running) ===
+正在构建网页…
+
+> story-workshop@0.2.0 build
+> tsc -b && vite build
+
+vite v8.3.4 building client environment for production...
+transforming...
+✓ 4737 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/assets/favicon-vYokD4zw.svg                0.30 kB │ gzip:   0.23 kB
+dist/index.html                                 0.74 kB │ gzip:   0.49 kB
+dist/assets/index-DY-9rwfF.css                 98.03 kB │ gzip:  19.66 kB
+dist/assets/Check.es-BmmoTLXm.js                1.53 kB │ gzip:   0.57 kB
+dist/assets/DownloadSimple.es-C9zquNG-.js       2.01 kB │ gzip:   0.67 kB
+dist/assets/useJobStream-gG9yARuc.js            2.14 kB │ gzip:   0.91 kB
+dist/assets/SlidersHorizontal.es-BRNA-51w.js    2.37 kB │ gzip:   0.73 kB
+dist/assets/Play.es-Csp4i0tt.js                 4.47 kB │ gzip:   1.24 kB
+dist/assets/ProductionResults-DO3Z7eyE.js       5.14 kB │ gzip:   1.55 kB
+dist/assets/JobsPage-C8s9g2wM.js                7.58 kB │ gzip:   3.12 kB
+dist/assets/BackupPage-D136Vi83.js              8.46 kB │ gzip:   3.31 kB
+dist/assets/SettingsPage-oz0PzJEb.js           11.46 kB │ gzip:   4.19 kB
+dist/assets/JobPresentation-B_qihVLT.js        18.87 kB │ gzip:   6.55 kB
+dist/assets/PlanningPage-DnNohsmH.js           21.95 kB │ gzip:   7.24 kB
+dist/assets/StoryPage-D5bTFm-y.js              32.56 kB │ gzip:  10.59 kB
+dist/assets/ui-h4OKnPuz.js                     67.11 kB │ gzip:  22.19 kB
+dist/assets/index-BrqgiGZN.js                 323.99 kB │ gzip:  97.52 kB
+dist/assets/EditorPage-D_HbFWla.js            474.81 kB │ gzip: 147.65 kB
+
+✓ built in 504ms
+正在启动 Inkloom：http://127.0.0.1:8765
+Inkloom 已启动：http://127.0.0.1:8765
+保留此窗口；按 Ctrl+C 停止本次启动的服务。
+运行日志：<PROJECT>\.runtime\launch-8765-d80f60f0387e4ff594d8f4eb8f7d2600.err.log
+
+=== Read-only local migration and HTTP verification ===
+Local schema upgraded b73d2f809a61 -> c84e3a190b72; integrity and foreign keys OK
+Existing manuscript, chapter, entity, fact and plan table counts/hashes preserved
+HTTP health, latest production index, history and thread list: OK; no generation requested

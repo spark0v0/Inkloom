@@ -10,6 +10,8 @@ export type Version = Schema['VersionOut']
 export type VersionSummary = Schema['VersionSummary']
 export type Entity = Schema['EntityOut']
 export type EntityInput = Schema['EntityInput']
+export type Thread = Schema['ThreadOut']
+export type ThreadProgressInput = Schema['ThreadProgressInput']
 export type Plan = Schema['PlanOut']
 export type PlanInput = Schema['PlanInput']
 export type Fact = Schema['FactOut']
@@ -92,6 +94,10 @@ export const api = {
   plans: (id: string) => request<Plan[]>(npath(id) + '/plans'),
   savePlan: (id: string, data: PlanInput, plan?: string) => request<Plan>(npath(id) + '/plans' + (plan ? '/' + plan : ''), { method: plan ? 'PUT' : 'POST', body: JSON.stringify(data) }),
   facts: (id: string, inactive = false) => request<Fact[]>(npath(id) + '/facts?include_inactive=' + inactive),
+  threads: (id: string) => request<Thread[]>(npath(id) + '/threads'),
+  saveThreadPlan: (id: string, entity: string, data: Schema['ThreadPlanInput']) => request<Thread>(npath(id) + `/threads/${entity}`, { method: 'PUT', body: JSON.stringify(data) }),
+  addThreadProgress: (id: string, entity: string, data: ThreadProgressInput) => request<Thread>(npath(id) + `/threads/${entity}/progress`, { method: 'POST', body: JSON.stringify(data) }),
+  changeThreadProgress: (id: string, entity: string, progress: string, data: Schema['ThreadProgressChange']) => request<Thread>(npath(id) + `/threads/${entity}/progress/${progress}`, { method: 'PATCH', body: JSON.stringify(data) }),
   search: (id: string, q: string) => request<Schema['SearchResult'][]>(npath(id) + '/search?q=' + encodeURIComponent(q)),
   context: (id: string, data: ContextInput) => request<Context>(npath(id) + '/context', { method: 'POST', body: JSON.stringify(data) }),
   createJob: (id: string, data: JobInput) => request<JobDetail>(npath(id) + '/jobs', { method: 'POST', body: JSON.stringify(data) }),

@@ -1,6 +1,6 @@
 # 技术方案与关键契约
 
-> 当前 0.2 沿用模块化单体和 SQLite，在已有生成任务中增加全书方案、分卷章节细纲及事务采纳；该阶段迁移为 `a12c7e604bc9`，最新本章参考迁移为 `b73d2f809a61`。实际变更见 [连载工作流决策](decisions/0004-serial-production.md)、[0.2 实现记录](IMPLEMENTATION-V0.2.md) 与 [本章参考实现](IMPLEMENTATION-REFERENCES.md)，以下保留最初的完整技术方案。
+> 当前 0.2 沿用模块化单体和 SQLite，在已有生成任务中增加全书方案、分卷章节细纲及事务采纳；该阶段迁移为 `a12c7e604bc9`，本章参考迁移为 `b73d2f809a61`，最新伏笔跟进迁移为 `c84e3a190b72`。实际变更见 [连载工作流决策](decisions/0004-serial-production.md)、[0.2 实现记录](IMPLEMENTATION-V0.2.md)、[本章参考实现](IMPLEMENTATION-REFERENCES.md) 与 [伏笔跟进实现](IMPLEMENTATION-THREAD-TRACKING.md)，以下保留最初的完整技术方案。
 
 2026-10-24 增加结构化 `inspiration` 任务与选中方向引用，复用任务表，无数据库迁移。方向在服务端按同作品、同章节与上下文基线校验；列表查询按章节过滤且不加载冻结上下文。前端结果展示与 SSE Hook 从写作助手拆出，供编辑器、任务记录和规划页复用。契约见 [决策 0007](decisions/0007-in-chapter-inspiration.md)。
 
@@ -9,6 +9,8 @@
 同日新增审稿修稿与历史分页，无新迁移：`review_rewrite.py` 从有效审稿的指定意见解析真实版本和稳定段落 ID，准备只读；`ContextInput.review_reference` 冻结来源哈希，完成与采纳同时检查意见、作者判断、依据和整段选区。`FindingDecision` 的可选基线字段保护新客户端的并发说明。`job_history.py` 提供绑定筛选作用域的 `(created_at, id)` 游标分页，SQL 只选有限摘要；原 `/jobs` 接口保留 150 条及旧响应供兼容入口使用。`ReviewFindings` 与 `SourceButton` 供编辑器和历史详情复用。契约见 [决策 0009](decisions/0009-review-rewrite-history.md)，验证见 [实现记录](IMPLEMENTATION-REVIEW-REVISION.md)。
 
 状态：**规划基线，已有 0.1.0 本地实现**。以下细分目录和部分字段仍是可演进设计，实际结构与取舍见 [ADR 0001](adr/0001-local-workspace.md)，验证范围见 [IMPLEMENTATION.md](IMPLEMENTATION.md)。技术调整不能绕开数据安全和作者控制原则。
+
+2026-10-26 新增 `ThreadTrack`、`ThreadProgress`，沿用伏笔 Entity，不把计划当事实。`threads.py` 按章序、段序计算有效进展，负责跟进修订、幂等新增、撤销与恢复；`context.py` 仅冻结当前章之前的进展，并把原文列为不可静默裁剪的依据。计划和关联变更递增作品设置修订，沿用旧任务失效机制。`thread_restore.py` 独立核验备份中的归属和不可变引文；旧上下文的 `thread_guidance` 缺失时默认为空。恢复支持前三个旧迁移，先验证再在新目录升级，未提供向旧代码直接降级承诺。契约见 [决策 0010](decisions/0010-thread-tracking.md)。
 
 ## 架构选择
 
