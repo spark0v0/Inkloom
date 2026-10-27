@@ -1,4 +1,5 @@
 import type { JSONContent } from '@tiptap/core'
+import type { OutlineDocument } from './api'
 
 export type RecoveryDraft = {
   key: string; baseVersion: string; text: string; doc: JSONContent; updatedAt: string
@@ -29,5 +30,13 @@ async function operation<T>(mode: IDBTransactionMode, run: (store: IDBObjectStor
 export const drafts = {
   get: (key: string) => operation<RecoveryDraft | undefined>('readonly', store => store.get(key)),
   put: (draft: RecoveryDraft) => operation('readwrite', store => store.put(draft)),
+  remove: (key: string) => operation('readwrite', store => store.delete(key)),
+}
+
+export type OutlineRecoveryDraft = { key: string; baseRevision: number; document: OutlineDocument; updatedAt: string }
+export const outlineDrafts = {
+  get: (key: string) => operation<OutlineRecoveryDraft | undefined>('readonly', store => store.get(key)),
+  list: (prefix: string) => operation<OutlineRecoveryDraft[]>('readonly', store => store.getAll(IDBKeyRange.bound(prefix, prefix + '\uffff'))),
+  put: (draft: OutlineRecoveryDraft) => operation('readwrite', store => store.put(draft)),
   remove: (key: string) => operation('readwrite', store => store.delete(key)),
 }

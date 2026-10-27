@@ -1,6 +1,6 @@
 # 技术方案与关键契约
 
-> 当前 0.2 沿用模块化单体和 SQLite，在已有生成任务中增加全书方案、分卷章节细纲及事务采纳；该阶段迁移为 `a12c7e604bc9`，本章参考为 `b73d2f809a61`，伏笔跟进为 `c84e3a190b72`，最新作品文风迁移为 `d95f4b207c83`。实际变更见 [连载工作流决策](decisions/0004-serial-production.md)、[0.2 实现记录](IMPLEMENTATION-V0.2.md)、[本章参考实现](IMPLEMENTATION-REFERENCES.md)、[伏笔跟进实现](IMPLEMENTATION-THREAD-TRACKING.md) 与 [写作辅助实现](IMPLEMENTATION-WRITING-ASSISTANCE.md)，以下保留最初的完整技术方案。
+> 当前 0.2 沿用模块化单体和 SQLite，在已有生成任务中增加全书方案、分卷章节细纲及事务采纳；该阶段迁移为 `a12c7e604bc9`，本章参考为 `b73d2f809a61`，伏笔跟进为 `c84e3a190b72`，作品文风为 `d95f4b207c83`，最新细纲历史为 `e06a5c318d94`。实际变更见 [连载工作流决策](decisions/0004-serial-production.md)、[0.2 实现记录](IMPLEMENTATION-V0.2.md)、[本章参考实现](IMPLEMENTATION-REFERENCES.md)、[伏笔跟进实现](IMPLEMENTATION-THREAD-TRACKING.md)、[写作辅助实现](IMPLEMENTATION-WRITING-ASSISTANCE.md) 与 [细纲编辑实现](IMPLEMENTATION-CHAPTER-OUTLINES.md)，以下保留最初的完整技术方案。
 
 2026-10-24 增加结构化 `inspiration` 任务与选中方向引用，复用任务表，无数据库迁移。方向在服务端按同作品、同章节与上下文基线校验；列表查询按章节过滤且不加载冻结上下文。前端结果展示与 SSE Hook 从写作助手拆出，供编辑器、任务记录和规划页复用。契约见 [决策 0007](decisions/0007-in-chapter-inspiration.md)。
 
@@ -13,6 +13,8 @@
 2026-10-26 新增 `ThreadTrack`、`ThreadProgress`，沿用伏笔 Entity，不把计划当事实。`threads.py` 按章序、段序计算有效进展，负责跟进修订、幂等新增、撤销与恢复；`context.py` 仅冻结当前章之前的进展，并把原文列为不可静默裁剪的依据。计划和关联变更递增作品设置修订，沿用旧任务失效机制。`thread_restore.py` 独立核验备份中的归属和不可变引文；旧上下文的 `thread_guidance` 缺失时默认为空。恢复支持前三个旧迁移，先验证再在新目录升级，未提供向旧代码直接降级承诺。契约见 [决策 0010](decisions/0010-thread-tracking.md)。
 
 ## 架构选择
+
+2026-10-28 完成章节细纲编辑，迁移为 `e06a5c318d94`：`Chapter.outline_revision` 与不可变 `OutlineRevision` 保存完整细纲快照，`chapter_outlines.py` 同步 Plan 结构和 Chapter.goal 投影，处理冲突、幂等、恢复和候选采纳；元数据与旧规划入口走同一服务。`outline_edit` 冻结修订和字段范围，在输出及采纳时校验；`outline_restore.py` 验证备份历史与当前投影。编辑器采用章节深链接、独立窗口恢复键和持久化任务，不引入新依赖。见 [决策 0014](decisions/0014-chapter-outline-editing.md)。
 
 活跃生成采用独立 `JobProgress` 投影，`job_progress.py` 显式选择必要列，不读取 `context`、`result` 和 Attempt 正文；SSE 也只查询任务状态与事件。`jobProgress.ts` 统一合并通知、单请求读取、迟到快照保护和 5 秒只读补偿；三个界面共用 `useJobStream`，终止后确认完整详情才解锁结果操作。无数据库迁移。见 [决策 0013](decisions/0013-live-job-progress.md) 与 [实现及验证](IMPLEMENTATION-LIVE-PROGRESS.md)。
 

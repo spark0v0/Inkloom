@@ -187,6 +187,9 @@ def mutate_backup(workspace, tmp_path, mutate, revision=None):
 def test_previous_schema_backup_upgrades_without_touching_prose(library, workspace, tmp_path):
     novel, _, chapters, tracking = setup(library)
     def old_schema(connection):
+        connection.execute("DROP TABLE outline_revisions")
+        connection.execute("ALTER TABLE chapters DROP COLUMN outline_revision")
+        connection.execute("ALTER TABLE novels DROP COLUMN writing_preferences")
         connection.execute("DROP TABLE thread_progress")
         connection.execute("DROP TABLE thread_tracks")
         connection.execute("UPDATE alembic_version SET version_num='b73d2f809a61'")

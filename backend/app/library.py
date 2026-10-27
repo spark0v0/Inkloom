@@ -173,13 +173,22 @@ class Library:
         with self.ws.session(write=True) as s:
             novel = require_novel(s, novel_id)
             chapter = require_chapter(s, novel_id, chapter_id)
-            for key, value in data.model_dump(exclude_none=True).items():
-                setattr(chapter, key, value)
-            for plan in s.scalars(select(Plan).where(Plan.novel_id == novel_id, Plan.level == "chapter")).all():
-                if plan.structure.get("chapter_id") == chapter.id:
-                    plan.title, plan.body = chapter.title, chapter.goal
-                    plan.structure = {"kind": "author_chapter", "chapter_id": chapter.id}
-                    plan.updated_at = now()
+            if not any(getattr(chapter, key) != value for key, value in data.model_dump(exclude_none=True).items()):
+                return chapter_out(s, chapter)
+            from .chapter_outlines import current_document, linked_plan, write_outline
+            document = current_document(s, chapter)
+            title = data.title if data.title is not None else chapter.title
+            if data.goal is not None and data.goal != chapter.goal:
+                document = dto.TextOutline(kind="text", title=title, text=data.goal)
+            else:
+                document = document.model_copy(update={"title": title})
+            write_outline(s, chapter, document, chapter.outline_revision, uid("outline_meta"), source="metadata")
+            if data.volume is not None:
+                chapter.volume = data.volume
+                plan = linked_plan(s, chapter)
+                if plan:
+                    parent = s.scalar(select(Plan).where(Plan.novel_id == novel_id, Plan.level == "volume", Plan.title == data.volume))
+                    plan.parent_id = parent.id if parent else None
             chapter.updated_at = now()
             novel.settings_revision += 1
             novel.updated_at = now()
@@ -289,8 +298,11 @@ class Library:
                         chapter.volume, chapter.updated_at = data.title, now()
                 if plan.structure.get("chapter_id"):
                     chapter = require_chapter(s, novel_id, plan.structure["chapter_id"])
-                    chapter.title, chapter.goal, chapter.updated_at = data.title, data.body, now()
-                    plan.structure = {"kind": "author_chapter", "chapter_id": chapter.id}
+                    from .chapter_outlines import current_document, write_outline
+                    document = current_document(s, chapter)
+                    document = (dto.TextOutline(kind="text", title=data.title, text=data.body) if data.body != chapter.goal
+                        else document.model_copy(update={"title": data.title}))
+                    write_outline(s, chapter, document, chapter.outline_revision, uid("outline_plan"), source="legacy")
                 elif plan.level == "book" and plan.body != data.body:
                     plan.structure = {"kind": "author_book"}
                 elif plan.level == "volume" and plan.body != data.body:

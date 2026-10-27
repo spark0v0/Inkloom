@@ -22,6 +22,7 @@ RESULT_SCHEMAS = {
     "plan": dto.PlanResult, "handoff": dto.HandoffResult,
     "blueprint": dto.BlueprintResult, "outline": dto.OutlineResult,
     "inspiration": dto.InspirationResult,
+    "outline_edit": dto.OutlineEditResult,
 }
 
 
@@ -53,6 +54,12 @@ def context_current(session: Session, job: Job) -> bool:
         expected = job.context.get("catalog_signature")
         if (expected and expected != digest(catalog)) or (not expected and job.context.get("catalog") != catalog):
             return False
+    if job.task == "outline_edit":
+        from .chapter_outlines import current_document
+        frozen = job.context["input"].get("outline_edit", {})
+        if (chapter.outline_revision != frozen.get("base_revision")
+                or current_document(session, chapter).model_dump() != frozen.get("document")):
+            return False
     from .review_rewrite import review_reference_current
     return review_reference_current(session, job)
 
@@ -80,6 +87,8 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
     direction = chosen_direction(session, novel_id, request)
     from .review_rewrite import review_guidance
     revision = review_guidance(session, novel_id, request)
+    from .chapter_outlines import edit_guidance
+    outline_edit = edit_guidance(session, novel_id, request)
     if request.task == "continue":
         if novel.dirty_from_order is not None and chapter.position > novel.dirty_from_order:
             raise DomainError("CANON_DIRTY", f"第 {novel.dirty_from_order} 章起的正史待复核。"
@@ -282,6 +291,8 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
         input_body["draft_sources"] = []
     if request.task in RESULT_SCHEMAS:
         input_body["output_schema"] = RESULT_SCHEMAS[request.task].model_json_schema()
+    if outline_edit:
+        input_body["outline_edit"] = outline_edit
     base_prompt = (PROJECT_DIR / "prompts/base-v1.md").read_text(encoding="utf-8")
     task_prompt = (PROJECT_DIR / f"prompts/{request.task}-v1.md").read_text(encoding="utf-8")
 
@@ -310,6 +321,7 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
     if provider.input_price is not None and provider.output_price is not None:
         estimated_max = (estimate() * provider.input_price + output * provider.output_price) / 1_000_000
     preview = dto.ContextOut(novel_id=novel_id, chapter_id=chapter.id, task=request.task,
+        outline_edit=request.outline_edit,
         writing_preferences=style_profile,
         thread_guidance=thread_guidance,
         base_version_id=version.id, canon_revision=novel.canon_revision,
@@ -346,6 +358,9 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
 def validate_result(task: str, raw: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
     schema = RESULT_SCHEMAS[task]
     result = schema.model_validate(raw).model_dump()
+    if task == "outline_edit":
+        from .chapter_outlines import validate_edit_result
+        validate_edit_result(result, context)
     sources = context["preview"]["sources"]
     draft_sources = [s for s in sources if s["version_id"] == context["preview"]["base_version_id"]]
     entity_ids = {e["id"] for e in context["preview"]["entities"] if e["kind"] == "character"}

@@ -56,6 +56,7 @@ class Chapter(Base):
     goal: Mapped[str] = mapped_column(Text, default="")
     references: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     references_revision: Mapped[int] = mapped_column(Integer, default=0)
+    outline_revision: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     working_version_id: Mapped[str] = mapped_column(String)
     accepted_version_id: Mapped[str | None] = mapped_column(String, nullable=True)
     review_state: Mapped[str] = mapped_column(String, default="draft")
@@ -128,6 +129,22 @@ class Plan(Base):
     parent_id: Mapped[str | None] = mapped_column(String, nullable=True)
     structure: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     updated_at: Mapped[str] = mapped_column(String, default=now)
+
+
+class OutlineRevision(Base):
+    __tablename__ = "outline_revisions"
+    __table_args__ = (UniqueConstraint("chapter_id", "revision"), UniqueConstraint("chapter_id", "operation_id"))
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    novel_id: Mapped[str] = mapped_column(ForeignKey("novels.id"), index=True)
+    chapter_id: Mapped[str] = mapped_column(ForeignKey("chapters.id"), index=True)
+    revision: Mapped[int] = mapped_column(Integer)
+    title: Mapped[str] = mapped_column(String(240))
+    document: Mapped[dict[str, Any]] = mapped_column(JSON)
+    content_hash: Mapped[str] = mapped_column(String)
+    operation_id: Mapped[str] = mapped_column(String)
+    request_hash: Mapped[str] = mapped_column(String)
+    source: Mapped[str] = mapped_column(String)
+    created_at: Mapped[str] = mapped_column(String, default=now)
 
 
 class Fact(Base):

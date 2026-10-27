@@ -10,6 +10,7 @@ import { ReviewFindings } from './ReviewFindings'
 import { SourceButton } from '../components/SourceButton'
 import { threadStatusNames } from '../lib/threads'
 import { viewpointNames } from '../lib/writing'
+import { outlineText } from '../lib/outlines'
 export { SourceButton } from '../components/SourceButton'
 
 export function AttemptHistory({ attempts, currency }: { attempts: JobDetail['attempts']; currency: string }) {
@@ -46,6 +47,7 @@ export function JobResult({ job, onEvidence, onChoose, onPrepareRewrite, stale =
   if (!result) return <div className="candidate-prose">{job.output_text || '等待模型返回内容…'}</div>
   if (result.kind === 'blueprint') return <BlueprintView value={result} />
   if (result.kind === 'outline') return <OutlineView value={result} />
+  if (result.kind === 'outline_edit') return <div className="structured-result"><h3>细纲修改建议</h3><p>{result.summary}</p><pre className="outline-readable">{outlineText(result.document)}</pre><p className="small muted">可在本章细纲中比较并采纳建议。</p></div>
   if (result.kind === 'inspiration') return <InspirationResult job={job} onEvidence={onEvidence} onChoose={onChoose} disabled={stale || disabled} />
   if (result.kind === 'review') return <ReviewFindings job={job} result={result} onEvidence={onEvidence} onPrepare={onPrepareRewrite} stale={stale} disabled={disabled} />
   return <div className="structured-result">

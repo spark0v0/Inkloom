@@ -143,6 +143,17 @@ def completion_cost(usage: dict[str, int] | None, config: dict[str, Any]) -> flo
 
 def demo_text(task: str, context: dict[str, Any]) -> str:
     body = context["input"]
+    if task == "outline_edit":
+        reference = body["outline_edit"]
+        document = dict(reference["document"])
+        for field in reference["fields"]:
+            if field == "beats":
+                document[field] = (document[field] + ["演示：主角核实线索后再决定行动。"])[:6]
+            else:
+                maximum = {"goal": 1200, "conflict": 1200, "ending_hook": 1000, "text": 8000}[field]
+                document[field] = ("演示建议：" + document[field])[:maximum]
+        return json.dumps({"kind": "outline_edit", "summary": "固定演示，仅展示所选字段的修改与采纳流程。",
+            "document": document}, ensure_ascii=False)
     if task == "blueprint":
         return json.dumps({"kind": "blueprint", "title": body["author_brief"]["title"],
             "logline": "演示方案：一封迟到十年的信，让离乡者回到旧港追查家人的失踪。",
@@ -239,7 +250,7 @@ async def stream_completion(config: dict[str, Any], key: str, messages: list[dic
         "stream": config["stream"], config["token_parameter"]: config["max_output_tokens"]}
     if config["stream"] and config["include_usage"]:
         payload["stream_options"] = {"include_usage": True}
-    if config["json_mode"] and task in {"extract", "review", "plan", "handoff", "blueprint", "outline"}:
+    if config["json_mode"] and task in {"extract", "review", "plan", "handoff", "blueprint", "outline", "outline_edit"}:
         payload["response_format"] = {"type": "json_object"}
     endpoint = config["base_url"].rstrip("/") + "/chat/completions"
     headers = {"Authorization": "Bearer " + key, "Content-Type": "application/json"}

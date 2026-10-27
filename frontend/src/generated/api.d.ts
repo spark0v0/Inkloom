@@ -140,6 +140,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/novels/{novel_id}/chapters/{chapter_id}/outline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chapter Outline */
+        get: operations["chapter_outline_api_v1_novels__novel_id__chapters__chapter_id__outline_get"];
+        /** Save Outline */
+        put: operations["save_outline_api_v1_novels__novel_id__chapters__chapter_id__outline_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/novels/{novel_id}/chapters/{chapter_id}/outline/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Outline History */
+        get: operations["outline_history_api_v1_novels__novel_id__chapters__chapter_id__outline_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/novels/{novel_id}/chapters/{chapter_id}/outline/history/{revision}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Outline Revision */
+        get: operations["outline_revision_api_v1_novels__novel_id__chapters__chapter_id__outline_history__revision__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/novels/{novel_id}/chapters/{chapter_id}/outline/history/{revision}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore Outline */
+        post: operations["restore_outline_api_v1_novels__novel_id__chapters__chapter_id__outline_history__revision__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/novels/{novel_id}/chapters/{chapter_id}/versions": {
         parameters: {
             query?: never;
@@ -528,6 +597,23 @@ export interface paths {
         put?: never;
         /** Apply Plan */
         post: operations["apply_plan_api_v1_jobs__job_id__apply_plan_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/{job_id}/apply-outline-edit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply Outline Edit */
+        post: operations["apply_outline_edit_api_v1_jobs__job_id__apply_outline_edit_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1008,7 +1094,7 @@ export interface components {
              * Task
              * @enum {string}
              */
-            task: "continue" | "rewrite" | "plan" | "extract" | "review" | "handoff" | "blueprint" | "outline" | "inspiration";
+            task: "continue" | "rewrite" | "plan" | "extract" | "review" | "handoff" | "blueprint" | "outline" | "inspiration" | "outline_edit";
             /**
              * Instruction
              * @default
@@ -1036,9 +1122,11 @@ export interface components {
             chapter_batch: number;
             inspiration?: components["schemas"]["InspirationReference"] | null;
             review_reference?: components["schemas"]["ReviewReference"] | null;
+            outline_edit?: components["schemas"]["OutlineEditReference"] | null;
         };
         /** ContextOut */
         ContextOut: {
+            outline_edit?: components["schemas"]["OutlineEditReference"] | null;
             writing_preferences?: components["schemas"]["WritingPreferences"] | null;
             /** Thread Guidance */
             thread_guidance?: components["schemas"]["ThreadGuidance"][];
@@ -1463,7 +1551,7 @@ export interface components {
             /** Output Text */
             output_text: string;
             /** Result */
-            result: components["schemas"]["ExtractResult"] | components["schemas"]["ReviewResult"] | components["schemas"]["PlanResult"] | components["schemas"]["HandoffResult"] | components["schemas"]["BlueprintResult"] | components["schemas"]["OutlineResult"] | components["schemas"]["InspirationResult"] | null;
+            result: components["schemas"]["ExtractResult"] | components["schemas"]["ReviewResult"] | components["schemas"]["PlanResult"] | components["schemas"]["HandoffResult"] | components["schemas"]["BlueprintResult"] | components["schemas"]["OutlineResult"] | components["schemas"]["InspirationResult"] | components["schemas"]["OutlineEditResult"] | null;
             /** Candidate Status */
             candidate_status: string;
             /** Adopted Version Id */
@@ -1542,7 +1630,7 @@ export interface components {
              * Task
              * @enum {string}
              */
-            task: "continue" | "rewrite" | "plan" | "extract" | "review" | "handoff" | "blueprint" | "outline" | "inspiration";
+            task: "continue" | "rewrite" | "plan" | "extract" | "review" | "handoff" | "blueprint" | "outline" | "inspiration" | "outline_edit";
             /**
              * Instruction
              * @default
@@ -1570,6 +1658,7 @@ export interface components {
             chapter_batch: number;
             inspiration?: components["schemas"]["InspirationReference"] | null;
             review_reference?: components["schemas"]["ReviewReference"] | null;
+            outline_edit?: components["schemas"]["OutlineEditReference"] | null;
             /** Idempotency Key */
             idempotency_key: string;
             /**
@@ -1601,7 +1690,7 @@ export interface components {
             /** Output Text */
             output_text: string;
             /** Result */
-            result: components["schemas"]["ExtractResult"] | components["schemas"]["ReviewResult"] | components["schemas"]["PlanResult"] | components["schemas"]["HandoffResult"] | components["schemas"]["BlueprintResult"] | components["schemas"]["OutlineResult"] | components["schemas"]["InspirationResult"] | null;
+            result: components["schemas"]["ExtractResult"] | components["schemas"]["ReviewResult"] | components["schemas"]["PlanResult"] | components["schemas"]["HandoffResult"] | components["schemas"]["BlueprintResult"] | components["schemas"]["OutlineResult"] | components["schemas"]["InspirationResult"] | components["schemas"]["OutlineEditResult"] | null;
             /** Candidate Status */
             candidate_status: string;
             /** Adopted Version Id */
@@ -1770,6 +1859,59 @@ export interface components {
             /** Chapter Words */
             chapter_words?: number | null;
         };
+        /** OutlineApplyInput */
+        OutlineApplyInput: {
+            /** Base Revision */
+            base_revision: number;
+            /** Operation Id */
+            operation_id: string;
+            /** Fields */
+            fields: ("goal" | "conflict" | "beats" | "ending_hook" | "text")[];
+        };
+        /** OutlineEditReference */
+        OutlineEditReference: {
+            /** Base Revision */
+            base_revision: number;
+            /** Fields */
+            fields: ("goal" | "conflict" | "beats" | "ending_hook" | "text")[];
+        };
+        /** OutlineEditResult */
+        OutlineEditResult: {
+            /**
+             * Kind
+             * @constant
+             */
+            kind: "outline_edit";
+            /** Document */
+            document: components["schemas"]["StructuredOutline"] | components["schemas"]["TextOutline"];
+            /** Summary */
+            summary: string;
+        };
+        /** OutlineHistoryItem */
+        OutlineHistoryItem: {
+            /** Revision */
+            revision: number;
+            /** Title */
+            title: string;
+            /** Source */
+            source: string;
+            /** Created At */
+            created_at: string;
+        };
+        /** OutlineHistoryPage */
+        OutlineHistoryPage: {
+            /** Items */
+            items: components["schemas"]["OutlineHistoryItem"][];
+            /** Next Before */
+            next_before?: number | null;
+        };
+        /** OutlineRestoreInput */
+        OutlineRestoreInput: {
+            /** Base Revision */
+            base_revision: number;
+            /** Operation Id */
+            operation_id: string;
+        };
         /** OutlineResult */
         OutlineResult: {
             /**
@@ -1781,6 +1923,37 @@ export interface components {
             volume_title: string;
             /** Chapters */
             chapters: components["schemas"]["ChapterOutline"][];
+        };
+        /** OutlineRevisionOut */
+        OutlineRevisionOut: {
+            /** Revision */
+            revision: number;
+            /** Title */
+            title: string;
+            /** Source */
+            source: string;
+            /** Created At */
+            created_at: string;
+            /** Document */
+            document: components["schemas"]["StructuredOutline"] | components["schemas"]["TextOutline"];
+        };
+        /** OutlineState */
+        OutlineState: {
+            /** Chapter Id */
+            chapter_id: string;
+            /** Revision */
+            revision: number;
+            /** Document */
+            document: components["schemas"]["StructuredOutline"] | components["schemas"]["TextOutline"];
+        };
+        /** OutlineUpdate */
+        OutlineUpdate: {
+            /** Base Revision */
+            base_revision: number;
+            /** Operation Id */
+            operation_id: string;
+            /** Document */
+            document: components["schemas"]["StructuredOutline"] | components["schemas"]["TextOutline"];
         };
         /** ParagraphOut */
         ParagraphOut: {
@@ -2129,6 +2302,48 @@ export interface components {
              * @default false
              */
             pinned: boolean;
+        };
+        /** StructuredOutline */
+        StructuredOutline: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "structured";
+            /** Title */
+            title: string;
+            /**
+             * Goal
+             * @default
+             */
+            goal: string;
+            /**
+             * Conflict
+             * @default
+             */
+            conflict: string;
+            /** Beats */
+            beats?: string[];
+            /**
+             * Ending Hook
+             * @default
+             */
+            ending_hook: string;
+        };
+        /** TextOutline */
+        TextOutline: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "text";
+            /** Title */
+            title: string;
+            /**
+             * Text
+             * @default
+             */
+            text: string;
         };
         /** ThreadGuidance */
         ThreadGuidance: {
@@ -2747,6 +2962,178 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReferenceState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    chapter_outline_api_v1_novels__novel_id__chapters__chapter_id__outline_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                novel_id: string;
+                chapter_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutlineState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_outline_api_v1_novels__novel_id__chapters__chapter_id__outline_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                novel_id: string;
+                chapter_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OutlineUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutlineState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    outline_history_api_v1_novels__novel_id__chapters__chapter_id__outline_history_get: {
+        parameters: {
+            query?: {
+                before?: number | null;
+            };
+            header?: never;
+            path: {
+                novel_id: string;
+                chapter_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutlineHistoryPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    outline_revision_api_v1_novels__novel_id__chapters__chapter_id__outline_history__revision__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                novel_id: string;
+                chapter_id: string;
+                revision: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutlineRevisionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_outline_api_v1_novels__novel_id__chapters__chapter_id__outline_history__revision__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                novel_id: string;
+                chapter_id: string;
+                revision: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OutlineRestoreInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutlineState"];
                 };
             };
             /** @description Validation Error */
@@ -3382,7 +3769,7 @@ export interface operations {
             query?: {
                 novel_id?: string | null;
                 chapter_id?: string | null;
-                task?: ("continue" | "rewrite" | "plan" | "extract" | "review" | "handoff" | "blueprint" | "outline" | "inspiration") | null;
+                task?: ("continue" | "rewrite" | "plan" | "extract" | "review" | "handoff" | "blueprint" | "outline" | "inspiration" | "outline_edit") | null;
             };
             header?: never;
             path?: never;
@@ -3415,7 +3802,7 @@ export interface operations {
             query?: {
                 novel_id?: string | null;
                 chapter_id?: string | null;
-                task?: ("continue" | "rewrite" | "plan" | "extract" | "review" | "handoff" | "blueprint" | "outline" | "inspiration") | null;
+                task?: ("continue" | "rewrite" | "plan" | "extract" | "review" | "handoff" | "blueprint" | "outline" | "inspiration" | "outline_edit") | null;
                 state?: ("queued" | "running" | "pausing" | "paused" | "cancelling" | "succeeded" | "failed" | "cancelled" | "interrupted_uncertain") | null;
                 query?: string;
                 cursor?: string | null;
@@ -3643,6 +4030,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProductionApplyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_outline_edit_api_v1_jobs__job_id__apply_outline_edit_post: {
+        parameters: {
+            query: {
+                novel_id: string;
+            };
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OutlineApplyInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutlineState"];
                 };
             };
             /** @description Validation Error */

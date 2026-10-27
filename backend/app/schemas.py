@@ -104,6 +104,73 @@ class ChapterPatch(Schema):
     goal: str | None = Field(default=None, max_length=8000)
 
 
+class StructuredOutline(Schema):
+    kind: Literal["structured"]
+    title: str = Field(min_length=1, max_length=240)
+    goal: str = Field(default="", max_length=1200)
+    conflict: str = Field(default="", max_length=1200)
+    beats: list[Annotated[str, Field(max_length=600)]] = Field(default_factory=list, max_length=6)
+    ending_hook: str = Field(default="", max_length=1000)
+
+
+class TextOutline(Schema):
+    kind: Literal["text"]
+    title: str = Field(min_length=1, max_length=240)
+    text: str = Field(default="", max_length=24000)
+
+
+OutlineDocument = Annotated[StructuredOutline | TextOutline, Field(discriminator="kind")]
+OutlineField = Literal["goal", "conflict", "beats", "ending_hook", "text"]
+
+
+class OutlineState(Schema):
+    chapter_id: str
+    revision: int
+    document: OutlineDocument
+
+
+class OutlineUpdate(Schema):
+    base_revision: int = Field(ge=0)
+    operation_id: str = Field(min_length=8, max_length=160)
+    document: OutlineDocument
+
+
+class OutlineRestoreInput(Schema):
+    base_revision: int = Field(ge=0)
+    operation_id: str = Field(min_length=8, max_length=160)
+
+
+class OutlineHistoryItem(Schema):
+    revision: int
+    title: str
+    source: str
+    created_at: str
+
+
+class OutlineHistoryPage(Schema):
+    items: list[OutlineHistoryItem]
+    next_before: int | None = None
+
+
+class OutlineRevisionOut(OutlineHistoryItem):
+    document: OutlineDocument
+
+
+class OutlineEditReference(Schema):
+    base_revision: int = Field(ge=0)
+    fields: list[OutlineField] = Field(min_length=1, max_length=4)
+
+
+class OutlineApplyInput(OutlineRestoreInput):
+    fields: list[OutlineField] = Field(min_length=1, max_length=4)
+
+
+class OutlineEditResult(Schema):
+    kind: Literal["outline_edit"]
+    document: OutlineDocument
+    summary: str = Field(max_length=2000)
+
+
 class ChapterSummary(Schema):
     id: str
     novel_id: str
@@ -448,9 +515,9 @@ class ProductionApplyOut(Schema):
     plan_ids: list[str]
 
 
-TaskResult = ExtractResult | ReviewResult | PlanResult | HandoffResult | BlueprintResult | OutlineResult | InspirationResult
+TaskResult = ExtractResult | ReviewResult | PlanResult | HandoffResult | BlueprintResult | OutlineResult | InspirationResult | OutlineEditResult
 
-TaskName = Literal["continue", "rewrite", "plan", "extract", "review", "handoff", "blueprint", "outline", "inspiration"]
+TaskName = Literal["continue", "rewrite", "plan", "extract", "review", "handoff", "blueprint", "outline", "inspiration", "outline_edit"]
 
 
 class Selection(Schema):
@@ -486,9 +553,11 @@ class ContextInput(Schema):
     chapter_batch: int = Field(default=5, ge=3, le=20)
     inspiration: InspirationReference | None = None
     review_reference: ReviewReference | None = None
+    outline_edit: OutlineEditReference | None = None
 
 
 class ContextOut(Schema):
+    outline_edit: OutlineEditReference | None = None
     writing_preferences: WritingPreferences | None = None
     thread_guidance: list[ThreadGuidance] = Field(default_factory=list)
     novel_id: str

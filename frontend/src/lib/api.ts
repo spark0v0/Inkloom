@@ -22,6 +22,11 @@ export type MemoryProposal = Schema['MemoryProposal']
 export type Job = Schema['JobOut']
 export type JobDetail = Schema['JobDetail']
 export type JobProgress = Schema['JobProgress']
+export type OutlineState = Schema['OutlineState']
+export type OutlineDocument = OutlineState['document']
+export type OutlineField = NonNullable<Schema['ContextInput']['outline_edit']>['fields'][number]
+export type OutlineHistoryItem = Schema['OutlineHistoryItem']
+export type OutlineRevision = Schema['OutlineRevisionOut']
 export type JobInput = Schema['JobInput']
 export type ReviewRewritePreparation = Schema['ReviewRewritePreparation']
 export type ReviewFinding = Schema['Finding']
@@ -102,6 +107,12 @@ export const api = {
   chapter: (id: string, chapter: string) => request<Chapter>(cpath(id, chapter)),
   createChapter: (id: string, data: Schema['ChapterInput']) => request<Chapter>(npath(id) + '/chapters', { method: 'POST', body: JSON.stringify(data) }),
   editChapter: (id: string, chapter: string, data: Schema['ChapterPatch']) => request<Chapter>(cpath(id, chapter), { method: 'PATCH', body: JSON.stringify(data) }),
+  chapterOutline: (id: string, chapter: string) => request<OutlineState>(cpath(id, chapter) + '/outline'),
+  saveChapterOutline: (id: string, chapter: string, data: Schema['OutlineUpdate']) => request<OutlineState>(cpath(id, chapter) + '/outline', { method: 'PUT', body: JSON.stringify(data) }),
+  outlineHistory: (id: string, chapter: string, before?: number) => request<Schema['OutlineHistoryPage']>(cpath(id, chapter) + '/outline/history' + (before == null ? '' : `?before=${before}`)),
+  outlineRevision: (id: string, chapter: string, revision: number) => request<OutlineRevision>(cpath(id, chapter) + `/outline/history/${revision}`),
+  restoreOutline: (id: string, chapter: string, revision: number, data: Schema['OutlineRestoreInput']) => request<OutlineState>(cpath(id, chapter) + `/outline/history/${revision}/restore`, { method: 'POST', body: JSON.stringify(data) }),
+  applyOutlineEdit: (id: string, novel: string, data: Schema['OutlineApplyInput']) => request<OutlineState>(`/jobs/${encodeURIComponent(id)}/apply-outline-edit?novel_id=${encodeURIComponent(novel)}`, { method: 'POST', body: JSON.stringify(data) }),
   references: (id: string, chapter: string) => request<ReferenceState>(cpath(id, chapter) + '/references'),
   saveReferences: (id: string, chapter: string, data: Schema['ReferenceUpdate']) => request<ReferenceState>(cpath(id, chapter) + '/references', { method: 'PUT', body: JSON.stringify(data) }),
   save: (id: string, chapter: string, data: Schema['SaveInput'], workspace?: string) => request<Version>(cpath(id, chapter) + '/versions', { method: 'POST', body: JSON.stringify(data) }, workspace),
@@ -149,7 +160,7 @@ export const api = {
 }
 
 export const taskNames: Record<Task, string> = {
-  continue: '正文生成', rewrite: '改写', plan: '场景规划', extract: '本章记忆', review: '审稿', handoff: '章节交接', blueprint: '全书方案', outline: '章节细纲', inspiration: '剧情灵感',
+  continue: '正文生成', rewrite: '改写', plan: '场景规划', extract: '本章记忆', review: '审稿', handoff: '章节交接', blueprint: '全书方案', outline: '章节细纲', inspiration: '剧情灵感', outline_edit: '细纲修改',
 }
 export const jobStateNames: Record<string, string> = {
   queued: '等待执行', running: '正在生成', pausing: '等待本次调用结束', paused: '已暂停', cancelling: '正在取消',

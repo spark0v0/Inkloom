@@ -20,6 +20,8 @@ Inkloom 是中文 AI 小说创作工作台。接入自己的大模型，让 AI �
 
 在写作助手点 **写作风格**，为本书保存叙述视角、语言节奏、避免写法和作者表达示例。选中文字后，可就近点 **润色、扩写、缩写**，检查原文和要求，再明确生成候选；模板、保存和准备都不调用模型。详见 [实现与截图](docs/IMPLEMENTATION-WRITING-ASSISTANCE.md) / [本轮开源项目对照](docs/REVIEW-2026-10-27.md)。
 
+在 **大纲与章节** 点击某章，可直接编辑目标、冲突、情节节点和章末钩子，也可让 AI 只修改指定部分，再对照采纳。细纲有历史版本和浏览器草稿恢复；修改标题、恢复旧细纲或采纳建议都不会替换正文。详见 [细纲编辑与验证](docs/IMPLEMENTATION-CHAPTER-OUTLINES.md)。
+
 ## 开始创作
 
 1. **连接模型**：在“模型设置”填写服务地址、模型 ID 和 API Key；首次保存可同时设为策划、写作、记忆与审稿的默认模型。
@@ -99,6 +101,7 @@ pwsh -File .\scripts\start.ps1 -Port 8766 -DataDirectory D:\StoryWorkspace
 - [伏笔计划、正文进展与验证](docs/IMPLEMENTATION-THREAD-TRACKING.md)
 - [作品写作风格、选段快捷操作与验证](docs/IMPLEMENTATION-WRITING-ASSISTANCE.md) / [开源交互对照](docs/REVIEW-2026-10-27.md)
 - [生成进度读取优化、断线补偿与验证](docs/IMPLEMENTATION-LIVE-PROGRESS.md)
+- [章节细纲编辑、历史恢复与 AI 局部修改](docs/IMPLEMENTATION-CHAPTER-OUTLINES.md)
 - [开发启动提示词](START_PROMPT.md) / [运行时提示词](prompts/)
 
 真实云模型的长篇质量、完整 Windows 输入法人工体验、跨浏览器与百万字性能仍待独立验证。当前不提供云同步、多人协作或完整剧情分支。项目独立实现，运行数据和密钥不进入源码仓库。

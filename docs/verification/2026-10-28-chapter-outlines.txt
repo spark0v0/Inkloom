@@ -1,0 +1,79 @@
+2026-10-28 — 章节细纲编辑 / Windows / PowerShell 7
+设计于 2026-10-27 开始；先生成 UI 概念图，再实现桌面与手机。
+真实写作模型调用：0。全部测试使用隔离 SQLite、固定 Demo 或浏览器断线注入。
+
+Backend related scope:
+  backend/.venv/Scripts/python.exe -X utf8 -m pytest backend/tests/test_chapter_outlines.py backend/tests/test_production.py backend/tests/test_writing_preferences.py backend/tests/test_threads.py -q --tb=short --basetemp .tmp/chapter-outline-core-2
+  32 passed, 1 existing Starlette/httpx deprecation warning (10.45s).
+  Includes new outline revision/metadata preservation, selective adoption, old
+  baseline refusal, original manuscript preservation, history restore, new
+  backup round trip and genuine d95 upgrade/tamper rejection, existing planning,
+  writing styles, thread tracking and previous genuine archive upgrades.
+  Updated old-schema test fixtures to drop new columns/tables before labeling
+  them as old versions, rather than relying on inconsistent fake schemas.
+
+  Initial new tests: a typed OutlineEditResult was treated as dict in one test;
+  corrected fixture to model_dump(); other 14 related cases passed in that run.
+  Subsequent code review fixed empty free-text outlines retaining their format,
+  no-op chapter metadata edits, and restore structure/duplicate checks.
+  backend/.venv/Scripts/python.exe -X utf8 -m pytest backend/tests/test_chapter_outlines.py -q --tb=short --basetemp .tmp/chapter-outline-core-final
+  Final targeted result: 5 passed, 1 existing warning (1.30s).
+
+Frontend contract/build:
+  npm --prefix frontend run generate:api — generated declarations successfully.
+  npm --prefix frontend run build — TypeScript and production bundle succeeded.
+  Final delivery build: .tmp/outline-build-delivery.txt (474ms Vite stage).
+  Initial typecheck caught missing chapter_batch and an unused import; corrected.
+
+Browser:
+  npm --prefix frontend run test:e2e -- chapter-outline.spec.ts
+  Initial: 2 passed, 4 failed (1.1m). All 4 failures were error text locators
+  expecting an exact parent text while that parent also contained a recovery
+  button. Error contexts confirmed the actual conflict/stale protection worked.
+  Locators now check alert contents; no product safety check removed.
+
+  npm --prefix frontend run test:e2e -- chapter-outline.spec.ts --grep 'AI 仅|细纲保存回执'
+  4 passed (21.7s).
+  Reviewed screenshots and added independent recovery keys per browser window,
+  guarded history preview against late reads, showed restore errors inside the
+  modal and cleared stale context preview when model/scope/instruction changes.
+
+  npm --prefix frontend run test:e2e -- chapter-outline.spec.ts --grep '细纲可直接|细纲保存回执'
+  Final affected scenarios: 4 passed (20.3s).
+  Desktop/mobile edit/save/refresh/history restore, lost save acknowledgement,
+  two-window conflict, one window saving while the other's recovery draft remains,
+  browser reload recovery and IME composition not submitting.
+  Axe WCAG A/AA automated checks: no violations on the edit page in these cases;
+  no horizontal page overflow. This is not a full accessibility certification.
+
+  npm --prefix frontend run test:e2e -- chapter-outline.spec.ts --grep 'AI 仅'
+  Final: 2 passed (15.2s).
+  Actual scoped context preview, opening source evidence without generation,
+  lost creation acknowledgement reusing identical payload/idempotency key,
+  chosen-field adoption, and stale candidate refusing to overwrite concurrent edit.
+  All six distinct new desktop/mobile scenarios exercised successfully.
+
+  npm --prefix frontend run test:e2e -- workshop.spec.ts --project=desktop --grep 'AI 建书'
+  1 passed (20.1s): book setup, chapter planning, manuscript, canon, next chapter, ZIP.
+  Browser fault injection/connection cleanup logs include WinError 10054 from
+  closed connections; the scenarios above completed successfully.
+
+Static:
+  Related Ruff checks — All checks passed!
+  git diff --check — passed; Git LF normalization notices only.
+
+Local workspace migration:
+  Consistent SQLite backup API snapshot, manifest SHA256, ZIP CRC, integrity
+  and foreign keys checked; active jobs=0. ZIP saved under ignored data/backups/.
+  Restored the real backup into an isolated .tmp directory and upgraded it;
+  validated all new outline invariants and integrity before touching source DB.
+  Before startup, 8 original table digests still matched the snapshot.
+  scripts/launch.ps1 -NoBrowser — build and loopback startup succeeded.
+  After startup: schema=e06a5c318d94; 8 original table digests unchanged;
+  outline revision defaults=0, no initial history rows, integrity/foreign keys=ok.
+  HTTP health=ok and existing chapter outlines read successfully.
+  No author manuscript/outline mutation or generation used for runtime smoke test.
+
+Limits:
+  No full-suite rerun, paid novel-model requests, literary quality claim,
+  full longform performance claim, continuous chat or story graph implementation.

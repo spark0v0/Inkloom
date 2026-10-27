@@ -80,6 +80,8 @@ def test_style_backup_round_trip_and_c84_upgrade(library, workspace, tmp_path):
         database = tmp_path / 'before-writing-style.db'
         database.write_bytes(contents.read('workspace.db'))
     with sqlite3.connect(database) as connection:
+        connection.execute('DROP TABLE outline_revisions')
+        connection.execute('ALTER TABLE chapters DROP COLUMN outline_revision')
         connection.execute('ALTER TABLE novels DROP COLUMN writing_preferences')
         connection.execute("UPDATE alembic_version SET version_num='c84e3a190b72'")
         connection.commit()

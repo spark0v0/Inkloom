@@ -19,6 +19,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from . import schemas as dto
+from .chapter_outlines import ChapterOutlines
 from .domain import TERMINAL_JOB_STATES, DomainError, split_manuscript
 from .jobs import Generation
 from .library import Library
@@ -95,6 +96,7 @@ def create_app(data_dir: Path | None = None, *, worker: bool = True, port: int =
         app.state.library = Library(workspace)
         app.state.references = ChapterReferences(workspace)
         app.state.threads = ThreadTracking(workspace)
+        app.state.outlines = ChapterOutlines(workspace)
         app.state.generation = Generation(workspace)
         task = asyncio.create_task(app.state.generation.run()) if worker else None
         app.state.worker_task = task
@@ -181,6 +183,26 @@ def create_app(data_dir: Path | None = None, *, worker: bool = True, port: int =
     @app.get(prefix + "/novels/{novel_id}/chapters/{chapter_id}/references", response_model=dto.ReferenceState)
     def get_references(novel_id: str, chapter_id: str, request: Request):
         return request.app.state.references.get(novel_id, chapter_id)
+
+    @app.get(prefix + "/novels/{novel_id}/chapters/{chapter_id}/outline", response_model=dto.OutlineState)
+    def chapter_outline(novel_id: str, chapter_id: str, request: Request):
+        return request.app.state.outlines.get(novel_id, chapter_id)
+
+    @app.put(prefix + "/novels/{novel_id}/chapters/{chapter_id}/outline", response_model=dto.OutlineState)
+    def save_outline(novel_id: str, chapter_id: str, data: dto.OutlineUpdate, request: Request):
+        return request.app.state.outlines.save(novel_id, chapter_id, data)
+
+    @app.get(prefix + "/novels/{novel_id}/chapters/{chapter_id}/outline/history", response_model=dto.OutlineHistoryPage)
+    def outline_history(novel_id: str, chapter_id: str, request: Request, before: int | None = Query(default=None, ge=0)):
+        return request.app.state.outlines.history(novel_id, chapter_id, before)
+
+    @app.get(prefix + "/novels/{novel_id}/chapters/{chapter_id}/outline/history/{revision}", response_model=dto.OutlineRevisionOut)
+    def outline_revision(novel_id: str, chapter_id: str, revision: int, request: Request):
+        return request.app.state.outlines.revision(novel_id, chapter_id, revision)
+
+    @app.post(prefix + "/novels/{novel_id}/chapters/{chapter_id}/outline/history/{revision}/restore", response_model=dto.OutlineState)
+    def restore_outline(novel_id: str, chapter_id: str, revision: int, data: dto.OutlineRestoreInput, request: Request):
+        return request.app.state.outlines.restore(novel_id, chapter_id, revision, data)
 
     @app.put(prefix + "/novels/{novel_id}/chapters/{chapter_id}/references", response_model=dto.ReferenceState)
     def save_references(novel_id: str, chapter_id: str, data: dto.ReferenceUpdate, request: Request):
@@ -317,6 +339,10 @@ def create_app(data_dir: Path | None = None, *, worker: bool = True, port: int =
     @app.post(prefix + "/jobs/{job_id}/apply-plan", response_model=dto.ProductionApplyOut)
     def apply_plan(job_id: str, novel_id: str, request: Request):
         return request.app.state.generation.apply_plan(novel_id, job_id)
+
+    @app.post(prefix + "/jobs/{job_id}/apply-outline-edit", response_model=dto.OutlineState)
+    def apply_outline_edit(job_id: str, novel_id: str, data: dto.OutlineApplyInput, request: Request):
+        return request.app.state.outlines.adopt(novel_id, job_id, data)
 
     @app.post(prefix + "/jobs/{job_id}/prepare-rewrite", response_model=dto.ReviewRewritePreparation)
     def prepare_rewrite(job_id: str, novel_id: str, data: dto.ReviewRewriteInput, request: Request):
