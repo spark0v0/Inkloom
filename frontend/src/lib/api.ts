@@ -2,6 +2,7 @@ import type { components, operations } from '../generated/api'
 
 type Schema = components['schemas']
 export type Novel = Schema['NovelOut']
+export type WritingPreferences = Schema['WritingPreferences']
 export type Chapter = Schema['ChapterOut']
 export type ChapterSummary = Schema['ChapterSummary']
 export type ReferenceSelection = Schema['ReferenceSelection']
@@ -94,6 +95,7 @@ export const api = {
   novel: (id: string) => request<Novel>(npath(id)),
   createNovel: (data: Schema['NovelInput']) => request<Novel>('/novels', { method: 'POST', body: JSON.stringify(data) }),
   editNovel: (id: string, data: Schema['NovelPatch']) => request<Novel>(npath(id), { method: 'PATCH', body: JSON.stringify(data) }),
+  saveWritingStyle: (id: string, data: Schema['WritingStyleInput']) => request<Novel>(npath(id) + '/writing-style', { method: 'PUT', body: JSON.stringify(data) }),
   demo: () => request<Novel>('/demo', { method: 'POST' }),
   chapters: (id: string) => request<ChapterSummary[]>(npath(id) + '/chapters'),
   chapter: (id: string, chapter: string) => request<Chapter>(cpath(id, chapter)),

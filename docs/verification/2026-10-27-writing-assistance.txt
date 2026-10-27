@@ -1,0 +1,64 @@
+2026-10-27 — 作品文风与选段快捷操作；Windows / PowerShell 7
+真实小说模型调用：0。Demo 仅证明工程行为。
+
+Backend:
+  backend/.venv/Scripts/python.exe -X utf8 -m pytest backend/tests/test_writing_preferences.py backend/tests/test_review_boundaries.py -q --tb=short --basetemp <isolated .tmp path>
+  7 passed, 1 warning in 1.50s
+  Warning: existing Starlette TestClient httpx deprecation.
+  Covers revision conflict, idempotent confirmation, per-novel scope, old candidate
+  invalidation, noncanonical sample scope, budget, new backup round trip,
+  genuine c84 backup upgrade, HTTP validation, prior data-boundary regressions.
+
+API / build:
+  npm --prefix frontend run generate:api — success
+  npm --prefix frontend run build — TypeScript + production build succeeded
+  Final layout build: .tmp/writing-assistance-build-delivery.txt
+  Launcher also performed its source-hash-triggered build and served it successfully.
+
+Browser:
+  npm --prefix frontend run test:e2e -- writing-assistance.spec.ts
+  Initial run: 5 passed, 1 failed (31.0s).
+  Failure was test locator: mobile status rendered “演示 · 已采纳”; locator
+  expected independent “已采纳”. Product adoption had completed. Assertion now
+  polls persisted candidate_status instead of relying on that text fragment.
+  npm --prefix frontend run test:e2e -- writing-assistance.spec.ts --project=mobile --grep '选段快捷操作'
+  1 passed (7.8s).
+  Six distinct desktop/mobile scenarios exercised: style save/refresh/context,
+  no implicit job creation, concurrent settings conflict with preserved draft,
+  selected-text preparation, refusal after baseline changes, explicit Demo rewrite,
+  adoption preserving prefix/suffix with emoji code-point offsets.
+
+  Screenshot inspection found expanded style form could overlap/hide footer.
+  Replaced fieldset scrolling with an independent flex scroll wrapper and fixed
+  modal action area. Added bounds assertions, then ran only affected scenarios:
+  npm --prefix frontend run test:e2e -- writing-assistance.spec.ts --grep '本书风格'
+  Final: 2 passed (11.2s).
+  Desktop/mobile screenshots inspected after this final fix. Content scrolls
+  separately and action buttons remain visible. Axe automated WCAG A/AA rules
+  found no violations on the style dialog/selection bar in these scenarios;
+  this is not a complete accessibility certification.
+
+Static check:
+  backend/.venv/Scripts/ruff.exe check backend/app/writing_preferences.py backend/app/context.py backend/app/models.py backend/app/schemas.py backend/app/main.py backend/app/workspace_io.py backend/alembic/versions/d95f4b207c83_writing_preferences.py backend/tests/test_writing_preferences.py
+  All checks passed!
+  git diff --check — success (Git LF normalization notices only).
+
+Local workspace / launcher:
+  Pre-migration: consistent SQLite snapshot ZIP; schema=c84e3a190b72;
+  integrity=ok, foreign keys=ok, manifest hash verified, active_jobs=0.
+  Backup retained in ignored data/backups/; credentials file not included.
+  scripts/launch.ps1 -NoBrowser — running at http://127.0.0.1:8765.
+  Post-migration: schema=d95f4b207c83; integrity=ok; foreign keys=ok;
+  original-column digests of novels/chapters/versions/entities/facts/plans/
+  thread_tracks/thread_progress unchanged; writing_preferences defaults={};
+  active_jobs=0.
+  HTTP health=ok, novel responses include preferences, latest frontend served.
+  Writing-style route checked using an absent novel ID: NOVEL_NOT_FOUND,
+  without editing an author novel or creating a job.
+  Initial smoke probe incorrectly expected production OpenAPI (disabled), then
+  lacked required Origin; corrected probe uses the application's local-session,
+  workspace and Origin contract. No application change needed for these probes.
+
+Scope limits:
+  No full-suite rerun. No real cloud novel-model requests. No literary quality,
+  revenue, longform style-consistency or full cross-browser/IME claims.

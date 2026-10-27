@@ -32,6 +32,7 @@ class Novel(Base):
     genre: Mapped[str] = mapped_column(String(80), default="")
     premise: Mapped[str] = mapped_column(Text, default="")
     style: Mapped[str] = mapped_column(Text, default="")
+    writing_preferences: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, server_default=text("'{}'"))
     platform: Mapped[str] = mapped_column(String(40), default="番茄小说")
     target_words: Mapped[int] = mapped_column(Integer, default=1000000)
     chapter_words: Mapped[int] = mapped_column(Integer, default=2000)

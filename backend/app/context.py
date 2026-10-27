@@ -260,6 +260,15 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
         input_body["review_guidance"] = revision
     if thread_guidance:
         input_body["thread_guidance"] = [item.model_dump() for item in thread_guidance]
+    writing_preferences = dto.WritingPreferences.model_validate(novel.writing_preferences)
+    style_profile = None
+    if request.task in {"continue", "rewrite", "review"} and writing_preferences != dto.WritingPreferences():
+        style_profile = writing_preferences
+        input_body["writing_preferences"] = {
+            "viewpoint": writing_preferences.viewpoint,
+            "avoid": writing_preferences.avoid,
+            "example": {"status": "author_supplied_noncanonical_style_sample", "text": writing_preferences.example},
+        }
     input_body["reference_selection"] = {"entity_ids": reference_selection.entity_ids,
         "chapters": [pin.model_dump() for pin in reference_selection.chapters], "revision": chapter.references_revision}
     if reference_selection.notes:
@@ -301,6 +310,7 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
     if provider.input_price is not None and provider.output_price is not None:
         estimated_max = (estimate() * provider.input_price + output * provider.output_price) / 1_000_000
     preview = dto.ContextOut(novel_id=novel_id, chapter_id=chapter.id, task=request.task,
+        writing_preferences=style_profile,
         thread_guidance=thread_guidance,
         base_version_id=version.id, canon_revision=novel.canon_revision,
         settings_revision=novel.settings_revision, author_brief=input_body["author_brief"],

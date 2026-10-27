@@ -27,6 +27,7 @@ from .seed import create_demo
 from .storage import PROJECT_DIR, Workspace, expected_workspace
 from .threads import ThreadTracking
 from .workspace_io import MAX_ARCHIVE, activate_original, activate_restore, backup, restore
+from .writing_preferences import save_writing_style
 
 logger = logging.getLogger("story_workshop")
 
@@ -128,6 +129,10 @@ def create_app(data_dir: Path | None = None, *, worker: bool = True, port: int =
                              "details": {"retryable": True}}, status_code=503)
 
     prefix = "/api/v1"
+
+    @app.put(prefix + "/novels/{novel_id}/writing-style", response_model=dto.NovelOut)
+    def writing_style(novel_id: str, data: dto.WritingStyleInput, request: Request):
+        return save_writing_style(request.app.state.workspace, novel_id, data)
 
     @app.get(prefix + "/health", response_model=dto.HealthOut)
     def health(request: Request):

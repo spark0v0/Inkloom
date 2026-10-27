@@ -368,6 +368,18 @@ summary,.small,.field-help { font-size:13px; }
   .reference-tabs > button { font-size:14px; padding:8px 2px; }
 }
 /* Evidence-bound thread tracking; layout reference: ui-thread-tracking-v1.png. */
+.selection-actions { display:flex; flex-shrink:0; align-items:center; flex-wrap:wrap; gap:8px; padding:10px 20px; border-bottom:1px solid var(--line); background:var(--paper); }
+.selection-actions > span { font-size:13px; color:var(--muted); margin-right:8px; }.selection-actions .btn { min-height:44px; }
+.writing-style-trigger { display:flex; align-items:center; width:100%; gap:8px; min-height:44px; margin-bottom:8px; border:1px solid var(--line); background:var(--paper); }
+.writing-style-trigger > span { margin-left:auto; font-size:12px; color:var(--muted); }
+.writing-style-fields { min-width:0; padding:0; margin:0; border:0; }.style-preset-row { display:flex; gap:8px; flex-wrap:wrap; }.style-preset-row .btn { flex:1; min-height:44px; padding:9px; }
+.writing-style-modal { display:flex; flex-direction:column; overflow:hidden; height:min(820px,calc(100svh - 40px)); }.writing-style-modal > .modal-heading { flex-shrink:0; }.writing-style-modal > form { flex:1; min-height:0; overflow:hidden; }.writing-style-scroll { flex:1; min-height:0; overflow:auto; padding:2px 4px; }.writing-style-modal .modal-actions { flex-shrink:0; margin-top:0; padding-top:12px; border-top:1px solid var(--line); background:var(--paper); }.writing-style-modal form > .notice { max-height:180px; overflow:auto; flex-shrink:0; }
+.style-preset-row .btn[aria-pressed=true] { border-color:var(--accent); color:var(--accent); background:var(--green-soft); }
+.style-example summary { min-height:44px; padding:12px 0; }.style-example .field { margin-top:12px; }.writing-style-modal .modal-actions { flex-wrap:wrap; }
+.writing-style-modal .modal-actions > span { margin-right:auto; }.context-writing-style { margin:14px 0; padding:12px; border:1px solid var(--line); border-radius:8px; }.context-writing-style p { white-space:pre-wrap; overflow-wrap:anywhere; }
+.prepared-selection { padding:12px; border:1px solid var(--line); border-radius:8px; background:var(--surface); }.prepared-selection blockquote { max-height:180px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; }
+@media(max-width:700px) { .selection-actions { padding:8px 12px; gap:6px; }.selection-actions > span { flex-basis:100%; }.style-preset-row .btn { flex-basis:40%; }.writing-style-modal .modal-actions > span { flex-basis:100%; } }
+
 .thread-panel { min-width:0; }
 .thread-toolbar { display:flex; gap:12px; margin-bottom:20px; }
 .thread-toolbar .search-input { flex:1; min-width:0; width:auto; }.thread-toolbar select { min-width:150px; width:auto; flex-shrink:0; }

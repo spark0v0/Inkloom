@@ -11,6 +11,18 @@ class Schema(BaseModel):
     model_config = ConfigDict(extra="forbid", from_attributes=True, allow_inf_nan=False)
 
 
+class WritingPreferences(Schema):
+    viewpoint: Literal["unspecified", "first_person", "third_person_limited", "omniscient"] = "unspecified"
+    avoid: str = Field(default="", max_length=1200)
+    example: str = Field(default="", max_length=4000)
+
+
+class WritingStyleInput(Schema):
+    base_settings_revision: int = Field(ge=0)
+    style: str = Field(default="", max_length=8000)
+    preferences: WritingPreferences = Field(default_factory=WritingPreferences)
+
+
 class NovelInput(Schema):
     title: str = Field(min_length=1, max_length=160)
     genre: str = Field(default="", max_length=80)
@@ -38,6 +50,7 @@ class NovelOut(Schema):
     genre: str
     premise: str
     style: str
+    writing_preferences: WritingPreferences = Field(default_factory=WritingPreferences)
     platform: str
     target_words: int
     chapter_words: int
@@ -476,6 +489,7 @@ class ContextInput(Schema):
 
 
 class ContextOut(Schema):
+    writing_preferences: WritingPreferences | None = None
     thread_guidance: list[ThreadGuidance] = Field(default_factory=list)
     novel_id: str
     chapter_id: str

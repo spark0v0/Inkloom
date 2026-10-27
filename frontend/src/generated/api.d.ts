@@ -1,4 +1,21 @@
 export interface paths {
+    "/api/v1/novels/{novel_id}/writing-style": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Writing Style */
+        put: operations["writing_style_api_v1_novels__novel_id__writing_style_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/health": {
         parameters: {
             query?: never;
@@ -1005,6 +1022,7 @@ export interface components {
         };
         /** ContextOut */
         ContextOut: {
+            writing_preferences?: components["schemas"]["WritingPreferences"] | null;
             /** Thread Guidance */
             thread_guidance?: components["schemas"]["ThreadGuidance"][];
             /** Novel Id */
@@ -1663,6 +1681,7 @@ export interface components {
             premise: string;
             /** Style */
             style: string;
+            writing_preferences?: components["schemas"]["WritingPreferences"];
             /** Platform */
             platform: string;
             /** Target Words */
@@ -2253,6 +2272,36 @@ export interface components {
             /** Planned Chapters */
             planned_chapters: number;
         };
+        /** WritingPreferences */
+        WritingPreferences: {
+            /**
+             * Viewpoint
+             * @default unspecified
+             * @enum {string}
+             */
+            viewpoint: "unspecified" | "first_person" | "third_person_limited" | "omniscient";
+            /**
+             * Avoid
+             * @default
+             */
+            avoid: string;
+            /**
+             * Example
+             * @default
+             */
+            example: string;
+        };
+        /** WritingStyleInput */
+        WritingStyleInput: {
+            /** Base Settings Revision */
+            base_settings_revision: number;
+            /**
+             * Style
+             * @default
+             */
+            style: string;
+            preferences?: components["schemas"]["WritingPreferences"];
+        };
     };
     responses: never;
     parameters: never;
@@ -2262,6 +2311,41 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    writing_style_api_v1_novels__novel_id__writing_style_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                novel_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WritingStyleInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NovelOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     health_api_v1_health_get: {
         parameters: {
             query?: never;

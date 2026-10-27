@@ -9,6 +9,7 @@ import { BlueprintView, OutlineView } from './ProductionResults'
 import { ReviewFindings } from './ReviewFindings'
 import { SourceButton } from '../components/SourceButton'
 import { threadStatusNames } from '../lib/threads'
+import { viewpointNames } from '../lib/writing'
 export { SourceButton } from '../components/SourceButton'
 
 export function AttemptHistory({ attempts, currency }: { attempts: JobDetail['attempts']; currency: string }) {
@@ -61,6 +62,7 @@ export function ContextDetails({ context, onEvidence, excluded, onToggle }: { co
     {!context.is_demo && context.provider_url && <p className="small muted">发送至：{context.provider_url}</p>}
     {context.inspiration_title && <p className="context-notice">本次选中的剧情方向：{context.inspiration_title}（未来创作意图）</p>}
     {context.review_reference && <div className="context-notice"><strong>本次选中的审稿建议</strong><p>{context.review_explanation}</p><p>{context.review_suggestion}</p><span className="small">只修改本次段落，建议不作为已发生事实。</span></div>}
+    {(context.author_brief?.style || context.writing_preferences) && <details className="context-writing-style"><summary>本次写作风格</summary><p>{viewpointNames[context.writing_preferences?.viewpoint || 'unspecified']}</p>{context.author_brief?.style && <p>{context.author_brief.style}</p>}{context.writing_preferences?.avoid && <p>避免：{context.writing_preferences.avoid}</p>}{context.writing_preferences?.example && <><h4>表达示例 · 非故事事实</h4><blockquote>{context.writing_preferences.example}</blockquote></>}</details>}
     {!!context.thread_guidance?.length && <section className="context-thread-guidance"><h3>本次伏笔跟进</h3>{context.thread_guidance.map(item => <article key={item.entity_id}><div className="section-heading"><strong>{item.name}</strong><Badge tone={item.status === 'needs_review' ? 'amber' : 'neutral'}>{threadStatusNames[item.status]}</Badge>{item.due && <span className="small">已到计划章节</span>}</div><p>作者安排：{item.author_plan || '未填写'}{item.target_chapter_title ? ` · 计划在《${item.target_chapter_title}》回收` : ''}</p>{item.progress.map(step => <div key={step.id}><SourceButton evidence={step.evidence} onEvidence={onEvidence} />{step.note && <p>{step.note}</p>}</div>)}{item.omitted_records > 0 && <p className="small muted">保留埋设与最近进展，另有 {item.omitted_records} 条中间记录未纳入。</p>}</article>)}<p className="small muted">安排属于作者计划；进展只引用本章之前的有效定稿。</p></section>}
     {context.notices.map((s, i) => <p className="context-notice" key={i}>{s}</p>)}
     <details><summary>本次要求与作品方向</summary><p className="small">{context.instruction}</p><p className="small muted">本章意图：{context.chapter_goal || '未填写'}</p><p className="small muted">{context.author_brief?.premise || '未填写故事方向'}</p>{context.author_brief?.style && <p className="small muted">文风：{context.author_brief?.style}</p>}</details>

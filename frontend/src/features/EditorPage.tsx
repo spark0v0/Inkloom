@@ -14,12 +14,19 @@ import { Assistant } from './Assistant'
 import { SourceButton } from './JobPresentation'
 import { useJobStream } from '../lib/useJobStream'
 import { ChapterList } from './ChapterList'
+import { WritingStyleDialog } from './WritingStyleDialog'
+import { rewriteActions } from '../lib/writing'
+import type { RewriteAction, SelectionRewrite } from '../lib/writing'
 
 type Props = { novel: Novel; chapter: Chapter; chapters: ChapterSummary[]; workspaceId: string; providers: Provider[]; roles: Roles; navigate: Navigate; onEvidence: (e: Evidence) => void; registerGuard: (guard: (() => Promise<unknown>) | null) => void }
 
 export function EditorPage({ novel, chapter, chapters, workspaceId, providers, roles, navigate, onEvidence, registerGuard }: Props) {
   const cache = useQueryClient()
   const [selection, setSelection] = useState<Selection | null>(null)
+  const [quickRewrite, setQuickRewrite] = useState<SelectionRewrite | null>(null)
+  const [preparingSelection, setPreparingSelection] = useState(false)
+  const [styleOpen, setStyleOpen] = useState(false)
+  const quickPrepared = useCallback((id: string) => setQuickRewrite(current => current?.id === id ? null : current), [])
   const [assistantOpen, setAssistantOpen] = useState(true)
   const [compact, setCompact] = useState(() => window.innerWidth <= 1100)
   const [candidateHost, setCandidateHost] = useState<HTMLDivElement | null>(null)
@@ -66,7 +73,7 @@ export function EditorPage({ novel, chapter, chapters, workspaceId, providers, r
     editorProps: {
       attributes: { class: 'manuscript-content', role: 'textbox', 'aria-label': '小说正文', 'aria-multiline': 'true', spellcheck: 'false' },
       handleDOMEvents: {
-        compositionstart: () => { stateRef.current.composing.current = true; return false },
+        compositionstart: () => { stateRef.current.composing.current = true; setSelection(null); return false },
         compositionend: () => {
           stateRef.current.composing.current = false
           queueMicrotask(() => { if (editor) stateRef.current.change({ text: editor.getText({ blockSeparator: '\n\n' }), doc: editor.getJSON() }) })
@@ -107,7 +114,19 @@ export function EditorPage({ novel, chapter, chapters, workspaceId, providers, r
   const chapterIndex = ordered.findIndex(c => c.id === chapter.id)
   const previousChapter = ordered[chapterIndex - 1]
   const nextChapter = ordered[chapterIndex + 1]
-  const assistantProps = { novel, chapter, providers, roles, flush: manuscript.flush, selection, onAdopt: adopt, onEvidence, onExtractReady: extraction, blockedChapter: previous?.title, onResolvePrevious: () => { if (previous) void navigate({ page: 'write', novelId: novel.id, chapterId: previous.id }).catch(e => setError(errorText(e))) } }
+  const assistantProps = { novel, chapter, providers, roles, flush: manuscript.flush, selection, quickRewrite, onQuickPrepared: quickPrepared, onWritingStyle: () => setStyleOpen(true), onAdopt: adopt, onEvidence, onExtractReady: extraction, blockedChapter: previous?.title, onResolvePrevious: () => { if (previous) void navigate({ page: 'write', novelId: novel.id, chapterId: previous.id }).catch(e => setError(errorText(e))) } }
+  async function prepareSelection(action: RewriteAction) {
+    if (!selection || preparingSelection || manuscript.composing.current) return
+    const selected = { ...selection }
+    setPreparingSelection(true); setError('')
+    try {
+      const version = await manuscript.flush()
+      if (Array.from(version.text).slice(selected.start_codepoint, selected.end_codepoint).join('') !== selected.text) throw new Error('选段已经变化，请重新选择后准备改写。')
+      setQuickRewrite({ id: uuid(), base_version_id: version.id, action, selection: selected })
+      setSelection(null); setAssistantOpen(true); setCandidateView(false)
+      if (compact) setMobileAssistant(true)
+    } catch (e) { setError(errorText(e)) } finally { setPreparingSelection(false) }
+  }
   async function openCanon() {
     try { const version = await manuscript.flush(); setCanonVersion(version); setCanonOpen(true) } catch (e) { setError(errorText(e)) }
   }
@@ -125,6 +144,7 @@ export function EditorPage({ novel, chapter, chapters, workspaceId, providers, r
     <section className={`editor-panel ${candidateView ? 'viewing-candidate' : ''}`} aria-label="章节写作">
       {!compact && <nav className="document-tabs" aria-label="稿件视图"><button aria-pressed={!candidateView} onClick={() => setCandidateView(false)}>正文</button><button aria-pressed={candidateView} disabled={!hasCandidate || !assistantOpen} onClick={() => setCandidateView(true)}>{candidateLabel}</button><span>{chapter.title}</span></nav>}
       <div className="editor-toolbar"><div className="button-row"><button className="icon-button mobile-directory-toggle" aria-label="打开章节目录" onClick={() => setDirectoryOpen(true)}><List size={20} /></button><span className="editor-volume">{chapter.volume}</span><span className="toolbar-divider" /><button className={`icon-button ${editor?.isActive('bold') ? 'selected' : ''}`} aria-label="加粗" aria-pressed={editor?.isActive('bold')} onMouseDown={e => e.preventDefault()} onClick={() => editor?.chain().focus().toggleBold().run()}><TextB size={18} /></button><button className="icon-button" aria-label="斜体" onMouseDown={e => e.preventDefault()} onClick={() => editor?.chain().focus().toggleItalic().run()}><TextItalic size={18} /></button><button className="icon-button" aria-label="撤销" onClick={() => editor?.chain().focus().undo().run()}><ArrowCounterClockwise size={17} /></button><button className="icon-button" aria-label="重做" onClick={() => editor?.chain().focus().redo().run()}><ArrowClockwise size={17} /></button></div><div className="button-row"><label className="font-size-label"><span className="sr-only">正文字号</span><select aria-label="正文字号" value={fontSize} onChange={e => setFontSize(Number(e.target.value))}><option value={16}>16</option><option value={18}>18</option><option value={20}>20</option><option value={22}>22</option></select></label><button className="icon-button focus-toggle" aria-label={focused ? '退出专注写作' : '专注写作'} onClick={() => setFocused(!focused)}><Article size={19} /></button><button className="icon-button desktop-assistant-toggle" aria-label={assistantOpen ? '收起写作助手' : '展开写作助手'} onClick={() => { setAssistantOpen(!assistantOpen); setCandidateView(false) }}><SidebarSimple size={19} /></button><button className="icon-button mobile-assistant-toggle" aria-label="打开写作助手" onClick={() => setMobileAssistant(true)}><Sparkle size={20} /></button></div></div>
+      {!candidateView && selection && <div className="selection-actions" role="group" aria-label="选段快捷操作"><span>已选 {Array.from(selection.text).length} 字符</span>{Object.entries(rewriteActions).map(([action, value]) => <Button key={action} disabled={preparingSelection} onMouseDown={e => e.preventDefault()} onClick={() => void prepareSelection(action as RewriteAction)} aria-label={`准备${value.name}选段`}>{value.name}</Button>)}<Button variant="ghost" disabled={preparingSelection} aria-label="收起选段快捷操作" onMouseDown={e => e.preventDefault()} onClick={() => setSelection(null)}><X size={16} /></Button></div>}
       <div className="candidate-host" ref={setCandidateHost} hidden={!candidateView} />
       <div className="editor-scroll" hidden={candidateView}>
         <div className="editor-notices">{novel.dirty_from_order != null && novel.dirty_from_order < chapter.position && <Notice>第 {novel.dirty_from_order} 章已修改，请先重新定稿前文，再生成后续章节。</Notice>}{manuscript.recovery && <Notice action={<Button onClick={() => void restoreBuffer(manuscript.recovery!.doc, manuscript.recovery!.text)}>恢复草稿</Button>}>发现一份 {dateLabel(manuscript.recovery.updatedAt)} 的浏览器恢复副本。<button className="inline-link" onClick={() => { downloadText(manuscript.recovery!.text, `${chapter.title}-恢复副本.txt`); manuscript.setRecovery(null) }}>先下载副本</button></Notice>}{(manuscript.message || error) && <Notice action={manuscript.status === 'error' ? <Button onClick={() => void manuscript.flush().catch(() => undefined)}>重试保存</Button> : undefined}>{manuscript.message || error}</Notice>}</div>
@@ -144,6 +164,7 @@ export function EditorPage({ novel, chapter, chapters, workspaceId, providers, r
     <Modal dismissible={false} open={!!manuscript.conflict} onOpenChange={() => undefined} title="此章已有另一个版本" description="两份文字都已保留。请比较后选择，关闭页面前可先下载当前草稿。" wide><div className="comparison"><div><h4>本页尚未保存的草稿</h4><div className="comparison-text">{manuscript.localText}</div></div><div><h4>工作区最新版本</h4><div className="comparison-text">{manuscript.conflict?.text}</div></div></div><div className="modal-actions"><Button onClick={() => downloadText(manuscript.localText, `${chapter.title}-冲突草稿.txt`)}>下载本页草稿</Button><Button onClick={() => manuscript.conflict && adopt(manuscript.conflict)}>使用工作区版本</Button><Button variant="primary" onClick={() => void manuscript.rebase().then(value => value && adopt(value)).catch(e => setError(errorText(e)))}>将本页文字另存为新版本</Button></div></Modal>
     {historyOpen && <VersionHistory novelId={novel.id} chapter={chapter} onClose={() => setHistoryOpen(false)} flush={manuscript.flush} onAdopt={adopt} />}
     {canonOpen && canonVersion && <CanonDialog novel={novel} chapter={chapter} version={canonVersion} proposed={changes?.versionId === canonVersion.id ? changes.values : []} onEvidence={onEvidence} onClose={() => setCanonOpen(false)} providers={providers} roles={roles} onNext={async () => { const next = chapters.find(c => c.position === chapter.position + 1); await navigate(next ? { page: 'write', novelId: novel.id, chapterId: next.id } : { page: 'plot', novelId: novel.id }) }} />}
+    {styleOpen && <WritingStyleDialog novel={novel} onClose={() => setStyleOpen(false)} />}
   </div>
 }
 
