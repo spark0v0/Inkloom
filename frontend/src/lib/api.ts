@@ -21,6 +21,7 @@ export type Source = Schema['Source']
 export type MemoryProposal = Schema['MemoryProposal']
 export type Job = Schema['JobOut']
 export type JobDetail = Schema['JobDetail']
+export type JobProgress = Schema['JobProgress']
 export type JobInput = Schema['JobInput']
 export type ReviewRewritePreparation = Schema['ReviewRewritePreparation']
 export type ReviewFinding = Schema['Finding']
@@ -129,7 +130,8 @@ export const api = {
     return request<Schema['JobHistoryPage']>('/jobs/page?' + query)
   },
   prepareReviewRewrite: (id: string, novel: string, data: Schema['ReviewRewriteInput']) => request<ReviewRewritePreparation>(`/jobs/${id}/prepare-rewrite?novel_id=${novel}`, { method: 'POST', body: JSON.stringify(data) }),
-  job: (id: string, novel: string) => request<JobDetail>(jpath(id, novel)),
+  job: (id: string, novel: string, signal?: AbortSignal) => request<JobDetail>(jpath(id, novel), { signal }),
+  jobProgress: (id: string, novel: string, signal?: AbortSignal) => request<JobProgress>(`/jobs/${encodeURIComponent(id)}/progress?novel_id=${encodeURIComponent(novel)}`, { signal }),
   control: (id: string, novel: string, action: string) => request<JobDetail>(`/jobs/${id}/${action}?novel_id=${novel}`, { method: 'POST' }),
   adopt: (id: string, novel: string, base: string) => request<Version>(`/jobs/${id}/adopt?novel_id=${novel}`, { method: 'POST', body: JSON.stringify({ base_version_id: base }) }),
   applyPlan: (id: string, novel: string) => request<Schema['ProductionApplyOut']>(`/jobs/${id}/apply-plan?novel_id=${novel}`, { method: 'POST' }),

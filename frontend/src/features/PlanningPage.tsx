@@ -109,7 +109,7 @@ function ProductionPanel({ novel, kind, volume, resumeId, onSettings, onClose, o
   const [jobId, setJobId] = useState<string | null>(null)
   const existing = jobs.data?.find(j => j.task === kind && j.candidate_status !== 'adopted' && j.candidate_status !== 'rejected' && (kind === 'blueprint' || !j.result || (j.result.kind === 'outline' && j.result.volume_title === volume?.title)))
   const id = jobId || resumeId || existing?.id
-  const job = useQuery({ queryKey: ['job', id], queryFn: () => api.job(id!, novel.id), enabled: !!id, refetchInterval: q => q.state.data && activeStates.has(q.state.data.state) ? 600 : false })
+  const job = useQuery({ queryKey: ['job', id], queryFn: () => api.job(id!, novel.id), enabled: !!id })
   useJobStream(job.data)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')

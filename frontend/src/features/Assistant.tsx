@@ -56,8 +56,7 @@ export function Assistant({ novel, chapter, providers, roles, flush, selection, 
   const provider = providers.find(p => p.id === providerId)
   const jobs = useQuery({ queryKey: ['jobs', novel.id, chapter.id], queryFn: () => api.jobs(novel.id, { chapter_id: chapter.id }) })
   const currentJobId = jobId || jobs.data?.find(j => j.chapter_id === chapter.id && !['blueprint', 'outline'].includes(j.task))?.id
-  const job = useQuery({ queryKey: ['job', currentJobId], queryFn: () => api.job(currentJobId!, novel.id), enabled: !!currentJobId,
-    refetchInterval: query => query.state.data && activeStates.has(query.state.data.state) ? 900 : false })
+  const job = useQuery({ queryKey: ['job', currentJobId], queryFn: () => api.job(currentJobId!, novel.id), enabled: !!currentJobId })
   const connection = useJobStream(job.data)
   const active = job.data && activeStates.has(job.data.state)
   const hasStyle = !!(novel.style || novel.writing_preferences?.avoid || novel.writing_preferences?.example ||

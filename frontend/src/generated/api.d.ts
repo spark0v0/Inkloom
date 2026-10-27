@@ -449,6 +449,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/jobs/{job_id}/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Job Progress */
+        get: operations["job_progress_api_v1_jobs__job_id__progress_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/jobs/{job_id}/events": {
         parameters: {
             query?: never;
@@ -1609,6 +1626,31 @@ export interface components {
             is_demo: boolean;
             /** Created At */
             created_at: string;
+            /** Updated At */
+            updated_at: string;
+        };
+        /** JobProgress */
+        JobProgress: {
+            /** Id */
+            id: string;
+            /** Novel Id */
+            novel_id: string;
+            /** State */
+            state: string;
+            /** Output Text */
+            output_text: string;
+            /** Candidate Status */
+            candidate_status: string;
+            /** Attempt Count */
+            attempt_count: number;
+            /** Cost */
+            cost: number | null;
+            /** Checkpoint */
+            checkpoint: string;
+            /** Error Code */
+            error_code: string | null;
+            /** Error Message */
+            error_message: string | null;
             /** Updated At */
             updated_at: string;
         };
@@ -3425,6 +3467,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    job_progress_api_v1_jobs__job_id__progress_get: {
+        parameters: {
+            query: {
+                novel_id: string;
+            };
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobProgress"];
                 };
             };
             /** @description Validation Error */

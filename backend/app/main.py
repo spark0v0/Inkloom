@@ -275,6 +275,10 @@ def create_app(data_dir: Path | None = None, *, worker: bool = True, port: int =
     def job(job_id: str, novel_id: str, request: Request):
         return request.app.state.generation.get(novel_id, job_id)
 
+    @app.get(prefix + "/jobs/{job_id}/progress", response_model=dto.JobProgress)
+    def job_progress(job_id: str, novel_id: str, request: Request):
+        return request.app.state.generation.progress(novel_id, job_id)
+
     @app.get(prefix + "/jobs/{job_id}/events")
     async def events(job_id: str, novel_id: str, request: Request, after: int = Query(default=0, ge=0),
                      last_event_id: str | None = Header(default=None)):
@@ -285,7 +289,7 @@ def create_app(data_dir: Path | None = None, *, worker: bool = True, port: int =
             except ValueError as exc:
                 raise DomainError("INVALID_EVENT_CURSOR", "事件序号无效。") from exc
         generation = request.app.state.generation
-        generation.get(novel_id, job_id)
+        generation.state(novel_id, job_id)
 
         async def stream():
             nonlocal cursor

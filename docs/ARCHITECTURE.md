@@ -14,6 +14,8 @@
 
 ## 架构选择
 
+活跃生成采用独立 `JobProgress` 投影，`job_progress.py` 显式选择必要列，不读取 `context`、`result` 和 Attempt 正文；SSE 也只查询任务状态与事件。`jobProgress.ts` 统一合并通知、单请求读取、迟到快照保护和 5 秒只读补偿；三个界面共用 `useJobStream`，终止后确认完整详情才解锁结果操作。无数据库迁移。见 [决策 0013](decisions/0013-live-job-progress.md) 与 [实现及验证](IMPLEMENTATION-LIVE-PROGRESS.md)。
+
 2026-10-27 新增作品结构化文风与选段快捷准备。`writing_preferences.py` 校验设置修订，沿用 `Novel.style` 保存语言节奏；JSON 字段只存视角、避免写法及非正史表达示例。`context.py` 将偏好冻结到正文/改写/审稿输入，计入预算，不加入事实或引用来源。前端快捷操作先保存并绑定真实选段，复用 rewrite 候选和安全采纳。备份校验新字段，同时保留前四版恢复升级。契约见 [决策 0012](decisions/0012-writing-style-selection-actions.md)。
 
 选择“网页工作台 + 本地 API + 持久化 worker”的模块化单体。初版不要求 Docker、PostgreSQL、向量服务或 WSL 才能写作。

@@ -15,6 +15,7 @@ from sqlalchemy.orm import load_only
 from . import schemas as dto
 from .context import RESULT_SCHEMAS, build_context, context_current, validate_result
 from .domain import ACTIVE_JOB_STATES, DomainError, digest, now, splice_document, text_document, uid
+from .job_progress import job_state, progress
 from .library import (
     mark_dirty,
     new_version,
@@ -183,6 +184,14 @@ class Generation:
         with self.ws.session() as s:
             return public_job(s, require_job(s, novel_id, job_id), True)
 
+    def progress(self, novel_id: str, job_id: str) -> dto.JobProgress:
+        with self.ws.session() as session:
+            return progress(session, novel_id, job_id)
+
+    def state(self, novel_id: str, job_id: str) -> str:
+        with self.ws.session() as session:
+            return job_state(session, novel_id, job_id)
+
     def list(self, novel_id: str | None = None, chapter_id: str | None = None,
              task: dto.TaskName | None = None) -> list[dto.JobOut]:
         with self.ws.session() as s:
@@ -211,10 +220,10 @@ class Generation:
 
     def events(self, novel_id: str, job_id: str, after: int) -> tuple[list[dto.JobEventOut], str]:
         with self.ws.session() as s:
-            job = require_job(s, novel_id, job_id)
+            state = job_state(s, novel_id, job_id)
             events = [dto.JobEventOut.model_validate(e) for e in s.scalars(select(JobEvent).where(
                 JobEvent.job_id == job_id, JobEvent.seq > after).order_by(JobEvent.seq).limit(300)).all()]
-            return events, job.state
+            return events, state
 
     def control(self, novel_id: str, job_id: str, action: str) -> dto.JobDetail:
         with self.ws.session(write=True) as s:

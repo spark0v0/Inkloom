@@ -57,7 +57,7 @@ export function JobsPage({ novelId, onEvidence }: { novelId?: string; onEvidence
 
 function JobDialog({ jobId, novelId, onEvidence, onClose }: { jobId: string; novelId: string; onEvidence: (e: Evidence) => void; onClose: () => void }) {
   const cache = useQueryClient()
-  const job = useQuery({ queryKey: ['job', jobId], queryFn: () => api.job(jobId, novelId), refetchInterval: query => query.state.data && activeStates.has(query.state.data.state) ? 900 : false })
+  const job = useQuery({ queryKey: ['job', jobId], queryFn: () => api.job(jobId, novelId) })
   const [error, setError] = useState('')
   const connection = useJobStream(job.data)
   async function control(action: string) {

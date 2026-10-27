@@ -1,0 +1,55 @@
+2026-10-27 — 活跃生成读取优化 / Windows / PowerShell 7
+真实写作模型调用：0。临时 SQLite、模拟连接与本地 Demo 验证。
+
+npm --prefix frontend run generate:api
+  Generated frontend/src/generated/api.d.ts from the backend OpenAPI contract
+
+npm --prefix frontend run test -- src/lib/jobProgress.test.ts
+  Final: 1 file passed, 7 tests passed (298ms).
+  Initial: 4 passed, 2 failed; fake timers advanced to the exact periodic callback
+  boundary but not its scheduled read. Advanced one additional event-loop turn;
+  no product change made for these assertion timings.
+  Final review also added a case ensuring successful read recovery clears an
+  earlier synchronization error message; final unit run above includes it.
+
+backend/.venv/Scripts/python.exe -X utf8 -m pytest backend/tests/test_job_progress.py -q --tb=short --basetemp .tmp/job-progress-core-verified
+  Final: 2 passed, 1 existing Starlette/httpx deprecation warning (0.52s).
+  Initial fixture omitted required task; corrected.
+  Response-size assertion initially counted Unicode characters instead of UTF-8
+  bytes; corrected to test actual encoded response size.
+  Real SQL statements asserted to exclude jobs.context, jobs.result and attempts.
+  Complete detail fixture >100KB UTF-8; progress fixture <1KB.
+
+npm --prefix frontend run build
+  TypeScript and Vite production build succeeded.
+
+npm --prefix frontend run test:e2e -- live-progress.spec.ts --project=desktop
+  2 passed (11.2s).
+  Normal SSE and blocked SSE both read persisted progress, load final detail,
+  preserve author manuscript until adoption and create exactly one job.
+  At most 2 full-detail requests before adoption, with real progress requests.
+
+npm --prefix frontend run test:e2e -- workshop.spec.ts --project=desktop --grep 'AI 建书'
+  1 passed (20.3s).
+  AI book setup, outlines, whole chapter, canon confirmation, next chapter and ZIP.
+  Earlier '^AI 建书' filter matched no tests; corrected command above executed.
+  Server log included ConnectionResetError: [WinError 10054] from a closed
+  connection; the full scenario completed successfully.
+
+npm --prefix frontend run test:e2e -- live-progress.spec.ts --project=mobile --grep 'SSE 断线'
+  1 passed (8.7s).
+
+backend/.venv/Scripts/ruff.exe check backend/app/job_progress.py backend/app/jobs.py backend/app/main.py backend/app/schemas.py backend/tests/test_job_progress.py
+  All checks passed! Initial import ordering corrected by Ruff.
+git diff --check
+  Success; Git LF normalization notices only.
+
+Local runtime:
+  Read-only pre-restart check: active jobs=0, schema=d95f4b207c83.
+  Stopped only our previous launcher via its command session Ctrl+C.
+  scripts/launch.ps1 -NoBrowser rebuilt/restarted owned loopback service.
+  Health=ok; new progress route returns scoped JOB_NOT_FOUND for absent job.
+  No schema migration or author novel write performed by runtime smoke check.
+
+No full-suite run, real paid generation, new UI layout, new dependency,
+database migration or copied competitor source code.

@@ -580,6 +580,20 @@ class JobDetail(JobOut):
     attempts: list[AttemptOut]
 
 
+class JobProgress(Schema):
+    id: str
+    novel_id: str
+    state: str
+    output_text: str
+    candidate_status: str
+    attempt_count: int
+    cost: float | None
+    checkpoint: str
+    error_code: str | None
+    error_message: str | None
+    updated_at: str
+
+
 JobStateName = Literal["queued", "running", "pausing", "paused", "cancelling", "succeeded", "failed", "cancelled", "interrupted_uncertain"]
 
 
