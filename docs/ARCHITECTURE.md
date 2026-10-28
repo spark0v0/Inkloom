@@ -14,6 +14,8 @@
 
 ## 架构选择
 
+编辑 HTTP 边界统一携带读到的基线：ChapterUpdate 使用细纲修订与分卷原值，PlanUpdate 使用 updated_at；普通正文保存不改变细纲修订。OutlineState.operation_revision 标记已执行操作对应的历史修订，revision/document 始终表示当前状态，二者不同时客户端保留输入并要求明确比较。元数据和规划表单记录 touched 字段，重读时只合并未编辑字段。见 [决策 0015](decisions/0015-edit-gateways-receipts.md)。现有数据库无变更。
+
 2026-10-28 完成章节细纲编辑，迁移为 `e06a5c318d94`：`Chapter.outline_revision` 与不可变 `OutlineRevision` 保存完整细纲快照，`chapter_outlines.py` 同步 Plan 结构和 Chapter.goal 投影，处理冲突、幂等、恢复和候选采纳；元数据与旧规划入口走同一服务。`outline_edit` 冻结修订和字段范围，在输出及采纳时校验；`outline_restore.py` 验证备份历史与当前投影。编辑器采用章节深链接、独立窗口恢复键和持久化任务，不引入新依赖。见 [决策 0014](decisions/0014-chapter-outline-editing.md)。
 
 活跃生成采用独立 `JobProgress` 投影，`job_progress.py` 显式选择必要列，不读取 `context`、`result` 和 Attempt 正文；SSE 也只查询任务状态与事件。`jobProgress.ts` 统一合并通知、单请求读取、迟到快照保护和 5 秒只读补偿；三个界面共用 `useJobStream`，终止后确认完整详情才解锁结果操作。无数据库迁移。见 [决策 0013](decisions/0013-live-job-progress.md) 与 [实现及验证](IMPLEMENTATION-LIVE-PROGRESS.md)。

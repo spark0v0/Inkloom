@@ -104,6 +104,11 @@ class ChapterPatch(Schema):
     goal: str | None = Field(default=None, max_length=8000)
 
 
+class ChapterUpdate(ChapterPatch):
+    base_outline_revision: int = Field(ge=0)
+    base_volume: str = Field(max_length=160)
+
+
 class StructuredOutline(Schema):
     kind: Literal["structured"]
     title: str = Field(min_length=1, max_length=240)
@@ -127,6 +132,7 @@ class OutlineState(Schema):
     chapter_id: str
     revision: int
     document: OutlineDocument
+    operation_revision: int | None = None
 
 
 class OutlineUpdate(Schema):
@@ -178,6 +184,7 @@ class ChapterSummary(Schema):
     volume: str
     position: int
     goal: str
+    outline_revision: int = 0
     working_version_id: str
     accepted_version_id: str | None
     review_state: str
@@ -251,6 +258,10 @@ class PlanInput(Schema):
     title: str = Field(min_length=1, max_length=240)
     level: Literal["book", "volume", "chapter", "scene"] = "chapter"
     body: str = Field(default="", max_length=24000)
+
+
+class PlanUpdate(PlanInput):
+    base_updated_at: str = Field(min_length=1, max_length=64)
 
 
 class PlanOut(PlanInput):

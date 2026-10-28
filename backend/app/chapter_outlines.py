@@ -67,7 +67,7 @@ def write_outline(session, chapter, document, base_revision, operation_id, *, so
     if previous:
         if previous.request_hash != request_hash:
             raise DomainError("IDEMPOTENCY_CONFLICT", "同一次细纲操作包含了不同内容。", 409)
-        return dto.OutlineState(chapter_id=chapter.id, revision=previous.revision, document=previous.document)
+        return state(session, chapter.novel_id, chapter.id).model_copy(update={"operation_revision": previous.revision})
     if base_revision != chapter.outline_revision:
         raise DomainError("OUTLINE_CONFLICT", "细纲已在其他窗口更新。你的输入已保留，请读取最新细纲后比较。", 409)
     current = current_document(session, chapter)
@@ -93,7 +93,8 @@ def write_outline(session, chapter, document, base_revision, operation_id, *, so
         **(document.model_dump(exclude={"kind"}) if document.kind == "structured" else {})}
     session.add(_row(chapter, document, chapter.outline_revision, operation_id, request_hash, source))
     session.flush()
-    return dto.OutlineState(chapter_id=chapter.id, revision=chapter.outline_revision, document=document)
+    return dto.OutlineState(chapter_id=chapter.id, revision=chapter.outline_revision,
+        document=document, operation_revision=chapter.outline_revision)
 
 
 def changed_settings(novel):
@@ -166,7 +167,8 @@ class ChapterOutlines:
             if applied:
                 if applied["signature"] != signature:
                     raise DomainError("IDEMPOTENCY_CONFLICT", "已采纳的细纲建议不能换一组字段再次覆盖。", 409)
-                return dto.OutlineState(**applied["state"])
+                return state(session, novel_id, job.chapter_id).model_copy(update={
+                    "operation_revision": applied["state"]["revision"]})
             if job.task != "outline_edit" or job.state != "succeeded" or not job.result or job.candidate_status != "ready":
                 raise DomainError("OUTLINE_CANDIDATE_NOT_READY", "这份细纲建议尚不可采纳。", 409)
             if not context_current(session, job):

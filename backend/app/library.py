@@ -173,8 +173,12 @@ class Library:
         with self.ws.session(write=True) as s:
             novel = require_novel(s, novel_id)
             chapter = require_chapter(s, novel_id, chapter_id)
-            if not any(getattr(chapter, key) != value for key, value in data.model_dump(exclude_none=True).items()):
+            values = data.model_dump(exclude_none=True, exclude={"base_outline_revision", "base_volume"})
+            if not any(getattr(chapter, key) != value for key, value in values.items()):
                 return chapter_out(s, chapter)
+            if isinstance(data, dto.ChapterUpdate) and (
+                    data.base_outline_revision != chapter.outline_revision or data.base_volume != chapter.volume):
+                raise DomainError("CHAPTER_CONFLICT", "章节信息或细纲已在其他窗口更新。你的输入已保留，请读取最新内容后比较。", 409)
             from .chapter_outlines import current_document, linked_plan, write_outline
             document = current_document(s, chapter)
             title = data.title if data.title is not None else chapter.title
@@ -271,7 +275,15 @@ class Library:
             return [dto.PlanOut.model_validate(p) for p in s.scalars(select(Plan).where(
                 Plan.novel_id == novel_id).order_by(Plan.position)).all()]
 
-    def put_plan(self, novel_id: str, data: dto.PlanInput, plan_id: str | None = None):
+    def plan(self, novel_id: str, plan_id: str):
+        with self.ws.session() as session:
+            plan = session.get(Plan, plan_id)
+            if plan is None or plan.novel_id != novel_id:
+                raise DomainError("PLAN_NOT_FOUND", "此作品中没有该规划。", 404)
+            return dto.PlanOut.model_validate(plan)
+
+    def put_plan(self, novel_id: str, data: dto.PlanInput, plan_id: str | None = None,
+                 *, base_updated_at: str | None = None):
         with self.ws.session(write=True) as s:
             novel = require_novel(s, novel_id)
             plan = s.get(Plan, plan_id) if plan_id else None
@@ -286,6 +298,10 @@ class Library:
                 plan = Plan(id=uid("plan"), novel_id=novel_id, position=position, **data.model_dump())
                 s.add(plan)
             else:
+                if all(getattr(plan, key) == value for key, value in data.model_dump().items()):
+                    return dto.PlanOut.model_validate(plan)
+                if base_updated_at is not None and base_updated_at != plan.updated_at:
+                    raise DomainError("PLAN_CONFLICT", "规划已在其他窗口更新。你的输入已保留，请读取最新内容后比较。", 409)
                 if plan.level != data.level:
                     raise DomainError("PLAN_LEVEL_LOCKED", "已有规划的层级不能更改。")
                 previous_title = plan.title

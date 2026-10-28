@@ -149,12 +149,49 @@ function ProductionPanel({ novel, kind, volume, resumeId, onSettings, onClose, o
 function PlanDialog({ novelId, plan, onClose }: { novelId: string; plan: Plan | null; onClose: () => void }) {
   const cache = useQueryClient()
   const [form, setForm] = useState<PlanInput>({ title: plan?.title || '', level: plan?.level || 'volume', body: plan?.body || '' })
+  const [baseline, setBaseline] = useState(plan)
+  const [latest, setLatest] = useState<Plan | null>(null)
+  const [touched, setTouched] = useState(new Set<'title' | 'body'>())
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const composing = useRef(false)
+  function change(key: 'title' | 'body', value: string) {
+    setForm(previous => ({ ...previous, [key]: value }))
+    setTouched(previous => new Set([...previous, key]))
+  }
   async function save() {
+    if (busy || composing.current) return
+    setBusy(true); setError('')
+    try {
+      if (baseline) {
+        const changes = Object.fromEntries([...touched].map(key => [key, form[key]]))
+        await api.editPlan(novelId, baseline.id, { title: baseline.title, body: baseline.body, level: baseline.level,
+          ...changes, base_updated_at: baseline.updated_at })
+      } else await api.savePlan(novelId, form)
+      await Promise.all(['plans', 'novel', 'chapters', 'chapter'].map(key => cache.invalidateQueries({ queryKey: [key, novelId] })))
+      onClose()
+    } catch (e) { setError(errorText(e)) } finally { setBusy(false) }
+  }
+  async function readLatest() {
+    if (!plan || busy) return
     setBusy(true)
-    try { await api.savePlan(novelId, form, plan?.id); await Promise.all(['plans', 'novel', 'chapters', 'chapter'].map(key => cache.invalidateQueries({ queryKey: [key, novelId] }))); onClose() }
+    try {
+      const value = await api.plan(novelId, plan.id)
+      setForm(previous => ({ ...previous, title: touched.has('title') ? previous.title : value.title,
+        body: touched.has('body') ? previous.body : value.body }))
+      setBaseline(value); setLatest(value); setError('')
+    }
     catch (e) { setError(errorText(e)) } finally { setBusy(false) }
   }
-  return <Modal open onOpenChange={value => !value && onClose()} title={plan ? '编辑规划' : '添加规划'} wide><form className="form-stack" onSubmit={e => { e.preventDefault(); void save() }}><div className="form-row"><Field label="层级"><select value={form.level} disabled={!!plan} onChange={e => setForm({ ...form, level: e.target.value as PlanInput['level'] })}>{Object.entries(labels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></Field><Field label="标题"><input required maxLength={240} value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} /></Field></div><Field label="内容"><textarea rows={12} maxLength={24000} value={form.body} onChange={e => setForm({ ...form, body: e.target.value })} /></Field>{error && <Notice>{error}</Notice>}<div className="modal-actions"><Button onClick={onClose}>取消</Button><Button type="submit" variant="primary" disabled={busy || !form.title.trim()}>保存</Button></div></form></Modal>
+  return <Modal open onOpenChange={value => !value && !busy && onClose()} dismissible={!busy} title={plan ? '编辑规划' : '添加规划'} wide>
+    <form className="form-stack" onCompositionStart={() => { composing.current = true }} onCompositionEnd={() => { composing.current = false }} onSubmit={e => { e.preventDefault(); void save() }}>
+      <fieldset disabled={busy} className="form-stack planning-fields"><legend className="sr-only">规划内容</legend>
+        <div className="form-row"><Field label="层级"><select value={form.level} disabled={!!plan} onChange={e => setForm({ ...form, level: e.target.value as PlanInput['level'] })}>{Object.entries(labels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></Field><Field label="标题"><input required maxLength={240} value={form.title} onChange={e => change('title', e.target.value)} /></Field></div>
+        <Field label="内容"><textarea rows={12} maxLength={24000} value={form.body} onChange={e => change('body', e.target.value)} /></Field>
+      </fieldset>
+      {latest && <Notice tone="neutral">你的输入仍保留，只会保存你主动修改的字段。<details><summary>查看最新规划</summary><h3>{latest.title}</h3><pre className="outline-readable">{latest.body || '尚未填写内容'}</pre></details></Notice>}
+      {error && <Notice>{error}{plan && <Button disabled={busy} onClick={() => void readLatest()}>读取最新规划并比较</Button>}</Notice>}
+      <div className="modal-actions"><Button disabled={busy} onClick={onClose}>取消</Button><Button type="submit" variant="primary" disabled={busy || !form.title.trim()}>{busy ? '正在保存…' : '保存'}</Button></div>
+    </form>
+  </Modal>
 }

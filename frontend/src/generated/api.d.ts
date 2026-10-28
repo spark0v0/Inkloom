@@ -389,7 +389,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Read Plan */
+        get: operations["read_plan_api_v1_novels__novel_id__plans__plan_id__get"];
         /** Edit Plan */
         put: operations["edit_plan_api_v1_novels__novel_id__plans__plan_id__put"];
         post?: never;
@@ -995,6 +996,11 @@ export interface components {
             position: number;
             /** Goal */
             goal: string;
+            /**
+             * Outline Revision
+             * @default 0
+             */
+            outline_revision: number;
             /** Working Version Id */
             working_version_id: string;
             /** Accepted Version Id */
@@ -1025,15 +1031,6 @@ export interface components {
             /** Ending Hook */
             ending_hook: string;
         };
-        /** ChapterPatch */
-        ChapterPatch: {
-            /** Title */
-            title?: string | null;
-            /** Volume */
-            volume?: string | null;
-            /** Goal */
-            goal?: string | null;
-        };
         /** ChapterReferenceVersion */
         ChapterReferenceVersion: {
             /** Chapter Id */
@@ -1055,6 +1052,11 @@ export interface components {
             position: number;
             /** Goal */
             goal: string;
+            /**
+             * Outline Revision
+             * @default 0
+             */
+            outline_revision: number;
             /** Working Version Id */
             working_version_id: string;
             /** Accepted Version Id */
@@ -1065,6 +1067,19 @@ export interface components {
             char_count: number;
             /** Updated At */
             updated_at: string;
+        };
+        /** ChapterUpdate */
+        ChapterUpdate: {
+            /** Title */
+            title?: string | null;
+            /** Volume */
+            volume?: string | null;
+            /** Goal */
+            goal?: string | null;
+            /** Base Outline Revision */
+            base_outline_revision: number;
+            /** Base Volume */
+            base_volume: string;
         };
         /** ConnectionOut */
         ConnectionOut: {
@@ -1945,6 +1960,8 @@ export interface components {
             revision: number;
             /** Document */
             document: components["schemas"]["StructuredOutline"] | components["schemas"]["TextOutline"];
+            /** Operation Revision */
+            operation_revision?: number | null;
         };
         /** OutlineUpdate */
         OutlineUpdate: {
@@ -2023,6 +2040,24 @@ export interface components {
             scenes: components["schemas"]["ScenePlan"][];
             /** Open Questions */
             open_questions?: string[];
+        };
+        /** PlanUpdate */
+        PlanUpdate: {
+            /** Title */
+            title: string;
+            /**
+             * Level
+             * @default chapter
+             * @enum {string}
+             */
+            level: "book" | "volume" | "chapter" | "scene";
+            /**
+             * Body
+             * @default
+             */
+            body: string;
+            /** Base Updated At */
+            base_updated_at: string;
         };
         /** ProductionApplyOut */
         ProductionApplyOut: {
@@ -2883,7 +2918,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ChapterPatch"];
+                "application/json": components["schemas"]["ChapterUpdate"];
             };
         };
         responses: {
@@ -3592,6 +3627,38 @@ export interface operations {
             };
         };
     };
+    read_plan_api_v1_novels__novel_id__plans__plan_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                novel_id: string;
+                plan_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     edit_plan_api_v1_novels__novel_id__plans__plan_id__put: {
         parameters: {
             query?: never;
@@ -3604,7 +3671,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["PlanInput"];
+                "application/json": components["schemas"]["PlanUpdate"];
             };
         };
         responses: {

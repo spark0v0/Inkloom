@@ -53,6 +53,11 @@ export function EditorPage({ novel, chapter, chapters, workspaceId, providers, r
   const [title, setTitle] = useState(chapter.title)
   const [volume, setVolume] = useState(chapter.volume)
   const [goal, setGoal] = useState(chapter.goal)
+  const [metadataBase, setMetadataBase] = useState({ revision: chapter.outline_revision ?? 0, volume: chapter.volume })
+  const [metadataTouched, setMetadataTouched] = useState(new Set<'title' | 'volume' | 'goal'>())
+  const [metadataLatest, setMetadataLatest] = useState<Chapter | null>(null)
+  const [metadataError, setMetadataError] = useState('')
+  const metadataComposing = useRef(false)
   const [busy, setBusy] = useState(false)
   const commit = useCallback((version: Version) => {
     cache.setQueryData<Chapter>(['chapter', novel.id, chapter.id], old => old ? { ...old, version, working_version_id: version.id, char_count: version.char_count, review_state: old.accepted_version_id && old.accepted_version_id !== version.id ? 'needs_review' : old.review_state } : old)
@@ -131,9 +136,37 @@ export function EditorPage({ novel, chapter, chapters, workspaceId, providers, r
     try { const version = await manuscript.flush(); setCanonVersion(version); setCanonOpen(true) } catch (e) { setError(errorText(e)) }
   }
   async function saveMetadata() {
+    if (busy) return
     setBusy(true)
-    try { await manuscript.flush(); await api.editChapter(novel.id, chapter.id, { ...(title !== chapter.title ? { title } : {}), ...(volume !== chapter.volume ? { volume } : {}), ...(goal !== chapter.goal ? { goal } : {}) }); await cache.invalidateQueries({ queryKey: ['chapter', novel.id, chapter.id] }); await cache.invalidateQueries({ queryKey: ['chapters', novel.id] }); await cache.invalidateQueries({ queryKey: ['plans', novel.id] }); setMetadataOpen(false) }
-    catch (e) { setError(errorText(e)) } finally { setBusy(false) }
+    setMetadataError('')
+    try {
+      await manuscript.flush()
+      const values = { title, volume, goal }
+      const changes = Object.fromEntries([...metadataTouched].map(key => [key, values[key]]))
+      await api.editChapter(novel.id, chapter.id, { ...changes, base_outline_revision: metadataBase.revision, base_volume: metadataBase.volume })
+      await Promise.all([['chapter', novel.id, chapter.id], ['chapters', novel.id], ['plans', novel.id], ['novel', novel.id]].map(queryKey => cache.invalidateQueries({ queryKey })))
+      setMetadataOpen(false)
+    } catch (e) { setMetadataError(errorText(e)) } finally { setBusy(false) }
+  }
+  function openMetadata() {
+    setTitle(chapter.title); setGoal(chapter.goal); setVolume(chapter.volume)
+    setMetadataBase({ revision: chapter.outline_revision ?? 0, volume: chapter.volume })
+    setMetadataTouched(new Set()); setMetadataLatest(null); setMetadataError(''); setMetadataOpen(true)
+  }
+  function changeMetadata(key: 'title' | 'volume' | 'goal', value: string) {
+    ({ title: setTitle, volume: setVolume, goal: setGoal })[key](value)
+    setMetadataTouched(previous => new Set([...previous, key]))
+  }
+  async function readMetadata() {
+    if (busy) return
+    setBusy(true)
+    try {
+      const value = await api.chapter(novel.id, chapter.id)
+      if (!metadataTouched.has('title')) setTitle(value.title)
+      if (!metadataTouched.has('volume')) setVolume(value.volume)
+      if (!metadataTouched.has('goal')) setGoal(value.goal)
+      setMetadataBase({ revision: value.outline_revision ?? 0, volume: value.volume }); setMetadataLatest(value); setMetadataError('')
+    } catch (e) { setMetadataError(errorText(e)) } finally { setBusy(false) }
   }
   async function restoreBuffer(doc: JSONContent, text: string) {
     editor?.commands.setContent(doc, { emitUpdate: false }); manuscript.change({ text, doc }); manuscript.setRecovery(null)
@@ -148,7 +181,7 @@ export function EditorPage({ novel, chapter, chapters, workspaceId, providers, r
       <div className="candidate-host" ref={setCandidateHost} hidden={!candidateView} />
       <div className="editor-scroll" hidden={candidateView}>
         <div className="editor-notices">{novel.dirty_from_order != null && novel.dirty_from_order < chapter.position && <Notice>第 {novel.dirty_from_order} 章已修改，请先重新定稿前文，再生成后续章节。</Notice>}{manuscript.recovery && <Notice action={<Button onClick={() => void restoreBuffer(manuscript.recovery!.doc, manuscript.recovery!.text)}>恢复草稿</Button>}>发现一份 {dateLabel(manuscript.recovery.updatedAt)} 的浏览器恢复副本。<button className="inline-link" onClick={() => { downloadText(manuscript.recovery!.text, `${chapter.title}-恢复副本.txt`); manuscript.setRecovery(null) }}>先下载副本</button></Notice>}{(manuscript.message || error) && <Notice action={manuscript.status === 'error' ? <Button onClick={() => void manuscript.flush().catch(() => undefined)}>重试保存</Button> : undefined}>{manuscript.message || error}</Notice>}</div>
-        <div className="manuscript" style={{ '--manuscript-size': `${fontSize}px` } as React.CSSProperties}><div className="chapter-eyebrow">{chapter.review_state === 'confirmed' ? <><CheckCircle size={15} />已定稿</> : chapter.review_state === 'needs_review' ? '待重新定稿' : '草稿'}</div><div className="manuscript-heading"><h1>{chapter.title}</h1><button className="icon-button" aria-label="编辑章节信息" onClick={() => { setTitle(chapter.title); setGoal(chapter.goal); setVolume(chapter.volume); setMetadataOpen(true) }}><DotsThree size={24} /></button></div>{chapter.goal && <details className="chapter-goal"><summary>本章细纲</summary><p>{chapter.goal}</p></details>}<EditorContent editor={editor} /></div>
+        <div className="manuscript" style={{ '--manuscript-size': `${fontSize}px` } as React.CSSProperties}><div className="chapter-eyebrow">{chapter.review_state === 'confirmed' ? <><CheckCircle size={15} />已定稿</> : chapter.review_state === 'needs_review' ? '待重新定稿' : '草稿'}</div><div className="manuscript-heading"><h1>{chapter.title}</h1><button className="icon-button" aria-label="编辑章节信息" onClick={openMetadata}><DotsThree size={24} /></button></div>{chapter.goal && <details className="chapter-goal"><summary>本章细纲</summary><p>{chapter.goal}</p></details>}<EditorContent editor={editor} /></div>
 
         <nav className="chapter-pagination" aria-label="前后章节">
           <button disabled={!previousChapter} onClick={() => { if (previousChapter) void navigate({ page: 'write', novelId: novel.id, chapterId: previousChapter.id }).catch(e => setError(errorText(e))) }}><span>‹ 上一章</span><small>{previousChapter?.title || '已是第一章'}</small></button>
@@ -160,7 +193,11 @@ export function EditorPage({ novel, chapter, chapters, workspaceId, providers, r
     {!compact && assistantOpen && <div className="desktop-assistant"><Assistant {...assistantProps} candidateHost={candidateHost} onCandidate={candidateChanged} onShowCandidate={() => setCandidateView(true)} /></div>}
     <Modal open={directoryOpen} onOpenChange={setDirectoryOpen} title="章节目录" description="选择章节或添加新章。" className="directory-modal"><ChapterList novel={novel} chapters={chapters} currentId={chapter.id} navigate={navigate} beforeCreate={manuscript.flush} onClose={() => setDirectoryOpen(false)} /></Modal>
     <Modal open={mobileAssistant} onOpenChange={setMobileAssistant} title="AI 写作" className="assistant-modal"><Assistant {...assistantProps} onClose={() => setMobileAssistant(false)} /></Modal>
-    <Modal open={metadataOpen} onOpenChange={setMetadataOpen} title="章节信息"><form className="form-stack" onSubmit={e => { e.preventDefault(); void saveMetadata() }}><Field label="章节标题"><input required maxLength={240} value={title} onChange={e => setTitle(e.target.value)} /></Field><Field label="分卷"><input maxLength={160} value={volume} onChange={e => setVolume(e.target.value)} /></Field><Field label="本章细纲"><textarea maxLength={8000} rows={5} value={goal} onChange={e => setGoal(e.target.value)} /></Field><Button disabled={title !== chapter.title || volume !== chapter.volume || goal !== chapter.goal} onClick={() => void navigate({ page: 'plot', novelId: novel.id, chapterId: chapter.id }).catch(e => setError(errorText(e)))}>分字段编辑与 AI 修改</Button>{error && <Notice>{error}</Notice>}<div className="modal-actions"><Button onClick={() => setMetadataOpen(false)}>取消</Button><Button type="submit" variant="primary" disabled={busy}>保存信息</Button></div></form></Modal>
+    <Modal open={metadataOpen} onOpenChange={value => !busy && setMetadataOpen(value)} dismissible={!busy} title="章节信息"><form className="form-stack" onCompositionStart={() => { metadataComposing.current = true }} onCompositionEnd={() => { metadataComposing.current = false }} onSubmit={e => { e.preventDefault(); if (!metadataComposing.current) void saveMetadata() }}>
+      <fieldset className="form-stack metadata-fields" disabled={busy}><legend className="sr-only">编辑章节信息</legend><Field label="章节标题"><input required maxLength={240} value={title} onChange={e => changeMetadata('title', e.target.value)} /></Field><Field label="分卷"><input maxLength={160} value={volume} onChange={e => changeMetadata('volume', e.target.value)} /></Field><Field label="本章细纲"><textarea maxLength={8000} rows={5} value={goal} onChange={e => changeMetadata('goal', e.target.value)} /></Field><Button disabled={metadataTouched.size > 0} onClick={() => void navigate({ page: 'plot', novelId: novel.id, chapterId: chapter.id }).catch(e => setMetadataError(errorText(e)))}>分字段编辑与 AI 修改</Button></fieldset>
+      {metadataLatest && <Notice tone="neutral">你的输入仍保留，只会保存你主动修改的字段。<details><summary>查看最新章节信息</summary><p>{metadataLatest.title} · {metadataLatest.volume}</p><pre className="outline-readable">{metadataLatest.goal || '尚未填写细纲'}</pre></details></Notice>}
+      {metadataError && <Notice>{metadataError}<Button disabled={busy} onClick={() => void readMetadata()}>读取最新章节信息并比较</Button></Notice>}
+      <div className="modal-actions"><Button disabled={busy} onClick={() => setMetadataOpen(false)}>取消</Button><Button type="submit" variant="primary" disabled={busy}>{busy ? '正在保存…' : '保存信息'}</Button></div></form></Modal>
     <Modal dismissible={false} open={!!manuscript.conflict} onOpenChange={() => undefined} title="此章已有另一个版本" description="两份文字都已保留。请比较后选择，关闭页面前可先下载当前草稿。" wide><div className="comparison"><div><h4>本页尚未保存的草稿</h4><div className="comparison-text">{manuscript.localText}</div></div><div><h4>工作区最新版本</h4><div className="comparison-text">{manuscript.conflict?.text}</div></div></div><div className="modal-actions"><Button onClick={() => downloadText(manuscript.localText, `${chapter.title}-冲突草稿.txt`)}>下载本页草稿</Button><Button onClick={() => manuscript.conflict && adopt(manuscript.conflict)}>使用工作区版本</Button><Button variant="primary" onClick={() => void manuscript.rebase().then(value => value && adopt(value)).catch(e => setError(errorText(e)))}>将本页文字另存为新版本</Button></div></Modal>
     {historyOpen && <VersionHistory novelId={novel.id} chapter={chapter} onClose={() => setHistoryOpen(false)} flush={manuscript.flush} onAdopt={adopt} />}
     {canonOpen && canonVersion && <CanonDialog novel={novel} chapter={chapter} version={canonVersion} proposed={changes?.versionId === canonVersion.id ? changes.values : []} onEvidence={onEvidence} onClose={() => setCanonOpen(false)} providers={providers} roles={roles} onNext={async () => { const next = chapters.find(c => c.position === chapter.position + 1); await navigate(next ? { page: 'write', novelId: novel.id, chapterId: next.id } : { page: 'plot', novelId: novel.id }) }} />}

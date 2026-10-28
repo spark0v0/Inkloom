@@ -4,7 +4,7 @@ import { nextWritingChapter } from './workflow'
 
 const chapter = (position: number, review_state: ChapterSummary['review_state'], updated_at: string): ChapterSummary => ({
   id: `chapter_${position}`, novel_id: 'novel_test', title: `第${position}章`, volume: '第一卷', position,
-  review_state, updated_at, goal: '', working_version_id: `version_${position}`, accepted_version_id: null, char_count: 0,
+  review_state, updated_at, goal: '', outline_revision: 0, working_version_id: `version_${position}`, accepted_version_id: null, char_count: 0,
 })
 
 describe('继续写作的章节选择', () => {

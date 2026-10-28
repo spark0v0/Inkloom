@@ -1,0 +1,76 @@
+2026-10-28 — 编辑入口与回执复查 / Windows / PowerShell 7
+真实写作模型调用：0。临时 SQLite、固定 Demo 和浏览器丢失回执注入。
+
+Before fix:
+  backend/.venv/Scripts/python.exe -X utf8 -m pytest backend/tests/test_outline_gateways.py -q --tb=short --basetemp .tmp/outline-gateway-before
+  4 failed (1.45s).
+  Save acknowledgement returned revision 1 while current revision was 2.
+  AI adoption acknowledgement returned revision 2 while current revision was 3.
+  Chapter PATCH accepted missing baselines (200 instead of 422).
+  New baseline fields were not recognized by the old contract (422 instead of
+  the expected scoped conflict 409).
+
+After fix:
+  backend/.venv/Scripts/python.exe -X utf8 -m pytest backend/tests/test_outline_gateways.py backend/tests/test_chapter_outlines.py -q --tb=short --basetemp .tmp/outline-gateway-after
+  9 passed, 1 existing Starlette/httpx deprecation warning (2.52s).
+
+  backend/.venv/Scripts/python.exe -X utf8 -m pytest backend/tests/test_outline_gateways.py backend/tests/test_chapter_outlines.py backend/tests/test_production.py backend/tests/test_api.py -q --tb=short --basetemp .tmp/gateways-core-final
+  22 passed, 1 existing warning (8.02s).
+
+Frontend:
+  npm --prefix frontend run generate:api — success.
+  Initial build required adding outline_revision=0 to two existing typed
+  ChapterSummary unit-test fixtures. Corrected to match public contract.
+  npm --prefix frontend run build — TypeScript + production build succeeded.
+  Final build log: .tmp/gateways-build-final.txt.
+
+  npm --prefix frontend run test:e2e -- edit-gateways.spec.ts
+  6 passed (15.4s), across desktop and mobile:
+  - Old receipt returns current state, retains local draft and old write baseline;
+    explicit comparison/discard chooses the later server state without new writes.
+  - Metadata conflict retains changed title; prose and current structured outline
+    survive explicit rebase and title-only save.
+  - Volume plan conflict retains author rename while keeping newer body and
+    synchronizing chapter volume names without extra outline revisions.
+
+  Refined re-read behavior to also refresh unedited displayed fields, then ran:
+  npm --prefix frontend run test:e2e -- edit-gateways.spec.ts --grep '章节信息|分卷规划'
+  4 passed (11.8s). No unrelated full-suite repeat.
+
+  Extended field-level rebase to the outline editor:
+  npm --prefix frontend run test -- src/lib/outlines.test.ts
+  3 passed (191ms). Preserve local changed fields, adopt current untouched fields,
+  retain local value for same-field conflicts, require choice for format changes.
+  An initial compile-time assertion read .goal without narrowing the union;
+  changed the test assertion to compare the complete document.
+  npm --prefix frontend run build — passed (.tmp/gateways-outline-build.txt).
+  npm --prefix frontend run test:e2e -- edit-gateways.spec.ts --grep '旧保存|细纲冲突比较|细纲格式变化'
+  6 passed (14.4s): old receipt behavior remains protected; unrelated concurrent
+  outline edits combine; format choice is required and the other full version
+  remains available in immutable history. Desktop/mobile total distinct cases=10.
+
+Static/runtime:
+  Related Ruff: All checks passed!
+  git diff --check: success (LF normalization notices only).
+  Pre-restart read-only check: active jobs=0; schema=e06a5c318d94.
+  Stopped only our owned launcher command session via Ctrl+C.
+  scripts/launch.ps1 -NoBrowser rebuilt and started loopback service.
+  No schema migration, actual author edit or real generation for runtime checks.
+
+Scope limits:
+  No complete accessibility/performance certification, paid generation,
+  continuous story chat, plot graph, revenue or literary-quality claim.
+
+2026-10-29 continuation:
+  Found format-conflict discard left the old form and save lock active.
+  Added a browser regression; corrected its initial textbox label to the actual
+  UI label before reproducing the missing latest-format form on the old code.
+  npm --prefix frontend run test:e2e -- edit-gateways.spec.ts --project desktop --grep '细纲格式冲突放弃修改'
+  1 failed before the fix (.tmp/gateways-discard-before.txt).
+  Discard now accepts the last-read current state and clears format conflict.
+  scripts/launch.ps1 -NoBrowser rebuilt the final UI (tsc + vite passed, 965ms)
+  and started the stopped local service on 127.0.0.1:8765.
+  npm --prefix frontend run test:e2e -- edit-gateways.spec.ts --grep '细纲格式冲突放弃修改|旧保存确认'
+  4 passed (10.1s), desktop/mobile; total distinct browser cases = 12.
+  Health returned ok; served HTML matched dist asset index-BxNDAG6q.js.
+  No additional author-data writes, migration or real model calls.

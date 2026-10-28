@@ -4,7 +4,7 @@ import { groupChapters, matchesChapter } from './chapterDirectory'
 
 function chapter(position: number, volume = '第一卷', review_state: ChapterSummary['review_state'] = 'draft'): ChapterSummary {
   return { id: `c${position}`, novel_id: 'novel', title: `第${position}章 雾港`, position, volume,
-    review_state, goal: '林舟与 Raven 重逢', char_count: 0, working_version_id: `v${position}`, accepted_version_id: null, updated_at: '' }
+    review_state, goal: '林舟与 Raven 重逢', outline_revision: 0, char_count: 0, working_version_id: `v${position}`, accepted_version_id: null, updated_at: '' }
 }
 
 describe('长篇目录', () => {

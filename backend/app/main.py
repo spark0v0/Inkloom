@@ -177,7 +177,7 @@ def create_app(data_dir: Path | None = None, *, worker: bool = True, port: int =
         return request.app.state.library.chapter(novel_id, chapter_id)
 
     @app.patch(prefix + "/novels/{novel_id}/chapters/{chapter_id}", response_model=dto.ChapterOut)
-    def edit_chapter(novel_id: str, chapter_id: str, data: dto.ChapterPatch, request: Request):
+    def edit_chapter(novel_id: str, chapter_id: str, data: dto.ChapterUpdate, request: Request):
         return request.app.state.library.edit_chapter(novel_id, chapter_id, data)
 
     @app.get(prefix + "/novels/{novel_id}/chapters/{chapter_id}/references", response_model=dto.ReferenceState)
@@ -261,8 +261,13 @@ def create_app(data_dir: Path | None = None, *, worker: bool = True, port: int =
         return request.app.state.library.put_plan(novel_id, data)
 
     @app.put(prefix + "/novels/{novel_id}/plans/{plan_id}", response_model=dto.PlanOut)
-    def edit_plan(novel_id: str, plan_id: str, data: dto.PlanInput, request: Request):
-        return request.app.state.library.put_plan(novel_id, data, plan_id)
+    def edit_plan(novel_id: str, plan_id: str, data: dto.PlanUpdate, request: Request):
+        return request.app.state.library.put_plan(novel_id,
+            dto.PlanInput(**data.model_dump(exclude={"base_updated_at"})), plan_id, base_updated_at=data.base_updated_at)
+
+    @app.get(prefix + "/novels/{novel_id}/plans/{plan_id}", response_model=dto.PlanOut)
+    def read_plan(novel_id: str, plan_id: str, request: Request):
+        return request.app.state.library.plan(novel_id, plan_id)
 
     @app.get(prefix + "/novels/{novel_id}/facts", response_model=list[dto.FactOut])
     def facts(novel_id: str, request: Request, include_inactive: bool = False):

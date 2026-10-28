@@ -6,7 +6,7 @@ import type { Context, ContextInput, Evidence, JobInput, Novel, OutlineDocument,
 import type { Navigate } from '../lib/route'
 import { outlineDrafts } from '../lib/drafts'
 import type { OutlineRecoveryDraft } from '../lib/drafts'
-import { outlineFields, outlineText, outlineValue, sameOutline, structuredFields } from '../lib/outlines'
+import { outlineFields, outlineText, outlineValue, rebaseOutline, sameOutline, structuredFields } from '../lib/outlines'
 import { useJobStream } from '../lib/useJobStream'
 import { Badge, Button, Field, Loading, Modal, Notice } from '../components/ui'
 import { ProviderDisclosure } from '../components/ProviderDisclosure'
@@ -28,6 +28,7 @@ export function ChapterOutlineEditor({ novel, chapterId, workspaceId, navigate, 
   const [base, setBase] = useState<OutlineState | null>(null)
   const [draft, setDraft] = useState<OutlineDocument | null>(null)
   const [remote, setRemote] = useState<OutlineState | null>(null)
+  const [formatConflict, setFormatConflict] = useState(false)
   const [recovery, setRecovery] = useState<OutlineRecoveryDraft | null>(null)
   const [recoveryReady, setRecoveryReady] = useState(false)
   const [tab, setTab] = useState('outline')
@@ -97,7 +98,10 @@ export function ChapterOutlineEditor({ novel, chapterId, workspaceId, navigate, 
   useEffect(() => { setContext(null) }, [providerId, scope, instruction, base?.revision])
 
   function accept(value: OutlineState) {
-    setBase(value); setDraft(value.document); setRemote(null); setRecovery(null)
+    if (value.operation_revision != null && value.operation_revision !== value.revision) {
+      setRemote(value)
+      setError(`上次操作已保存为版本 ${value.operation_revision}，但细纲随后更新。你的输入已保留，请先比较最新内容。`)
+    } else { setBase(value); setDraft(value.document); setRemote(null); setRecovery(null); setFormatConflict(false) }
     cache.setQueryData(['chapter-outline', novel.id, chapterId], value)
     for (const name of ['plans', 'chapters', 'chapter', 'novel', 'jobs', 'outline-history']) void cache.invalidateQueries({ queryKey: [name, novel.id] })
     void cache.invalidateQueries({ queryKey: ['novels'] })
@@ -122,11 +126,18 @@ export function ChapterOutlineEditor({ novel, chapterId, workspaceId, navigate, 
     } finally { setBusy(false) }
   }
   async function save() {
-    if (base && draft) await submit({ kind: 'save', data: { base_revision: base.revision, operation_id: uuid(), document: draft } })
+    if (base && draft && !formatConflict) await submit({ kind: 'save', data: { base_revision: base.revision, operation_id: uuid(), document: draft } })
   }
   async function latest() {
+    if (!base || !draft) return
     setBusy(true)
-    try { const value = await api.chapterOutline(novel.id, chapterId); setRemote(value); setBase(value); setError('') }
+    try {
+      const value = await api.chapterOutline(novel.id, chapterId)
+      setRemote(value)
+      const merged = rebaseOutline(base.document, draft, value.document)
+      if (merged) { setBase(value); setDraft(merged); setFormatConflict(false); setError('') }
+      else { setFormatConflict(true); setError('细纲格式发生变化，请先比较并选择保留哪种格式。') }
+    }
     catch (e) { setError(errorText(e)) } finally { setBusy(false) }
   }
   async function input(): Promise<ContextInput> {
@@ -171,7 +182,7 @@ export function ChapterOutlineEditor({ novel, chapterId, workspaceId, navigate, 
     {error && <Notice>{error}{!locked && <Button onClick={() => void latest()}>读取最新细纲并比较</Button>}</Notice>}
     {pending && !busy && <Notice>上次操作尚未确认，请点击原操作按钮确认回执；不会另建生成请求。</Notice>}
     {recovery && <Notice tone="neutral">发现本机未保存的细纲副本。<Button disabled={locked} onClick={() => { setDraft(recovery.document); setBase({ ...base, revision: recovery.baseRevision }); setRecovery(null) }}>恢复本地细纲</Button><Button disabled={locked} onClick={() => setRecovery(null)}>本次不恢复</Button></Notice>}
-    {remote && <Notice tone="neutral">你的输入仍保留。请比较后决定是否保存。<details><summary>查看当前已保存细纲</summary><h3>{remote.document.title}</h3><pre className="outline-readable">{outlineText(remote.document)}</pre></details></Notice>}
+    {remote && <Notice tone="neutral">你的修改仍保留，未修改的字段会采用最新内容。<details><summary>查看当前已保存细纲</summary><h3>{remote.document.title}</h3><pre className="outline-readable">{outlineText(remote.document)}</pre></details>{formatConflict && <div className="button-row"><Button disabled={locked} onClick={() => { setBase(remote); setFormatConflict(false); setError('') }}>保留我的格式，继续编辑</Button><Button disabled={locked} onClick={() => { accept({ ...remote, operation_revision: null }); setError('') }}>放弃本地修改，使用最新细纲</Button></div>}</Notice>}
     <div className={`outline-workspace showing-${tab}`}>
       <section className="outline-manual" aria-label="编辑章节细纲"><form onSubmit={e => { e.preventDefault(); void save() }}>
         <fieldset disabled={locked} className="form-stack"><legend className="sr-only">章节细纲</legend>
@@ -184,7 +195,7 @@ export function ChapterOutlineEditor({ novel, chapterId, workspaceId, navigate, 
             <Field label="章末钩子"><textarea rows={3} maxLength={1000} value={draft.ending_hook || ''} onChange={e => set('ending_hook', e.target.value)} /></Field>
           </>}
         </fieldset>
-        <div className="outline-save-bar"><span role="status">{busy && pending?.kind === 'save' ? '正在保存…' : pending?.kind === 'save' ? '保存尚未确认' : dirty ? '尚未保存' : '已保存'}</span>{dirty && <Button disabled={locked} onClick={() => { setDraft(base.document); setRemote(null); setError('') }}>放弃修改</Button>}<Button type="submit" variant="primary" disabled={busy || (!!pending && pending.kind !== 'save') || (!dirty && pending?.kind !== 'save')}>{pending?.kind === 'save' && !busy ? '确认上次保存' : '保存细纲'}</Button></div>
+        <div className="outline-save-bar"><span role="status">{busy && pending?.kind === 'save' ? '正在保存…' : pending?.kind === 'save' ? '保存尚未确认' : remote && remote.revision !== base.revision ? '有新版本，待比较' : dirty ? '尚未保存' : '已保存'}</span>{dirty && <Button disabled={locked} onClick={() => { accept({ ...(remote || base), operation_revision: null }); setError('') }}>放弃修改</Button>}<Button type="submit" variant="primary" disabled={busy || formatConflict || (!!pending && pending.kind !== 'save') || (!dirty && pending?.kind !== 'save')}>{pending?.kind === 'save' && !busy ? '确认上次保存' : '保存细纲'}</Button></div>
       </form></section>
       <section className="outline-assistance" aria-label="AI 修改建议"><h2>AI 修改建议</h2>
         <fieldset disabled={locked || active} className="form-stack"><legend className="sr-only">生成修改建议</legend><Field label="创作模型"><select value={providerId} onChange={e => setChosen(e.target.value)}>{providers.data?.map(p => <option value={p.id} key={p.id}>{p.name}{p.kind === 'demo' ? ' · 固定样例' : ''}</option>)}</select></Field>

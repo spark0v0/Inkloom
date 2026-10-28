@@ -102,6 +102,7 @@ pwsh -File .\scripts\start.ps1 -Port 8766 -DataDirectory D:\StoryWorkspace
 - [作品写作风格、选段快捷操作与验证](docs/IMPLEMENTATION-WRITING-ASSISTANCE.md) / [开源交互对照](docs/REVIEW-2026-10-27.md)
 - [生成进度读取优化、断线补偿与验证](docs/IMPLEMENTATION-LIVE-PROGRESS.md)
 - [章节细纲编辑、历史恢复与 AI 局部修改](docs/IMPLEMENTATION-CHAPTER-OUTLINES.md)
+- [编辑入口并发、迟到回执修复与开源实现对照](docs/REVIEW-2026-10-28.md)
 - [开发启动提示词](START_PROMPT.md) / [运行时提示词](prompts/)
 
 真实云模型的长篇质量、完整 Windows 输入法人工体验、跨浏览器与百万字性能仍待独立验证。当前不提供云同步、多人协作或完整剧情分支。项目独立实现，运行数据和密钥不进入源码仓库。
