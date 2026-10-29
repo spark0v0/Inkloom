@@ -161,7 +161,7 @@ def create_app(data_dir: Path | None = None, *, worker: bool = True, port: int =
         return request.app.state.library.novel(novel_id)
 
     @app.patch(prefix + "/novels/{novel_id}", response_model=dto.NovelOut)
-    def edit_novel(novel_id: str, data: dto.NovelPatch, request: Request):
+    def edit_novel(novel_id: str, data: dto.NovelUpdate, request: Request):
         return request.app.state.library.edit_novel(novel_id, data)
 
     @app.get(prefix + "/novels/{novel_id}/chapters", response_model=list[dto.ChapterSummary])

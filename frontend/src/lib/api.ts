@@ -100,7 +100,7 @@ export const api = {
   novels: (archived = false) => request<Novel[]>(`/novels?archived=${archived}`),
   novel: (id: string) => request<Novel>(npath(id)),
   createNovel: (data: Schema['NovelInput']) => request<Novel>('/novels', { method: 'POST', body: JSON.stringify(data) }),
-  editNovel: (id: string, data: Schema['NovelPatch']) => request<Novel>(npath(id), { method: 'PATCH', body: JSON.stringify(data) }),
+  editNovel: (id: string, data: Schema['NovelUpdate']) => request<Novel>(npath(id), { method: 'PATCH', body: JSON.stringify(data) }),
   saveWritingStyle: (id: string, data: Schema['WritingStyleInput']) => request<Novel>(npath(id) + '/writing-style', { method: 'PUT', body: JSON.stringify(data) }),
   demo: () => request<Novel>('/demo', { method: 'POST' }),
   chapters: (id: string) => request<ChapterSummary[]>(npath(id) + '/chapters'),

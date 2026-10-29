@@ -20,21 +20,32 @@ export function useManuscript(novelId: string, chapterId: string, workspaceId: s
   const alive = useRef(true)
   const onCommitRef = useRef(onCommit)
   onCommitRef.current = onCommit
-  const key = `${workspaceId}:${novelId}:${chapterId}`
+  const [editorId] = useState(uuid)
+  const legacyKey = `${workspaceId}:${novelId}:${chapterId}`
+  const prefix = legacyKey + ':'
+  const key = prefix + editorId
+  const recoveryQueue = useRef<Promise<unknown>>(Promise.resolve())
   const [status, setStatus] = useState<'saved' | 'dirty' | 'saving' | 'error' | 'conflict'>('saved')
   const [message, setMessage] = useState('')
   const [conflict, setConflict] = useState<Version | null>(null)
-  const [recovery, setRecovery] = useState<RecoveryDraft | null>(null)
+  const [recoveries, setRecoveries] = useState<RecoveryDraft[]>([])
   const [localText, setLocalText] = useState(initial.text)
   const [savedAt, setSavedAt] = useState(initial.created_at)
 
+  const queueRecovery = useCallback((action: () => Promise<unknown>) => {
+    const task = recoveryQueue.current.catch(() => undefined).then(action)
+    recoveryQueue.current = task
+    return task
+  }, [])
+
   const persistRecovery = useCallback(async () => {
+    const snapshot = { key, baseVersion: base.current.id, ...current.current, updatedAt: new Date().toISOString() }
     try {
-      await drafts.put({ key, baseVersion: base.current.id, ...current.current, updatedAt: new Date().toISOString() })
+      await queueRecovery(() => drafts.put(snapshot))
     } catch {
       if (alive.current) setMessage('浏览器恢复副本不可用。请保持页面打开，确认工作区保存成功或下载草稿。')
     }
-  }, [key])
+  }, [key, queueRecovery])
 
   const flush = useCallback((): Promise<Version> => {
     if (!alive.current) return Promise.reject(new Error('页面已切换，草稿保留在原工作区的浏览器恢复副本。'))
@@ -57,7 +68,7 @@ export function useManuscript(novelId: string, chapterId: string, workspaceId: s
           if (composing.current) break
         }
         if (signature(current.current) === saved.current && !pending.current) {
-          await drafts.remove(key).catch(() => undefined)
+          await queueRecovery(() => drafts.remove(key)).catch(() => undefined)
           if (signature(current.current) === saved.current && !pending.current) {
             if (alive.current) { setStatus('saved'); setMessage('') }
           } else {
@@ -81,7 +92,7 @@ export function useManuscript(novelId: string, chapterId: string, workspaceId: s
     }
     inFlight.current = run()
     return inFlight.current
-  }, [chapterId, key, novelId, persistRecovery, workspaceId])
+  }, [chapterId, key, novelId, persistRecovery, queueRecovery, workspaceId])
 
   const change = useCallback((value: Buffer) => {
     current.current = value
@@ -109,10 +120,23 @@ export function useManuscript(novelId: string, chapterId: string, workspaceId: s
     saved.current = signature(current.current)
     pending.current = null
     setLocalText(version.text); setSavedAt(version.created_at); setStatus('saved'); setMessage(''); setConflict(null)
-    void drafts.remove(key).catch(() => undefined)
+    void queueRecovery(() => drafts.remove(key)).catch(() => undefined)
     onCommitRef.current(version)
     return true
-  }, [key, persistRecovery])
+  }, [key, persistRecovery, queueRecovery])
+
+  const dismissRecovery = useCallback((value: RecoveryDraft) => {
+    setRecoveries(previous => previous.filter(item => item.key !== value.key))
+  }, [])
+  const consumeRecovery = useCallback(async (value: RecoveryDraft) => {
+    const removed = await drafts.removeIfUnchanged(value)
+    if (!alive.current) return
+    if (removed) dismissRecovery(value)
+    else {
+      const latest = await drafts.get(value.key)
+      if (alive.current) setRecoveries(previous => latest ? previous.map(item => item.key === value.key ? latest : item) : previous.filter(item => item.key !== value.key))
+    }
+  }, [dismissRecovery])
 
   const rebase = useCallback(async () => {
     if (!conflict) return
@@ -125,15 +149,17 @@ export function useManuscript(novelId: string, chapterId: string, workspaceId: s
 
   useEffect(() => {
     alive.current = true
-    void drafts.get(key).then(value => {
-      if (value && signature(value) !== saved.current && (value.text !== initial.text || JSON.stringify(value.doc) !== JSON.stringify(initial.editor_doc)) && alive.current) setRecovery(value)
+    void Promise.all([drafts.get(legacyKey), drafts.list(prefix)]).then(([legacy, values]) => {
+      const copies = [...(legacy ? [legacy] : []), ...values].filter(value => value.key !== key &&
+        (value.text !== initial.text || JSON.stringify(value.doc) !== JSON.stringify(initial.editor_doc)))
+      if (alive.current) setRecoveries(copies.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)))
     }).catch(() => { if (alive.current) setMessage('浏览器恢复存储不可用，工作区保存仍可使用。') })
     const unload = (event: BeforeUnloadEvent) => {
       if (pending.current || signature(current.current) !== saved.current) { event.preventDefault(); event.returnValue = '' }
     }
     window.addEventListener('beforeunload', unload)
     return () => { alive.current = false; clearTimeout(timer.current); window.removeEventListener('beforeunload', unload) }
-  }, [key, initial])
+  }, [key, legacyKey, prefix, initial])
 
-  return { status, message, conflict, recovery, setRecovery, localText, savedAt, base, current, flush, change, accept, rebase, composing }
+  return { status, message, conflict, recoveries, dismissRecovery, consumeRecovery, localText, savedAt, base, current, flush, change, accept, rebase, composing }
 }

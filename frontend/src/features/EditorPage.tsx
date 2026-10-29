@@ -4,11 +4,11 @@ import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowCounterClockwise, ArrowClockwise, Article, Check, CheckCircle, ClockCounterClockwise, DotsThree, List, Plus, SidebarSimple, Sparkle, TextB, TextItalic, X } from '@phosphor-icons/react'
-import type { JSONContent } from '@tiptap/core'
 import { activeStates, ApiError, api, countChars, dateLabel, downloadText, errorText, number, uuid } from '../lib/api'
 import type { Chapter, ChapterSummary, Evidence, JobInput, MemoryProposal, Novel, Provider, Roles, Selection, Version } from '../lib/api'
 import type { Navigate } from '../lib/route'
 import { useManuscript } from '../lib/useManuscript'
+import type { RecoveryDraft } from '../lib/drafts'
 import { Badge, Button, Field, Loading, Modal, Notice } from '../components/ui'
 import { Assistant } from './Assistant'
 import { SourceButton } from './JobPresentation'
@@ -168,8 +168,14 @@ export function EditorPage({ novel, chapter, chapters, workspaceId, providers, r
       setMetadataBase({ revision: value.outline_revision ?? 0, volume: value.volume }); setMetadataLatest(value); setMetadataError('')
     } catch (e) { setMetadataError(errorText(e)) } finally { setBusy(false) }
   }
-  async function restoreBuffer(doc: JSONContent, text: string) {
-    editor?.commands.setContent(doc, { emitUpdate: false }); manuscript.change({ text, doc }); manuscript.setRecovery(null)
+  async function restoreBuffer(value: RecoveryDraft) {
+    if (manuscript.composing.current) { setError('请先完成当前中文输入，再恢复草稿。'); return }
+    try {
+      await manuscript.flush()
+      editor?.commands.setContent(value.doc, { emitUpdate: false }); manuscript.change({ text: value.text, doc: value.doc })
+      await manuscript.flush()
+      await manuscript.consumeRecovery(value)
+    } catch (e) { setError(errorText(e)) }
   }
 
   return <div className={`writing-layout ${!assistantOpen ? 'assistant-hidden' : ''} ${focused ? 'writing-focus' : ''}`}>
@@ -180,7 +186,7 @@ export function EditorPage({ novel, chapter, chapters, workspaceId, providers, r
       {!candidateView && selection && <div className="selection-actions" role="group" aria-label="选段快捷操作"><span>已选 {Array.from(selection.text).length} 字符</span>{Object.entries(rewriteActions).map(([action, value]) => <Button key={action} disabled={preparingSelection} onMouseDown={e => e.preventDefault()} onClick={() => void prepareSelection(action as RewriteAction)} aria-label={`准备${value.name}选段`}>{value.name}</Button>)}<Button variant="ghost" disabled={preparingSelection} aria-label="收起选段快捷操作" onMouseDown={e => e.preventDefault()} onClick={() => setSelection(null)}><X size={16} /></Button></div>}
       <div className="candidate-host" ref={setCandidateHost} hidden={!candidateView} />
       <div className="editor-scroll" hidden={candidateView}>
-        <div className="editor-notices">{novel.dirty_from_order != null && novel.dirty_from_order < chapter.position && <Notice>第 {novel.dirty_from_order} 章已修改，请先重新定稿前文，再生成后续章节。</Notice>}{manuscript.recovery && <Notice action={<Button onClick={() => void restoreBuffer(manuscript.recovery!.doc, manuscript.recovery!.text)}>恢复草稿</Button>}>发现一份 {dateLabel(manuscript.recovery.updatedAt)} 的浏览器恢复副本。<button className="inline-link" onClick={() => { downloadText(manuscript.recovery!.text, `${chapter.title}-恢复副本.txt`); manuscript.setRecovery(null) }}>先下载副本</button></Notice>}{(manuscript.message || error) && <Notice action={manuscript.status === 'error' ? <Button onClick={() => void manuscript.flush().catch(() => undefined)}>重试保存</Button> : undefined}>{manuscript.message || error}</Notice>}</div>
+        <div className="editor-notices">{novel.dirty_from_order != null && novel.dirty_from_order < chapter.position && <Notice>第 {novel.dirty_from_order} 章已修改，请先重新定稿前文，再生成后续章节。</Notice>}{manuscript.recoveries.map(value => <Notice key={value.key} action={<Button onClick={() => void restoreBuffer(value)}>恢复草稿</Button>}>发现一份 {dateLabel(value.updatedAt)} 的浏览器恢复副本。<button className="inline-link" onClick={() => { downloadText(value.text, `${chapter.title}-恢复副本.txt`); manuscript.dismissRecovery(value) }}>先下载副本</button><details><summary>查看恢复副本</summary><pre className="outline-readable">{value.text}</pre></details></Notice>)}{(manuscript.message || error) && <Notice action={manuscript.status === 'error' ? <Button onClick={() => void manuscript.flush().catch(() => undefined)}>重试保存</Button> : undefined}>{manuscript.message || error}</Notice>}</div>
         <div className="manuscript" style={{ '--manuscript-size': `${fontSize}px` } as React.CSSProperties}><div className="chapter-eyebrow">{chapter.review_state === 'confirmed' ? <><CheckCircle size={15} />已定稿</> : chapter.review_state === 'needs_review' ? '待重新定稿' : '草稿'}</div><div className="manuscript-heading"><h1>{chapter.title}</h1><button className="icon-button" aria-label="编辑章节信息" onClick={openMetadata}><DotsThree size={24} /></button></div>{chapter.goal && <details className="chapter-goal"><summary>本章细纲</summary><p>{chapter.goal}</p></details>}<EditorContent editor={editor} /></div>
 
         <nav className="chapter-pagination" aria-label="前后章节">
@@ -228,7 +234,7 @@ function CanonDialog({ novel, chapter, version, proposed: initialProposed, onEvi
   const [jobId, setJobId] = useState<string | null>(null)
   const jobs = useQuery({ queryKey: ['jobs', novel.id, chapter.id, 'extract'], queryFn: () => api.jobs(novel.id, { chapter_id: chapter.id, task: 'extract' }) })
   const matching = jobId || jobs.data?.find(j => j.chapter_id === chapter.id && j.base_version_id === version.id && j.task === 'extract' && !['cancelled', 'failed'].includes(j.state))?.id
-  const job = useQuery({ queryKey: ['job', matching], queryFn: () => api.job(matching!, novel.id), enabled: !!matching, refetchInterval: q => q.state.data && activeStates.has(q.state.data.state) ? 600 : false })
+  const job = useQuery({ queryKey: ['job', matching], queryFn: () => api.job(matching!, novel.id), enabled: !!matching })
   useJobStream(job.data)
   const active = job.data && activeStates.has(job.data.state)
   const applied = useRef<string | null>(null)

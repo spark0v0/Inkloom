@@ -44,6 +44,10 @@ class NovelPatch(Schema):
     chapter_words: int | None = Field(default=None, ge=500, le=6000)
 
 
+class NovelUpdate(NovelPatch):
+    base_settings_revision: int = Field(ge=0)
+
+
 class NovelOut(Schema):
     id: str
     title: str

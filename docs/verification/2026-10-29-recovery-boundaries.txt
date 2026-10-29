@@ -1,0 +1,50 @@
+2026-10-29 / Windows / PowerShell 7
+范围：恢复副本、作品设置并发、定稿任务同步；真实模型调用=0。
+
+修复前隔离浏览器复现：
+  B 保存失败后保留的正文副本，被 A 的正常保存清空。
+  本地细纲只改目标，恢复并比较后仍把远端新标题写回旧标题。
+  编辑作品只改题材，整份旧表单覆盖另一窗口的新文风。
+
+后端：
+  python -X utf8 -m pytest backend/tests/test_novel_edit_boundaries.py -q --tb=short --basetemp .tmp/novel-edit-before
+  3 failed (1.37s)，缺少基线被接受，新基线未被旧 Schema 识别。
+  python -X utf8 -m pytest backend/tests/test_novel_edit_boundaries.py backend/tests/test_writing_preferences.py backend/tests/test_outline_gateways.py -q --tb=short --basetemp .tmp/recovery-novel-backend
+  11 passed (2.88s)，一条已有 Starlette/httpx 弃用警告。
+
+前端：
+  npm --prefix frontend run generate:api — 生成成功。
+  npm --prefix frontend run build — TypeScript 与生产构建通过。
+  恢复操作补充先保存本页输入后再次构建通过（902ms），日志 .tmp/recovery-final-build.txt。
+  npm --prefix frontend run test:e2e -- recovery-boundaries.spec.ts
+  10 passed (36.1s)，桌面/手机各 5 场景。
+  覆盖多副本选择、旧正文键兼容、清理时保留迟到更新、新旧细纲基线、
+  旧细纲历史暂不可读时保留与重试，以及作品表单字段合并和输入法提交保护。
+
+核心回归与最终补验：
+  npm --prefix frontend run test:e2e -- recovery-boundaries.spec.ts review-boundaries.spec.ts workshop.spec.ts --grep '正文窗口各|兼容旧正文|采纳等待期间|跨标签页恢复后|AI 建书、章节细纲'
+  9 passed / 1 failed (1.7m)。恢复相关最终改动、工作区切换以及桌面/手机
+  固定 Demo 的建书→细纲→正文→采纳→记忆→定稿→下一章→ZIP 导出均通过。
+  失败为既有采纳等待测试未打开手机助手；首次补验 1 passed / 1 failed (14.9s)，
+  定位为页面尚未加载就检查按钮可见性，随后补齐编辑区就绪等待及手机助手打开/关闭。
+  npm --prefix frontend run test:e2e -- review-boundaries.spec.ts --project mobile --grep '采纳等待期间'
+  1 passed (6.3s)。最终确认过的不同桌面/手机场景共 16 项，未全量重跑。
+  日志：.tmp/recovery-core-browser.txt、.tmp/recovery-adoption-recheck.txt、
+  .tmp/recovery-adoption-mobile.txt。
+  故障注入和页面关闭期间观察到 Windows asyncio 连接关闭诊断：
+  ConnectionResetError: [WinError 10054] 远程主机强迫关闭了一个现有的连接。
+  相关测试断言通过；本轮未调整传输层。另有 NO_COLOR/FORCE_COLOR 提示。
+
+本地运行：
+  scripts/launch.ps1 -NoBrowser 启动成功；启动器自动刷新生产构建（443ms）。
+  GET http://127.0.0.1:8765/api/v1/health → status=ok。
+  首页与当前 dist/index.html 一致，主资源 /assets/index-C5Zq5Xsu.js。
+  仅做只读探测，没有操作作者作品或调用真实模型。
+
+静态检查：
+  相关 backend/app 与新增测试 Ruff：All checks passed!
+  git diff --check：通过，只有 Git 行尾规范化提示。
+
+边界：
+  使用临时 SQLite 和浏览器故障注入。固定 Demo 只验证流程。
+  没有全量性能/无障碍认证，没有真实模型生成或数据库迁移。

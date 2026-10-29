@@ -24,6 +24,9 @@ test('采纳等待期间输入保留，作者比较后可另存', async ({ page 
     if (!r.ok) throw new Error('Demo job failed')
   }, ids)
   await page.goto(`/#/write/${ids.novel}/${ids.chapter}`)
+  await expect(page.locator('.editor-panel')).toBeVisible()
+  const assistantOpener = page.getByRole('button', { name: '打开写作助手', exact: true })
+  if (await assistantOpener.isVisible()) await assistantOpener.click()
   await expect(page.getByRole('button', { name: '采纳正文', exact: true })).toBeVisible()
   let release!: () => void
   let arrived!: () => void
@@ -36,7 +39,10 @@ test('采纳等待期间输入保留，作者比较后可另存', async ({ page 
   })
   await page.getByRole('button', { name: '采纳正文', exact: true }).click()
   await dispatched
-  await page.getByRole('button', { name: '正文', exact: true }).click()
+  const assistantDialog = page.getByRole('dialog', { name: 'AI 写作', exact: true })
+  if (await assistantDialog.isVisible()) await assistantDialog.getByRole('button', { name: '关闭对话框', exact: true }).click()
+  const manuscriptTab = page.getByRole('button', { name: '正文', exact: true })
+  if (await manuscriptTab.isVisible()) await manuscriptTab.click()
   const editor = page.getByRole('textbox', { name: '小说正文', exact: true })
   const marker = '采纳等待期间刚写的新句子。'
   await editor.fill(marker)
@@ -97,8 +103,9 @@ test('跨标签页恢复后重新读取当前工作区，原草稿副本保留',
     const recovery = await new Promise<{ text: string } | undefined>((resolve, reject) => {
       const open = indexedDB.open('story-workshop-recovery', 1)
       open.onsuccess = () => {
-        const query = open.result.transaction('drafts').objectStore('drafts').get(`${before.workspace}:${ids.novel}:${ids.chapter}`)
-        query.onsuccess = () => { resolve(query.result); open.result.close() }
+        const prefix = `${before.workspace}:${ids.novel}:${ids.chapter}:`
+        const query = open.result.transaction('drafts').objectStore('drafts').getAll()
+        query.onsuccess = () => { resolve(query.result.find(value => value.key.startsWith(prefix))); open.result.close() }
         query.onerror = () => reject(query.error)
       }
     })

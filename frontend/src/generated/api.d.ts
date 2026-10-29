@@ -1855,8 +1855,8 @@ export interface components {
             /** Updated At */
             updated_at: string;
         };
-        /** NovelPatch */
-        NovelPatch: {
+        /** NovelUpdate */
+        NovelUpdate: {
             /** Title */
             title?: string | null;
             /** Genre */
@@ -1873,6 +1873,8 @@ export interface components {
             target_words?: number | null;
             /** Chapter Words */
             chapter_words?: number | null;
+            /** Base Settings Revision */
+            base_settings_revision: number;
         };
         /** OutlineApplyInput */
         OutlineApplyInput: {
@@ -2784,7 +2786,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["NovelPatch"];
+                "application/json": components["schemas"]["NovelUpdate"];
             };
         };
         responses: {

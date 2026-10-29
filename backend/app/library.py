@@ -131,13 +131,19 @@ class Library:
     def edit_novel(self, novel_id: str, data: dto.NovelPatch) -> dto.NovelOut:
         with self.ws.session(write=True) as s:
             novel = require_novel(s, novel_id)
-            for key, value in data.model_dump(exclude_none=True).items():
+            values = data.model_dump(exclude_none=True, exclude={"base_settings_revision"})
+            if all(getattr(novel, key) == value for key, value in values.items()):
+                return novel_out(s, novel)
+            if isinstance(data, dto.NovelUpdate) and novel.settings_revision != data.base_settings_revision:
+                raise DomainError("NOVEL_CONFLICT", "作品或文风已在其他窗口更新。你的输入已保留，请读取最新作品信息后比较。", 409)
+            for key, value in values.items():
                 if key == "title" and not value.strip():
                     raise DomainError("TITLE_REQUIRED", "请填写作品名。")
                 setattr(novel, key, value)
             if data.title is not None:
                 for plan in s.scalars(select(Plan).where(Plan.novel_id == novel_id, Plan.level == "book")).all():
-                    plan.title = novel.title
+                    if plan.title != novel.title:
+                        plan.title, plan.updated_at = novel.title, now()
                     if plan.structure.get("kind") == "blueprint":
                         plan.structure = {**plan.structure, "title": novel.title}
             novel.settings_revision += 1

@@ -10,6 +10,7 @@ import { useJobStream } from '../lib/useJobStream'
 import { BlueprintView, OutlineView } from './ProductionResults'
 import { ChapterOutlineEditor } from './ChapterOutlineEditor'
 import { ProviderDisclosure } from '../components/ProviderDisclosure'
+import { NovelBriefDialog } from './NovelBriefDialog'
 
 const labels = { book: '全书', volume: '分卷', chapter: '章节', scene: '场景' }
 
@@ -23,7 +24,6 @@ export function PlanningPage({ novel, navigate, chapterId, workspaceId, register
   const [editing, setEditing] = useState<Plan | 'new' | null>(null)
   const [brief, setBrief] = useState(false)
   const [generation, setGeneration] = useState<'blueprint' | 'outline' | null>(null)
-  const [form, setForm] = useState({ title: novel.title, genre: novel.genre, premise: novel.premise, style: novel.style, platform: novel.platform, target_words: novel.target_words, chapter_words: novel.chapter_words })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [appliedChapters, setAppliedChapters] = useState<string[]>([])
@@ -38,11 +38,6 @@ export function PlanningPage({ novel, navigate, chapterId, workspaceId, register
   const list = (chapters.data || []).filter(c => volume ? c.volume === volume.title : true)
   const setupKind = generation || (!book && !volumes.length ? 'blueprint' : null)
   const resumable = jobs.data?.find(j => ['blueprint', 'outline'].includes(j.task) && (activeStates.has(j.state) || j.state === 'paused' || j.candidate_status === 'ready'))
-  async function saveBrief() {
-    setBusy(true)
-    try { await api.editNovel(novel.id, form); await refresh(); setBrief(false) }
-    catch (e) { setError(errorText(e)) } finally { setBusy(false) }
-  }
   async function refresh() {
     await Promise.all(['novel', 'chapters', 'plans', 'entities', 'jobs'].map(key => cache.invalidateQueries({ queryKey: [key, novel.id] })))
     await cache.invalidateQueries({ queryKey: ['novels'] })
@@ -74,7 +69,7 @@ export function PlanningPage({ novel, navigate, chapterId, workspaceId, register
   }} />
   if (chapterId) return <ChapterOutlineEditor key={chapterId} novel={novel} chapterId={chapterId} workspaceId={workspaceId} navigate={navigate} registerGuard={registerGuard} onEvidence={onEvidence} />
   return <div className="page-scroll"><div className="serial-studio">
-    <header className="book-heading"><div className="studio-book-cover" aria-hidden="true"><BookOpen size={28} weight="light" /><span>{novel.title}</span></div><div className="book-heading-main"><div className="book-category">{novel.genre || '题材待定'}<span>/</span>{novel.platform || '自由创作'}{novel.is_demo && <Badge tone="amber">示例</Badge>}</div><h1>{novel.title}</h1><p>{novel.premise || '写下一句故事想法，让 AI 帮你展开。'}</p><div className="book-targets"><span>计划 {number(novel.target_words / 10000)} 万字</span><span>每章 {number(novel.chapter_words)} 字</span><span>{novel.accepted_count} 章已定稿</span></div></div><Button onClick={() => { setForm({ title: novel.title, genre: novel.genre, premise: novel.premise, style: novel.style, platform: novel.platform, target_words: novel.target_words, chapter_words: novel.chapter_words }); setBrief(true) }}><PencilSimple size={17} />编辑作品</Button></header>
+    <header className="book-heading"><div className="studio-book-cover" aria-hidden="true"><BookOpen size={28} weight="light" /><span>{novel.title}</span></div><div className="book-heading-main"><div className="book-category">{novel.genre || '题材待定'}<span>/</span>{novel.platform || '自由创作'}{novel.is_demo && <Badge tone="amber">示例</Badge>}</div><h1>{novel.title}</h1><p>{novel.premise || '写下一句故事想法，让 AI 帮你展开。'}</p><div className="book-targets"><span>计划 {number(novel.target_words / 10000)} 万字</span><span>每章 {number(novel.chapter_words)} 字</span><span>{novel.accepted_count} 章已定稿</span></div></div><Button onClick={() => setBrief(true)}><PencilSimple size={17} />编辑作品</Button></header>
     <nav className="creation-steps" aria-label="创作步骤">
       <button className={book ? 'done' : 'current'} aria-current={!book ? 'step' : undefined} onClick={() => { setTab('book'); setGeneration(book ? null : 'blueprint') }}><span>{book ? <Check size={16} /> : '1'}</span>全书方案</button><i />
       <button className={book && !chapters.data?.some(c => c.goal) ? 'current' : ''} disabled={!book && !volumes.length} onClick={() => { setTab('volumes'); setGeneration(null) }}><span>2</span>章节细纲</button><i />
@@ -88,7 +83,7 @@ export function PlanningPage({ novel, navigate, chapterId, workspaceId, register
     {allPlans.some(p => p.level === 'scene' || (p.level === 'chapter' && !p.structure?.chapter_id)) && <details className="legacy-plans"><summary>其他规划</summary>{allPlans.filter(p => p.level === 'scene' || (p.level === 'chapter' && !p.structure?.chapter_id)).map(p => <button key={p.id} className="legacy-plan" onClick={() => setEditing(p)}><Badge>{labels[p.level]}</Badge>{p.title}<CaretRight size={16} /></button>)}</details>}
 
     {editing && <PlanDialog novelId={novel.id} plan={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
-    <Modal open={brief} onOpenChange={setBrief} title="编辑作品" wide><form className="form-stack" onSubmit={e => { e.preventDefault(); void saveBrief() }}><div className="form-row"><Field label="作品名"><input required maxLength={160} value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} /></Field><Field label="题材"><input maxLength={80} value={form.genre} onChange={e => setForm({ ...form, genre: e.target.value })} /></Field></div><div className="form-row"><Field label="目标平台"><select value={form.platform} onChange={e => setForm({ ...form, platform: e.target.value })}><option>番茄小说</option><option>起点中文网</option><option>自由创作</option></select></Field><Field label="目标字数"><input type="number" required min={10000} max={10000000} step={10000} value={form.target_words} onChange={e => setForm({ ...form, target_words: Number(e.target.value) })} /></Field></div><Field label="每章字数"><select value={form.chapter_words} onChange={e => setForm({ ...form, chapter_words: Number(e.target.value) })}>{[1000, 1500, 2000, 2500, 3000, 4000, 5000, 6000].map(n => <option value={n} key={n}>{number(n)} 字</option>)}</select></Field><Field label="故事想法"><textarea rows={4} maxLength={12000} value={form.premise} onChange={e => setForm({ ...form, premise: e.target.value })} /></Field><Field label="文风偏好"><textarea rows={3} maxLength={8000} value={form.style} onChange={e => setForm({ ...form, style: e.target.value })} /></Field>{error && <Notice>{error}</Notice>}<div className="modal-actions"><Button onClick={() => setBrief(false)}>取消</Button><Button type="submit" variant="primary" disabled={busy}>保存</Button></div></form></Modal>
+    {brief && <NovelBriefDialog novel={novel} onClose={() => setBrief(false)} />}
   </div></div>
 }
 

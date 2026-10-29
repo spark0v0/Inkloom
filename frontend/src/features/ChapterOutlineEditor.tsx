@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, ArrowRight, ClockCounterClockwise, Plus, Sparkle, X } from '@phosphor-icons/react'
-import { activeStates, ApiError, api, dateLabel, errorText, jobStateNames, uuid } from '../lib/api'
+import { activeStates, ApiError, api, dateLabel, downloadText, errorText, jobStateNames, uuid } from '../lib/api'
 import type { Context, ContextInput, Evidence, JobInput, Novel, OutlineDocument, OutlineField, OutlineHistoryItem, OutlineRevision, OutlineState } from '../lib/api'
 import type { Navigate } from '../lib/route'
 import { outlineDrafts } from '../lib/drafts'
@@ -46,10 +46,8 @@ export function ChapterOutlineEditor({ novel, chapterId, workspaceId, navigate, 
   const [error, setError] = useState('')
   const composing = useRef(false)
   const queue = useRef(Promise.resolve())
-  const [tabId] = useState(() => {
-    try { const value = sessionStorage.getItem('inkloom-outline-tab') || uuid(); sessionStorage.setItem('inkloom-outline-tab', value); return value }
-    catch { return uuid() }
-  })
+  const [tabId] = useState(uuid)
+  const recoveredFrom = useRef<OutlineRecoveryDraft | null>(null)
   const prefix = `outline:${workspaceId}:${novel.id}:${chapterId}:`
   const key = prefix + tabId
   const recoveryLoaded = useRef(false)
@@ -84,7 +82,7 @@ export function ChapterOutlineEditor({ novel, chapterId, workspaceId, navigate, 
   useEffect(() => {
     if (!recoveryReady || recovery || !base || !draft) return
     queue.current = queue.current.catch(() => undefined).then(async () => {
-      if (dirty) await outlineDrafts.put({ key, baseRevision: base.revision, document: draft, updatedAt: new Date().toISOString() })
+      if (dirty) await outlineDrafts.put({ key, baseRevision: base.revision, baseDocument: base.document, document: draft, updatedAt: new Date().toISOString() })
       else await outlineDrafts.remove(key)
     }).catch(() => setError('浏览器恢复副本写入失败，请保存到工作区。'))
   }, [key, base, draft, dirty, recovery, recoveryReady])
@@ -101,7 +99,13 @@ export function ChapterOutlineEditor({ novel, chapterId, workspaceId, navigate, 
     if (value.operation_revision != null && value.operation_revision !== value.revision) {
       setRemote(value)
       setError(`上次操作已保存为版本 ${value.operation_revision}，但细纲随后更新。你的输入已保留，请先比较最新内容。`)
-    } else { setBase(value); setDraft(value.document); setRemote(null); setRecovery(null); setFormatConflict(false) }
+    } else {
+      setBase(value); setDraft(value.document); setRemote(null); setRecovery(null); setFormatConflict(false)
+      const recovered = recoveredFrom.current
+      recoveredFrom.current = null
+      if (recovered) queue.current = queue.current.catch(() => undefined).then(async () => { await outlineDrafts.removeIfUnchanged(recovered) })
+        .catch(() => setError('细纲已保存，旧恢复副本暂未清理。'))
+    }
     cache.setQueryData(['chapter-outline', novel.id, chapterId], value)
     for (const name of ['plans', 'chapters', 'chapter', 'novel', 'jobs', 'outline-history']) void cache.invalidateQueries({ queryKey: [name, novel.id] })
     void cache.invalidateQueries({ queryKey: ['novels'] })
@@ -139,6 +143,18 @@ export function ChapterOutlineEditor({ novel, chapterId, workspaceId, navigate, 
       else { setFormatConflict(true); setError('细纲格式发生变化，请先比较并选择保留哪种格式。') }
     }
     catch (e) { setError(errorText(e)) } finally { setBusy(false) }
+  }
+  async function restoreRecovery() {
+    if (!recovery || locked || composing.current) return
+    setBusy(true); setError('')
+    try {
+      const original = recovery.baseDocument || (await api.outlineRevision(novel.id, chapterId, recovery.baseRevision)).document
+      setBase({ chapter_id: chapterId, revision: recovery.baseRevision, document: original, operation_revision: null })
+      setDraft(recovery.document); setRemote(null); setFormatConflict(false)
+      recoveredFrom.current = recovery
+      setRecovery(null)
+    } catch (e) { setError(`未能读取恢复副本的原始细纲。副本仍保留，可先下载。${errorText(e)}`) }
+    finally { setBusy(false) }
   }
   async function input(): Promise<ContextInput> {
     if (!base) throw new Error('请先读取细纲。')
@@ -181,7 +197,7 @@ export function ChapterOutlineEditor({ novel, chapterId, workspaceId, navigate, 
     <div className="outline-mobile-tabs" role="tablist" aria-label="细纲工作区"><button role="tab" aria-selected={tab === 'outline'} onClick={() => setTab('outline')}>细纲</button><button role="tab" aria-selected={tab === 'ai'} onClick={() => setTab('ai')}>AI 建议</button></div>
     {error && <Notice>{error}{!locked && <Button onClick={() => void latest()}>读取最新细纲并比较</Button>}</Notice>}
     {pending && !busy && <Notice>上次操作尚未确认，请点击原操作按钮确认回执；不会另建生成请求。</Notice>}
-    {recovery && <Notice tone="neutral">发现本机未保存的细纲副本。<Button disabled={locked} onClick={() => { setDraft(recovery.document); setBase({ ...base, revision: recovery.baseRevision }); setRecovery(null) }}>恢复本地细纲</Button><Button disabled={locked} onClick={() => setRecovery(null)}>本次不恢复</Button></Notice>}
+    {recovery && <Notice tone="neutral">发现本机未保存的细纲副本。<Button disabled={locked} onClick={() => void restoreRecovery()}>恢复本地细纲</Button><Button disabled={locked} onClick={() => downloadText(outlineText(recovery.document), `${recovery.document.title}-细纲恢复副本.txt`)}>下载恢复副本</Button><Button disabled={locked} onClick={() => setRecovery(null)}>本次不恢复</Button></Notice>}
     {remote && <Notice tone="neutral">你的修改仍保留，未修改的字段会采用最新内容。<details><summary>查看当前已保存细纲</summary><h3>{remote.document.title}</h3><pre className="outline-readable">{outlineText(remote.document)}</pre></details>{formatConflict && <div className="button-row"><Button disabled={locked} onClick={() => { setBase(remote); setFormatConflict(false); setError('') }}>保留我的格式，继续编辑</Button><Button disabled={locked} onClick={() => { accept({ ...remote, operation_revision: null }); setError('') }}>放弃本地修改，使用最新细纲</Button></div>}</Notice>}
     <div className={`outline-workspace showing-${tab}`}>
       <section className="outline-manual" aria-label="编辑章节细纲"><form onSubmit={e => { e.preventDefault(); void save() }}>

@@ -84,8 +84,8 @@ export function LibraryPage({ navigate, query = '' }: { navigate: Navigate; quer
   const demo = useMutation({ mutationFn: api.demo, onSuccess: async novel => { await cache.invalidateQueries({ queryKey: ['novels'] }); await openNovel(novel, navigate) } })
   const list = (novels.data ?? []).filter(n => [n.title, n.genre, n.premise].join(' ').includes(query))
   async function archive(novel: Novel) {
-    try { await api.editNovel(novel.id, { archived: !archived }); await cache.invalidateQueries({ queryKey: ['novels'] }) }
-    catch (e) { setError(errorText(e)) }
+    try { await api.editNovel(novel.id, { archived: !archived, base_settings_revision: novel.settings_revision }); await cache.invalidateQueries({ queryKey: ['novels'] }); setError('') }
+    catch (e) { setError(errorText(e)); void cache.invalidateQueries({ queryKey: ['novels'] }) }
   }
   return <div className="page library-page"><PageHeading title="我的作品" action={<div className="button-row"><Button onClick={() => setImporting(true)}><UploadSimple size={18} />导入手稿</Button><Button variant="primary" onClick={() => setCreating(true)}><Plus size={18} />新建小说</Button></div>} />
     <div className="library-model"><PlugsConnected size={20} /><span>{realProvider ? <><strong>{realProvider.name}</strong><small>{realProvider.model}</small></> : <><strong>连接你的 AI，开始创作</strong><small>支持 OpenAI 兼容接口</small></>}</span><Button variant="ghost" onClick={() => void navigate({ page: 'settings' })}>{realProvider ? '管理模型' : '连接模型'}<ArrowRight size={16} /></Button></div>

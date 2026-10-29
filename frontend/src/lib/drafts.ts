@@ -29,14 +29,33 @@ async function operation<T>(mode: IDBTransactionMode, run: (store: IDBObjectStor
 
 export const drafts = {
   get: (key: string) => operation<RecoveryDraft | undefined>('readonly', store => store.get(key)),
+  list: (prefix: string) => operation<RecoveryDraft[]>('readonly', store => store.getAll(IDBKeyRange.bound(prefix, prefix + '\uffff'))),
   put: (draft: RecoveryDraft) => operation('readwrite', store => store.put(draft)),
   remove: (key: string) => operation('readwrite', store => store.delete(key)),
+  removeIfUnchanged,
 }
 
-export type OutlineRecoveryDraft = { key: string; baseRevision: number; document: OutlineDocument; updatedAt: string }
+async function removeIfUnchanged(snapshot: { key: string }): Promise<boolean> {
+  const db = await open()
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction('drafts', 'readwrite')
+    const store = transaction.objectStore('drafts')
+    const request = store.get(snapshot.key)
+    let removed = false
+    request.onsuccess = () => {
+      if (JSON.stringify(request.result) === JSON.stringify(snapshot)) { store.delete(snapshot.key); removed = true }
+    }
+    transaction.oncomplete = () => { db.close(); resolve(removed) }
+    transaction.onerror = () => { db.close(); reject(transaction.error) }
+    transaction.onabort = () => { db.close(); reject(transaction.error) }
+  })
+}
+
+export type OutlineRecoveryDraft = { key: string; baseRevision: number; baseDocument?: OutlineDocument; document: OutlineDocument; updatedAt: string }
 export const outlineDrafts = {
   get: (key: string) => operation<OutlineRecoveryDraft | undefined>('readonly', store => store.get(key)),
   list: (prefix: string) => operation<OutlineRecoveryDraft[]>('readonly', store => store.getAll(IDBKeyRange.bound(prefix, prefix + '\uffff'))),
   put: (draft: OutlineRecoveryDraft) => operation('readwrite', store => store.put(draft)),
   remove: (key: string) => operation('readwrite', store => store.delete(key)),
+  removeIfUnchanged,
 }
