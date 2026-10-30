@@ -1,0 +1,127 @@
+{
+  "captures": [
+    {
+      "name": "library-initial",
+      "viewport": 1440,
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "name": "library-desktop",
+      "viewport": 1440,
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "name": "library-empty",
+      "viewport": 1440,
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "name": "editor-desktop",
+      "viewport": 1440,
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "name": "editor-focused-panes",
+      "viewport": 1440,
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "name": "editor-tablet",
+      "viewport": 768,
+      "width": 768,
+      "height": 1024
+    },
+    {
+      "name": "editor-mobile",
+      "viewport": 390,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "name": "assistant-mobile",
+      "viewport": 390,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "name": "library-mobile",
+      "viewport": 390,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "name": "planning-desktop",
+      "viewport": 1440,
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "name": "outline-desktop",
+      "viewport": 1440,
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "name": "planning-mobile",
+      "viewport": 390,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "name": "outline-mobile",
+      "viewport": 390,
+      "width": 390,
+      "height": 844
+    }
+  ],
+  "accessibility": [
+    {
+      "name": "library-desktop",
+      "violations": []
+    },
+    {
+      "name": "library-empty",
+      "violations": []
+    },
+    {
+      "name": "editor-desktop",
+      "violations": []
+    },
+    {
+      "name": "editor-mobile",
+      "violations": []
+    },
+    {
+      "name": "assistant-mobile",
+      "violations": []
+    },
+    {
+      "name": "library-mobile",
+      "violations": []
+    },
+    {
+      "name": "planning-desktop",
+      "violations": []
+    },
+    {
+      "name": "outline-desktop",
+      "violations": []
+    },
+    {
+      "name": "planning-mobile",
+      "violations": []
+    },
+    {
+      "name": "outline-mobile",
+      "violations": []
+    }
+  ],
+  "errors": [],
+  "novelRoute": "/#/write/novel_ff1981cd08ae4ce28b57b30e9dcf9eff/chapter_d3765a7e8aae4cc3a868cfa1864b13d7",
+  "realModelCalls": 0
+}

@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
 import './styles.css'
 import './studio.css'
+import './workbench.css'
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 10000, refetchOnWindowFocus: false }, mutations: { retry: false } } })
 class Boundary extends Component<{ children: ReactNode }, { failed: boolean }> {

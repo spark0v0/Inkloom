@@ -1,0 +1,114 @@
+{
+  "captures": [
+    {
+      "name": "planning-desktop",
+      "width": 1440,
+      "documentWidth": 1440,
+      "overflowing": []
+    },
+    {
+      "name": "story-desktop",
+      "width": 1440,
+      "documentWidth": 1440,
+      "overflowing": []
+    },
+    {
+      "name": "entity-dialog-desktop",
+      "width": 1440,
+      "documentWidth": 1440,
+      "overflowing": []
+    },
+    {
+      "name": "settings-desktop",
+      "width": 1440,
+      "documentWidth": 1440,
+      "overflowing": []
+    },
+    {
+      "name": "provider-dialog-desktop",
+      "width": 1440,
+      "documentWidth": 1440,
+      "overflowing": []
+    },
+    {
+      "name": "planning-tablet",
+      "width": 768,
+      "documentWidth": 768,
+      "overflowing": []
+    },
+    {
+      "name": "story-tablet",
+      "width": 768,
+      "documentWidth": 768,
+      "overflowing": []
+    },
+    {
+      "name": "entity-dialog-tablet",
+      "width": 768,
+      "documentWidth": 768,
+      "overflowing": []
+    },
+    {
+      "name": "settings-tablet",
+      "width": 768,
+      "documentWidth": 768,
+      "overflowing": []
+    },
+    {
+      "name": "provider-dialog-tablet",
+      "width": 768,
+      "documentWidth": 768,
+      "overflowing": []
+    },
+    {
+      "name": "planning-mobile",
+      "width": 390,
+      "documentWidth": 390,
+      "overflowing": []
+    },
+    {
+      "name": "story-mobile",
+      "width": 390,
+      "documentWidth": 390,
+      "overflowing": []
+    },
+    {
+      "name": "entity-dialog-mobile",
+      "width": 390,
+      "documentWidth": 390,
+      "overflowing": []
+    },
+    {
+      "name": "settings-mobile",
+      "width": 390,
+      "documentWidth": 390,
+      "overflowing": []
+    },
+    {
+      "name": "provider-dialog-mobile",
+      "width": 390,
+      "documentWidth": 390,
+      "overflowing": []
+    }
+  ],
+  "checks": [
+    {
+      "name": "planning-mobile",
+      "violations": []
+    },
+    {
+      "name": "story-mobile",
+      "violations": []
+    },
+    {
+      "name": "settings-mobile",
+      "violations": []
+    },
+    {
+      "name": "provider-dialog-mobile",
+      "violations": []
+    }
+  ],
+  "errors": [],
+  "realModelCalls": 0
+}

@@ -88,7 +88,7 @@ export function PlanningPage({ novel, navigate, chapterId, workspaceId, register
 }
 
 function ChapterRow({ chapter, onOpen }: { chapter: ChapterSummary; onOpen: () => void }) {
-  return <button className="chapter-table-row" onClick={onOpen}><strong>{chapter.title}</strong><p>{chapter.goal.split('\n')[0] || '尚未填写细纲'}</p><span className={`chapter-row-state ${chapter.review_state === 'confirmed' ? 'complete' : ''}`}>{chapter.review_state === 'confirmed' ? <CheckCircle size={17} weight="fill" /> : <FileText size={17} />}{chapter.review_state === 'confirmed' ? '已定稿' : chapter.review_state === 'needs_review' ? '待复核' : chapter.char_count ? '草稿' : '待创作'}</span><CaretRight size={17} /></button>
+  return <button className="chapter-table-row" onClick={onOpen}><strong>{chapter.title}</strong><p>{chapter.goal || '尚未填写细纲'}</p><span className={`chapter-row-state ${chapter.review_state === 'confirmed' ? 'complete' : ''}`}>{chapter.review_state === 'confirmed' ? <CheckCircle size={17} weight="fill" /> : <FileText size={17} />}{chapter.review_state === 'confirmed' ? '已定稿' : chapter.review_state === 'needs_review' ? '待复核' : chapter.char_count ? '草稿' : '待创作'}</span><CaretRight size={17} /></button>
 }
 
 function ProductionPanel({ novel, kind, volume, resumeId, onSettings, onClose, onApplied }: { novel: Novel; kind: 'blueprint' | 'outline'; volume?: Plan; resumeId: string | null; onSettings: () => void; onClose: () => void; onApplied: (ids: string[]) => Promise<void> }) {
