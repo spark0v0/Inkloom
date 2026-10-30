@@ -7,14 +7,14 @@ import { threadStageNames, threadStatusNames } from '../lib/threads'
 import { Badge, Button, Empty, Field, Loading, Modal, Notice } from '../components/ui'
 import { SourceButton } from '../components/SourceButton'
 
-type Props = { novelId: string; onEvidence: (e: Evidence) => void; onEdit: (e: Entity) => void; onCreate: () => void }
+type Props = { novelId: string; onEvidence: (e: Evidence) => void; onEdit: (e: Entity) => void; onCreate: () => void; initialThreadId?: string }
 
-export function ThreadPanel({ novelId, onEvidence, onEdit, onCreate }: Props) {
+export function ThreadPanel({ novelId, onEvidence, onEdit, onCreate, initialThreadId }: Props) {
   const tracks = useQuery({ queryKey: ['threads', novelId], queryFn: () => api.threads(novelId) })
   const chapters = useQuery({ queryKey: ['chapters', novelId], queryFn: () => api.chapters(novelId) })
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('')
-  const [selected, setSelected] = useState<string | null>(null)
+  const [selected, setSelected] = useState<string | null>(initialThreadId || null)
   const rows = (tracks.data || []).filter(track => (!filter || (filter === 'paused' ? track.paused : track.status === filter)) &&
     `${track.entity.name} ${track.entity.summary} ${(track.entity.aliases || []).join(' ')} ${track.intent}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
   const current = rows.find(track => track.entity.id === selected) || rows[0]

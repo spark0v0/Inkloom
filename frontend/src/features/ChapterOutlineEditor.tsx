@@ -18,9 +18,9 @@ type Operation =
   | { kind: 'adopt'; job: string; data: Parameters<typeof api.applyOutlineEdit>[2] }
   | { kind: 'restore'; revision: number; data: Parameters<typeof api.restoreOutline>[3] }
 
-type Props = { novel: Novel; chapterId: string; workspaceId: string; navigate: Navigate; registerGuard: (guard: (() => Promise<unknown>) | null) => void; onEvidence: (e: Evidence) => void }
+type Props = { novel: Novel; chapterId: string; workspaceId: string; navigate: Navigate; returnView?: 'map'; registerGuard: (guard: (() => Promise<unknown>) | null) => void; onEvidence: (e: Evidence) => void }
 
-export function ChapterOutlineEditor({ novel, chapterId, workspaceId, navigate, registerGuard, onEvidence }: Props) {
+export function ChapterOutlineEditor({ novel, chapterId, workspaceId, navigate, returnView, registerGuard, onEvidence }: Props) {
   const cache = useQueryClient()
   const read = useQuery({ queryKey: ['chapter-outline', novel.id, chapterId], queryFn: () => api.chapterOutline(novel.id, chapterId) })
   const providers = useQuery({ queryKey: ['providers'], queryFn: api.providers })
@@ -186,13 +186,13 @@ export function ChapterOutlineEditor({ novel, chapterId, workspaceId, navigate, 
     try { const value = await api.control(job.data.id, novel.id, action); cache.setQueryData(['job', value.id], value) }
     catch (e) { setError(errorText(e)) } finally { setBusy(false) }
   }
-  const go = (page: 'plot' | 'write') => void navigate({ page, novelId: novel.id, chapterId: page === 'write' ? chapterId : undefined }).catch(e => setError(errorText(e)))
-  if (!base || !draft) return <div className="content-page"><Button onClick={() => go('plot')}>返回章节列表</Button>{read.error ? <Notice>{errorText(read.error)}</Notice> : <Loading />}</div>
+  const go = (page: 'plot' | 'write') => void navigate({ page, novelId: novel.id, chapterId: page === 'write' ? chapterId : undefined, view: page === 'plot' ? returnView : undefined }).catch(e => setError(errorText(e)))
+  if (!base || !draft) return <div className="content-page"><Button onClick={() => go('plot')}>{returnView ? '返回故事脉络' : '返回章节列表'}</Button>{read.error ? <Notice>{errorText(read.error)}</Notice> : <Loading />}</div>
   const set = (field: OutlineField, value: string | string[]) => setDraft(previous => previous ? { ...previous, [field]: value } : previous)
   return <div className="page-scroll"><div className="content-page chapter-outline-page" onCompositionStart={() => { composing.current = true }} onCompositionEnd={() => { composing.current = false }} onKeyDown={e => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); if (!e.nativeEvent.isComposing && !locked) void save() }
   }}>
-    <Button variant="ghost" onClick={() => go('plot')}><ArrowLeft size={17} />返回章节列表</Button>
+    <Button variant="ghost" onClick={() => go('plot')}><ArrowLeft size={17} />{returnView ? '返回故事脉络' : '返回章节列表'}</Button>
     <header className="outline-heading"><h1>{base.document.title}</h1><div className="button-row"><Button onClick={() => setHistoryOpen(true)}><ClockCounterClockwise size={17} />历史版本</Button><Button onClick={() => go('write')}>写正文<ArrowRight size={17} /></Button></div></header>
     <div className="outline-mobile-tabs" role="tablist" aria-label="细纲工作区"><button role="tab" aria-selected={tab === 'outline'} onClick={() => setTab('outline')}>细纲</button><button role="tab" aria-selected={tab === 'ai'} onClick={() => setTab('ai')}>AI 建议</button></div>
     {error && <Notice>{error}{!locked && <Button onClick={() => void latest()}>读取最新细纲并比较</Button>}</Notice>}

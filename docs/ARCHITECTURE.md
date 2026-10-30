@@ -14,6 +14,8 @@
 
 ## 架构选择
 
+故事脉络采用前端只读投影：`storyMap.ts` 从本书 ChapterSummary 与 Thread 关联生成章序视图，同时核对进展有效性与当前定稿版本；`StoryMap.tsx` 沿用已有 API、Query 缓存和原文查看。路由查询参数保存地图/伏笔入口，编辑继续走原细纲服务。没有新增数据库或任务类型，不复制图状态。见 [决策 0017](decisions/0017-story-map.md)。
+
 编辑 HTTP 边界统一携带读到的基线：ChapterUpdate 使用细纲修订与分卷原值，PlanUpdate 使用 updated_at；普通正文保存不改变细纲修订。OutlineState.operation_revision 标记已执行操作对应的历史修订，revision/document 始终表示当前状态，二者不同时客户端保留输入并要求明确比较。元数据和规划表单记录 touched 字段，重读时只合并未编辑字段。见 [决策 0015](decisions/0015-edit-gateways-receipts.md)。现有数据库无变更。
 
 2026-10-28 完成章节细纲编辑，迁移为 `e06a5c318d94`：`Chapter.outline_revision` 与不可变 `OutlineRevision` 保存完整细纲快照，`chapter_outlines.py` 同步 Plan 结构和 Chapter.goal 投影，处理冲突、幂等、恢复和候选采纳；元数据与旧规划入口走同一服务。`outline_edit` 冻结修订和字段范围，在输出及采纳时校验；`outline_restore.py` 验证备份历史与当前投影。编辑器采用章节深链接、独立窗口恢复键和持久化任务，不引入新依赖。见 [决策 0014](decisions/0014-chapter-outline-editing.md)。

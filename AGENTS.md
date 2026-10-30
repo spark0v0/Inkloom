@@ -14,10 +14,11 @@
 - 五项数据边界修复见 `docs/IMPLEMENTATION-REVIEW-FIXES.md`、`docs/decisions/0011-review-data-boundaries.md`。采纳/历史恢复必须检查本地缓冲区基线；查询缓存按工作区重建，HTTP 身份在事务锁内核验。档案编辑携带 `base_updated_at`，记忆整理未确认时锁定原参数；ZIP 导出须满足恢复大小上限。后续按变更风险做核心验证，不默认重跑全套。
 - 作品文风与选段快捷操作见 `docs/IMPLEMENTATION-WRITING-ASSISTANCE.md`、`docs/decisions/0012-writing-style-selection-actions.md`，开源对照见 `docs/REVIEW-2026-10-27.md`。文风保存绑定设置修订，表达示例不是故事事实；润色、扩写、缩写先准备选段，明确生成后才调用模型。文风阶段迁移为 `d95f4b207c83`；真实模型文风效果未验证。
 - 活跃任务同步见 `docs/IMPLEMENTATION-LIVE-PROGRESS.md`、`docs/decisions/0013-live-job-progress.md`。进度接口只查状态和当前片段，SSE 合并通知、定时只读补偿，终止后重新读完整详情；不要恢复各页面的完整详情高频轮询或盲目累加重放事件。无新迁移，真实模型调用授权不变。
-- 章节细纲编辑、版本历史与 AI 局部修改见 `docs/IMPLEMENTATION-CHAPTER-OUTLINES.md`、`docs/decisions/0014-chapter-outline-editing.md`。结构化字段与自由文本明确区分，标题/分卷编辑不降级结构；保存/恢复/采纳检查细纲修订和幂等操作号，正文不替换。outline_edit 复用持久化任务，只允许选定字段。当前迁移为 `e06a5c318d94`，兼容前五版备份升级；聊天规划和脉络图尚未实现，真实调用授权不变。
+- 章节细纲编辑、版本历史与 AI 局部修改见 `docs/IMPLEMENTATION-CHAPTER-OUTLINES.md`、`docs/decisions/0014-chapter-outline-editing.md`。结构化字段与自由文本明确区分，标题/分卷编辑不降级结构；保存/恢复/采纳检查细纲修订和幂等操作号，正文不替换。outline_edit 复用持久化任务，只允许选定字段。当前迁移为 `e06a5c318d94`，兼容前五版备份升级；持续聊天规划尚未实现，真实调用授权不变。
 - 编辑入口和迟到回执复查见 `docs/REVIEW-2026-10-28.md`、`docs/decisions/0015-edit-gateways-receipts.md`。操作修订与当前状态分开，旧回执不推进本地写入基线；章节 HTTP 更新要求 base_outline_revision/base_volume，规划更新要求 base_updated_at。冲突比较保留已改字段，更新未改字段；细纲格式变化须明确选择，不能把旧表单整份重新写回。无新迁移。
 - 恢复副本与作品设置边界见 `docs/IMPLEMENTATION-RECOVERY-BOUNDARIES.md`、`docs/decisions/0016-recovery-and-novel-edit-boundaries.md`。正文按编辑实例保存多份副本，恢复前保存本页输入，源副本按快照条件清理；细纲恢复须使用原始文档基线，旧副本从历史读取。公开作品 PATCH 要求 base_settings_revision，只提交已改字段。定稿弹窗复用轻量进度，无新迁移或真实模型验收。
 - 工作台视觉优化见 `docs/design/IMPLEMENTATION-UI-POLISH-2026-10-29.md` 与 `ui-polish-2026-10-29.png`。沿用 V4 流程，采用灰白框架与深青色主要操作；`workbench.css` 管理共用视觉层，目录与助手可独立收起，手机使用抽屉。没有新增模型或存储行为。
+- 故事脉络见 `docs/IMPLEMENTATION-STORY-MAP.md`、`docs/decisions/0017-story-map.md`，最新竞品对照见 `docs/REVIEW-2026-10-30.md`。从当前作品章节和伏笔投影，计划与有效正文进展分开；版本变化显示待复核，保留原文深链。40 章一页，筛选及编辑返回复用既有资料。章节顺序不等于故事内时间；刷新失败保留内容，不冒充最新。无迁移或模型调用，持续聊天和场景级生成仍待实现。
 - 大纲、档案与模型设置的界面细化见 `docs/design/IMPLEMENTATION-UI-DETAIL-2026-10-30.md`。手机保留两行细纲预览、人物单列；档案与连接表单独立滚动，保存和错误留在窗口内。沿用工作台概念图，无新增模型或存储行为。
 - 首次开发先读 `README.md`、`docs/PRODUCT.md`、`docs/ARCHITECTURE.md` 和 `docs/ROADMAP.md`；按当前任务补读验收与设计文档，不要求每次全量重读。
 - 开发前检查实际目录、相关配置和未提交修改。后续已有技术栈时优先尊重现状；本文中的推荐栈不能作为无条件迁移依据。
