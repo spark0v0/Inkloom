@@ -70,6 +70,30 @@ class NovelOut(Schema):
     updated_at: str
 
 
+class ExportChapterOut(Schema):
+    id: str
+    title: str
+    volume: str
+    position: int
+    review_state: str
+    char_count: int
+    included: bool
+    excluded_reason: Literal["empty", "unconfirmed", "needs_review"] | None
+
+
+class ExportPreviewOut(Schema):
+    novel_id: str
+    title: str
+    confirmed: bool
+    start_position: int | None
+    end_position: int | None
+    fingerprint: str
+    chapters: list[ExportChapterOut]
+    included_count: int
+    skipped_count: int
+    total_chars: int
+
+
 class ParagraphOut(Schema):
     paragraph_id: str
     ordinal: int

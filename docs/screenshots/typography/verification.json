@@ -1,0 +1,82 @@
+{
+  "captures": [
+    {
+      "name": "library-desktop",
+      "viewport": 1440,
+      "width": 1440
+    },
+    {
+      "name": "editor-desktop",
+      "viewport": 1440,
+      "width": 1440
+    },
+    {
+      "name": "editor-tablet",
+      "viewport": 768,
+      "width": 768
+    },
+    {
+      "name": "editor-mobile",
+      "viewport": 390,
+      "width": 390
+    },
+    {
+      "name": "assistant-mobile",
+      "viewport": 390,
+      "width": 390
+    },
+    {
+      "name": "settings-desktop",
+      "viewport": 1440,
+      "width": 1440
+    }
+  ],
+  "accessibility": [
+    {
+      "name": "library-desktop",
+      "violations": []
+    },
+    {
+      "name": "editor-desktop",
+      "violations": []
+    },
+    {
+      "name": "editor-mobile",
+      "violations": []
+    },
+    {
+      "name": "assistant-mobile",
+      "violations": []
+    },
+    {
+      "name": "settings-desktop",
+      "violations": []
+    }
+  ],
+  "preferences": "persisted after reload; manuscript unchanged",
+  "bodyFont": "\"Inkloom UI\", \"PingFang SC\", \"Microsoft YaHei UI\", \"Microsoft YaHei\", sans-serif",
+  "fonts": [
+    {
+      "family": "Inkloom UI",
+      "weight": "400 700",
+      "status": "loaded"
+    },
+    {
+      "family": "Inkloom UI",
+      "weight": "400 700",
+      "status": "loaded"
+    },
+    {
+      "family": "Inkloom UI",
+      "weight": "400 700",
+      "status": "loaded"
+    },
+    {
+      "family": "Inkloom UI",
+      "weight": "400 700",
+      "status": "loaded"
+    }
+  ],
+  "externalRequests": [],
+  "errors": []
+}

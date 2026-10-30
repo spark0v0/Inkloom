@@ -177,7 +177,12 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
                 optional_sources.append(source)
     source_rank = {source_id: rank for rank, source_id in enumerate(ranked_ids)}
     optional_sources.sort(key=lambda source: source_rank[source["source_id"]])
-    # Explicit pins are mandatory and de-duplicated against recent/retrieved text.
+    # Explicit pins and selected thread evidence are hard constraints; automatic
+    # recent prose is useful context, not an implicit pin of two entire chapters.
+    protected_ids = {source["source_id"] for source in pinned_sources + thread_sources}
+    latest_id = prior_chapters[0].id if prior_chapters else None
+    continuity_ids = {source["source_id"] for source in
+                      [source for source in prior_sources if source["chapter_id"] == latest_id][-2:]}
     prior_by_id = {source["source_id"]: source for source in prior_sources}
     prior_by_id.update({source["source_id"]: source for source in pinned_sources})
     prior_by_id.update({source["source_id"]: source for source in thread_sources})
@@ -224,19 +229,29 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
     seen = {f.id for f in relevant_facts}
     facts = (relevant_facts + [f for f in recent_facts if f.id not in seen])[:60]
     facts = [fact for fact in facts if not any(e["source_id"] in request.excluded_source_ids for e in fact.evidence)]
-    included = {source["source_id"] for source in prior_sources}
-    fact_sources = []
+    fact_source_pool = {}
     for fact in facts:
         fact_version = session.get(Version, fact.version_id)
         fact_chapter = session.get(Chapter, fact.chapter_id)
         for evidence in fact.evidence:
-            if evidence["source_id"] in included:
+            if evidence["source_id"] in fact_source_pool:
                 continue
             paragraph = next(p for p in fact_version.paragraphs if p["paragraph_id"] == evidence["paragraph_id"])
-            source = source_for(fact_version, fact_chapter, paragraph)
-            fact_sources.append(source)
-            included.add(source["source_id"])
-    optional_sources = [source for source in optional_sources if source["source_id"] not in included]
+            fact_source_pool[evidence["source_id"]] = source_for(fact_version, fact_chapter, paragraph)
+
+    def reading_sources():
+        # Rebuild after every trim so retained facts never lose their evidence,
+        # and removing one fact cannot remove another channel's shared source.
+        sources = {source["source_id"]: source for source in prior_sources}
+        for fact in facts:
+            for evidence in fact.evidence:
+                sources.setdefault(evidence["source_id"], fact_source_pool[evidence["source_id"]])
+        for source in optional_sources:
+            sources.setdefault(source["source_id"], source)
+        return list(sources.values())
+
+    initial_source_ids = {source["source_id"] for source in reading_sources()}
+    initial_fact_count = len(facts)
     notices = ["Token 为保守估算，未使用此模型的专用 tokenizer。"]
     if terms_omitted:
         notices.append("本章检索词较多，已优先检索人物及别名；部分检索词未纳入。")
@@ -260,7 +275,7 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
         "canon_facts": [dto.FactOut.model_validate(f).model_dump() for f in facts],
         "plans": [plan_context(p) for p in plans],
         "draft_sources": draft_sources,
-        "sources": prior_sources + fact_sources + optional_sources,
+        "sources": reading_sources(),
         "selection": request.selection.model_dump() if request.selection else None,
     }
     if production is not None:
@@ -308,20 +323,36 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
     window = provider.context_window
     output = provider.max_output_tokens
     available = window - output - max(512, math.ceil(window * .08))
-    optional_count = len(optional_sources)
     optional_entity_count = len(entities) - len(required)
     while len(entities) > len(required) and estimate() > available:
         entities.pop()
         input_body["author_settings"].pop()
+    trimmable_recent = sorted((source for source in prior_sources
+        if source["source_id"] not in protected_ids | continuity_ids),
+        key=lambda source: (source["source_id"] in relevant_ids, source["chapter_position"]))
+    for source in trimmable_recent:
+        if estimate() <= available:
+            break
+        prior_sources.remove(source)
+        input_body["sources"] = reading_sources()
     while optional_sources and estimate() > available:
         optional_sources.pop()
-        input_body["sources"] = prior_sources + fact_sources + optional_sources
+        input_body["sources"] = reading_sources()
+    while facts and estimate() > available:
+        facts.pop()
+        input_body["canon_facts"].pop()
+        input_body["sources"] = reading_sources()
     if estimate() > available:
         raise DomainError("CONTEXT_TOO_LARGE", "本章基线和必要参考超出模型上下文预算。"
-                          "请选择更大上下文的模型、在“本章参考”减少必读资料，或使用选段改写；未发送请求。", 422,
+                          "请选择更大上下文的模型、减少必要设定或本章必读，或缩小当前稿/选段范围。"
+                          "最近衔接段落与明确必读不会自动截断；未发送请求。", 422,
                           estimated_tokens=estimate(), available_tokens=available)
-    if len(optional_sources) < optional_count:
-        notices.append(f"受上下文预算限制，自动召回的 {optional_count - len(optional_sources)} 段可选原文未纳入；本章必读已保留。")
+    omitted_sources = len(initial_source_ids - {source["source_id"] for source in input_body["sources"]})
+    if omitted_sources:
+        notices.append(f"受上下文预算限制，{omitted_sources} 段自动前文未纳入；最近衔接原文、本章必读与伏笔依据已保留。")
+    if len(facts) < initial_fact_count:
+        notices.append(f"受上下文预算限制，{initial_fact_count - len(facts)} 条自动记忆及其专用引文未纳入；"
+                       "记录仍保存在本书中，未纳入不代表没有发生。")
     if len(entities) < len(all_entities):
         notices.append(f"本次参考 {len(entities)} / {len(all_entities)} 条作者设定；"
                        "本章提及的人物、别名及世界规则优先，其余部分设定未纳入。")
@@ -348,7 +379,7 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
         chapter_goal=query_goal, instruction=request.instruction,
         current_selection=request.selection, rewrite_surroundings=input_body.get("surrounding_text", {}),
         sources=[dto.Source(**s) for s in
-            input_body["draft_sources"] + prior_sources + fact_sources + optional_sources],
+            input_body["draft_sources"] + input_body["sources"]],
         entities=[dto.EntityOut.model_validate(e) for e in entities],
         facts=[dto.FactOut.model_validate(f) for f in facts],
         plans=[dto.PlanOut(**plan_context(p)) for p in plans],
@@ -357,7 +388,7 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
         excluded_source_ids=request.excluded_source_ids,
         source_fingerprint=digest({"canon": novel.canon_revision, "settings": novel.settings_revision,
                                  "sources": [(s["source_id"], s["content_hash"]) for s in
-                                             input_body["draft_sources"] + prior_sources + fact_sources + optional_sources]}),
+                                             input_body["draft_sources"] + input_body["sources"]]}),
         estimated_max_cost=estimated_max, currency=provider.currency,
         provider_name=provider.name, model=provider.model, is_demo=provider.kind == "demo",
         provider_url=provider.base_url,

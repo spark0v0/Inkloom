@@ -1,12 +1,13 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
-import { Archive, ArrowDown, ArrowRight, BookOpen, CaretRight, Clock, Export, GearSix, List, MagnifyingGlass, Notebook, PenNib, TreeStructure, X } from '@phosphor-icons/react'
-import { api, bindWorkspace, downloadFile, errorText, npath } from './lib/api'
+import { Archive, ArrowRight, BookOpen, CaretRight, Clock, Export, GearSix, List, MagnifyingGlass, Notebook, PenNib, TreeStructure, X } from '@phosphor-icons/react'
+import { api, bindWorkspace, errorText } from './lib/api'
 import type { Evidence, Health, Novel } from './lib/api'
 import { readRoute, routeHash } from './lib/route'
 import type { Route } from './lib/route'
-import { Badge, Button, Empty, Field, Loading, Modal, Notice } from './components/ui'
+import { Badge, Button, Empty, Loading, Modal, Notice } from './components/ui'
 import { EvidenceModal } from './components/EvidenceModal'
+import { ExportDialog } from './features/ExportDialog'
 import { LibraryPage, openNovel } from './features/LibraryPage'
 const EditorPage = lazy(() => import('./features/EditorPage').then(m => ({ default: m.EditorPage })))
 const StoryPage = lazy(() => import('./features/StoryPage').then(m => ({ default: m.StoryPage })))
@@ -119,17 +120,4 @@ function SearchDialog({ novel, onClose, onEvidence, onLibrarySearch }: { novel?:
   useEffect(() => { const timeout = setTimeout(() => setDebounced(query.trim()), 250); return () => clearTimeout(timeout) }, [query])
   const results = useQuery({ queryKey: ['search', novel?.id, debounced], queryFn: () => api.search(novel!.id, debounced), enabled: !!novel && !!debounced })
   return <Modal open onOpenChange={value => !value && onClose()} title={novel ? `搜索《${novel.title}》` : '搜索我的作品'} description={novel ? '仅搜索当前作品已确认且仍有效的原文，支持中文短词。' : '按书名、题材和故事方向搜索。'} wide><div className="search-dialog-input"><MagnifyingGlass size={22} /><input autoFocus aria-label="输入搜索内容" maxLength={200} placeholder={novel ? '人物名、一句话，或两字短词…' : '书名或故事方向…'} value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing && !novel) onLibrarySearch(query) }} />{query && <button className="icon-button" aria-label="清空搜索" onClick={() => setQuery('')}><X size={17} /></button>}</div>{novel ? <div className="search-results">{results.isFetching ? <Loading label="正在搜索定稿正文…" /> : results.error ? <Notice>{errorText(results.error)}</Notice> : debounced && !results.data?.length ? <Empty icon={<MagnifyingGlass size={28} />} title="没有找到有效原文">未确认或已经失效的正文不会进入这里。</Empty> : results.data?.map(({ source }) => <button className="search-result" key={source.source_id} onClick={() => onEvidence({ ...source, quote: source.text })}><span>{source.chapter_title}<ArrowRight size={16} /></span><p>{source.text}</p></button>)}</div> : <div className="modal-actions"><Button variant="primary" onClick={() => onLibrarySearch(query)}>搜索作品<ArrowRight size={17} /></Button></div>}</Modal>
-}
-
-function ExportDialog({ novel, onClose, flush }: { novel: Novel; onClose: () => void; flush: () => Promise<unknown> }) {
-  const [format, setFormat] = useState('txt')
-  const [confirmed, setConfirmed] = useState(novel.accepted_count > 0)
-  const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
-  async function download() {
-    setBusy(true)
-    try { await flush(); await downloadFile(`${npath(novel.id)}/export?format=${format}&confirmed=${confirmed}`, `${novel.title}${confirmed ? '-定稿' : ''}.${format}`); onClose() }
-    catch (e) { setError(errorText(e)) } finally { setBusy(false) }
-  }
-  return <Modal open onOpenChange={value => !value && onClose()} title="连载导出"><div className="form-stack"><Field label="格式"><select value={format} onChange={e => setFormat(e.target.value)}><option value="txt">整本 TXT</option><option value="zip">每章一个 TXT（ZIP 压缩包）</option><option value="md">Markdown</option></select></Field><Field label="正文范围"><select value={confirmed ? 'confirmed' : 'working'} onChange={e => setConfirmed(e.target.value === 'confirmed')}><option value="working">所有章节的当前工作稿</option><option value="confirmed">已定稿章节</option></select></Field>{confirmed && <Notice tone="neutral">当前 {novel.accepted_count} 章定稿。空白章和待复核章节不导出。</Notice>}{error && <Notice>{error}</Notice>}<div className="modal-actions"><Button onClick={onClose}>取消</Button><Button variant="primary" onClick={() => void download()} disabled={busy}><ArrowDown size={17} />下载正文</Button></div></div></Modal>
 }

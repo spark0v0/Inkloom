@@ -1,5 +1,9 @@
 # 技术方案与关键契约
 
+2026-10-31 补充连载范围导出：`manuscript_export.py` 用单条关联查询绑定作品、章节范围与版本元数据，预览不加载正文，实际下载只读取纳入的正文；TXT/Markdown/ZIP 共用选择及空稿校验。前端下载携带预览指纹，变更返回 409，不自动重试。无迁移，见 [决策 0020](decisions/0020-serial-export-preview.md) 与 [结项说明](PROJECT-CLOSEOUT-2026-10-31.md)。
+
+2026-10-31 补充自动资料预算边界：最近两章全文和自动记忆可按优先级让出空间，保留最近章末、明确必读及伏笔依据；记忆与引文同步重新组装，预览、消息与来源指纹使用同一结果。保护层仍超限时拒绝发送，不调用模型自动压缩。见 [决策 0019](decisions/0019-continuity-context-budget.md) 与 [review 记录](REVIEW-2026-10-31.md)。
+
 > 当前 0.2 沿用模块化单体和 SQLite，在已有生成任务中增加全书方案、分卷章节细纲及事务采纳；该阶段迁移为 `a12c7e604bc9`，本章参考为 `b73d2f809a61`，伏笔跟进为 `c84e3a190b72`，作品文风为 `d95f4b207c83`，最新细纲历史为 `e06a5c318d94`。实际变更见 [连载工作流决策](decisions/0004-serial-production.md)、[0.2 实现记录](IMPLEMENTATION-V0.2.md)、[本章参考实现](IMPLEMENTATION-REFERENCES.md)、[伏笔跟进实现](IMPLEMENTATION-THREAD-TRACKING.md)、[写作辅助实现](IMPLEMENTATION-WRITING-ASSISTANCE.md) 与 [细纲编辑实现](IMPLEMENTATION-CHAPTER-OUTLINES.md)，以下保留最初的完整技术方案。
 
 2026-10-24 增加结构化 `inspiration` 任务与选中方向引用，复用任务表，无数据库迁移。方向在服务端按同作品、同章节与上下文基线校验；列表查询按章节过滤且不加载冻结上下文。前端结果展示与 SSE Hook 从写作助手拆出，供编辑器、任务记录和规划页复用。契约见 [决策 0007](decisions/0007-in-chapter-inspiration.md)。

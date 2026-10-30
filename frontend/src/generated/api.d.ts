@@ -759,6 +759,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/novels/{novel_id}/export-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export Preview */
+        get: operations["export_preview_api_v1_novels__novel_id__export_preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/novels/{novel_id}/export": {
         parameters: {
             query?: never;
@@ -1356,6 +1373,48 @@ export interface components {
             start_codepoint?: number | null;
             /** End Codepoint */
             end_codepoint?: number | null;
+        };
+        /** ExportChapterOut */
+        ExportChapterOut: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Volume */
+            volume: string;
+            /** Position */
+            position: number;
+            /** Review State */
+            review_state: string;
+            /** Char Count */
+            char_count: number;
+            /** Included */
+            included: boolean;
+            /** Excluded Reason */
+            excluded_reason: ("empty" | "unconfirmed" | "needs_review") | null;
+        };
+        /** ExportPreviewOut */
+        ExportPreviewOut: {
+            /** Novel Id */
+            novel_id: string;
+            /** Title */
+            title: string;
+            /** Confirmed */
+            confirmed: boolean;
+            /** Start Position */
+            start_position: number | null;
+            /** End Position */
+            end_position: number | null;
+            /** Fingerprint */
+            fingerprint: string;
+            /** Chapters */
+            chapters: components["schemas"]["ExportChapterOut"][];
+            /** Included Count */
+            included_count: number;
+            /** Skipped Count */
+            skipped_count: number;
+            /** Total Chars */
+            total_chars: number;
         };
         /** ExtractResult */
         ExtractResult: {
@@ -4458,11 +4517,49 @@ export interface operations {
             };
         };
     };
+    export_preview_api_v1_novels__novel_id__export_preview_get: {
+        parameters: {
+            query?: {
+                confirmed?: boolean;
+                start_position?: number | null;
+                end_position?: number | null;
+            };
+            header?: never;
+            path: {
+                novel_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportPreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     export_api_v1_novels__novel_id__export_get: {
         parameters: {
             query?: {
                 format?: string;
                 confirmed?: boolean;
+                start_position?: number | null;
+                end_position?: number | null;
+                expected_fingerprint?: string | null;
             };
             header?: never;
             path: {

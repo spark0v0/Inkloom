@@ -5,6 +5,8 @@ export type Novel = Schema['NovelOut']
 export type WritingPreferences = Schema['WritingPreferences']
 export type Chapter = Schema['ChapterOut']
 export type ChapterSummary = Schema['ChapterSummary']
+export type ExportPreview = Schema['ExportPreviewOut']
+export type ExportOptions = NonNullable<operations['export_api_v1_novels__novel_id__export_get']['parameters']['query']>
 export type ReferenceSelection = Schema['ReferenceSelection']
 export type ReferenceState = Schema['ReferenceState']
 export type Version = Schema['VersionOut']
@@ -60,6 +62,7 @@ export const uuid = () => crypto.randomUUID()
 export const npath = (id: string) => `/novels/${encodeURIComponent(id)}`
 export const cpath = (novel: string, chapter: string) => `${npath(novel)}/chapters/${encodeURIComponent(chapter)}`
 export const jpath = (job: string, novel: string) => `/jobs/${encodeURIComponent(job)}?novel_id=${encodeURIComponent(novel)}`
+export const exportQuery = (options: ExportOptions) => new URLSearchParams(Object.entries(options).filter(([, value]) => value !== undefined).map(([key, value]) => [key, String(value)])).toString()
 
 let activeWorkspace: string | undefined
 export function bindWorkspace(id: string) { activeWorkspace = id }
@@ -99,6 +102,7 @@ export const api = {
   health: () => request<Health>('/health'),
   novels: (archived = false) => request<Novel[]>(`/novels?archived=${archived}`),
   novel: (id: string) => request<Novel>(npath(id)),
+  exportPreview: (id: string, options: Omit<ExportOptions, 'format' | 'expected_fingerprint'>) => request<ExportPreview>(`${npath(id)}/export-preview?${exportQuery(options)}`),
   createNovel: (data: Schema['NovelInput']) => request<Novel>('/novels', { method: 'POST', body: JSON.stringify(data) }),
   editNovel: (id: string, data: Schema['NovelUpdate']) => request<Novel>(npath(id), { method: 'PATCH', body: JSON.stringify(data) }),
   saveWritingStyle: (id: string, data: Schema['WritingStyleInput']) => request<Novel>(npath(id) + '/writing-style', { method: 'PUT', body: JSON.stringify(data) }),

@@ -389,17 +389,29 @@ def create_app(data_dir: Path | None = None, *, worker: bool = True, port: int =
     def import_manuscript(data: dto.ImportInput, request: Request):
         return request.app.state.library.import_manuscript(data)
 
+    @app.get(prefix + "/novels/{novel_id}/export-preview", response_model=dto.ExportPreviewOut)
+    def export_preview(novel_id: str, request: Request, confirmed: bool = True,
+                       start_position: int | None = Query(default=None, ge=1, le=2147483647),
+                       end_position: int | None = Query(default=None, ge=1, le=2147483647)):
+        return request.app.state.library.export_preview(
+            novel_id, confirmed, start_position, end_position)
+
     @app.get(prefix + "/novels/{novel_id}/export")
-    def export(novel_id: str, request: Request, format: str = "md", confirmed: bool = False):
+    def export(novel_id: str, request: Request, format: str = "md", confirmed: bool = False,
+               start_position: int | None = Query(default=None, ge=1, le=2147483647),
+               end_position: int | None = Query(default=None, ge=1, le=2147483647),
+               expected_fingerprint: str | None = Query(default=None, pattern=r"^[a-f0-9]{64}$")):
         if format not in {"md", "txt", "zip"}:
             raise DomainError("INVALID_EXPORT", "支持 Markdown、TXT 和按章 TXT 压缩包。")
         library = request.app.state.library
         title = library.novel(novel_id).title
         if format == "zip":
             filename = quote(title.replace("/", "_").replace("\\", "_") + "-章节.zip")
-            return Response(library.export_chapters(novel_id, confirmed), media_type="application/zip",
+            return Response(library.export_chapters(novel_id, confirmed, start_position,
+                            end_position, expected_fingerprint), media_type="application/zip",
                 headers={"Content-Disposition": "attachment; filename*=UTF-8''" + filename})
-        body = library.export(novel_id, confirmed, format == "md")
+        body = library.export(novel_id, confirmed, format == "md", start_position,
+                              end_position, expected_fingerprint)
         filename = quote(title.replace("/", "_").replace("\\", "_") + "." + format)
         return Response(body, media_type="text/plain; charset=utf-8",
                         headers={"Content-Disposition": "attachment; filename*=UTF-8''" + filename})

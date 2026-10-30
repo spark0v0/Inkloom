@@ -1,0 +1,32 @@
+.modal.export-dialog { display: flex; flex-direction: column; width: min(620px, 94vw); max-height: 88dvh; overflow: hidden; }
+.export-dialog .modal-heading { flex-shrink: 0; }
+.export-body { overflow-y: auto; min-height: 0; padding: 0 2px 2px; }
+.export-settings { border: 0; margin: 0 0 20px; padding: 0; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.export-settings .field { margin: 0; }
+.export-range { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.export-preview-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.export-preview-heading .btn { min-height: 36px; font-size: 13px; padding: 4px 8px; }
+.export-totals { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 16px; font-size: 14px; color: var(--muted); margin: 4px 0 14px; font-variant-numeric: tabular-nums; }
+.export-totals strong { color: var(--ink); font-size: 20px; }
+.export-chapters { padding: 10px 0 0; }
+.export-chapters > summary { min-height: 32px; color: var(--muted); }
+.export-chapters ol { max-height: 220px; overflow-y: auto; list-style: none; margin: 0; padding: 0; }
+.export-chapters li { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding: 8px; font-size: 13px; border-radius: 5px; }
+.export-chapters li:nth-child(odd) { background: var(--surface); }
+.export-chapters li > div { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.export-chapters li > div:last-child { flex-shrink: 0; color: var(--muted); font-variant-numeric: tabular-nums; }
+.export-order { width: 22px; flex-shrink: 0; color: var(--muted); font-variant-numeric: tabular-nums; }
+.export-chapter-title { overflow-wrap: anywhere; }
+.export-excluded { color: var(--muted); }
+.export-dialog .modal-actions { flex-shrink: 0; margin-top: 16px; }
+@media (max-width: 680px) {
+  .modal.export-dialog { max-height: 92dvh; }
+  .export-settings { gap: 12px; }
+  .export-range { gap: 8px; }
+  .export-preview-heading .btn { min-height: 44px; }
+  .export-chapters ol { max-height: 180px; }
+  .export-chapters li { flex-wrap: wrap; gap: 4px; }
+  .export-chapters li > div:first-child { flex: 1 1 100%; }
+  .export-chapters li > div:last-child { padding-left: 30px; }
+  .export-dialog .modal-actions .btn { min-height: 44px; flex: 1; }
+}

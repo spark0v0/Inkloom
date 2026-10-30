@@ -20,6 +20,7 @@ from .domain import (
     uid,
     validate_document,
 )
+from .manuscript_export import export_archive, export_text, preview_export
 from .models import CanonRevision, Chapter, Entity, Fact, Job, Novel, Plan, Version
 from .storage import Workspace
 
@@ -459,46 +460,22 @@ class Library:
                                                    match_kind=match_kind))
             return result
 
-    def export(self, novel_id: str, confirmed: bool = False, markdown: bool = True) -> str:
-        with self.ws.session() as s:
-            novel = require_novel(s, novel_id)
-            parts = [("# " if markdown else "") + novel.title]
-            chapters = s.scalars(select(Chapter).where(Chapter.novel_id == novel_id).order_by(
-                Chapter.position)).all()
-            for chapter in chapters:
-                version_id = chapter.accepted_version_id if confirmed else chapter.working_version_id
-                if confirmed and chapter.review_state != "confirmed":
-                    continue
-                if not version_id:
-                    continue
-                version = s.get(Version, version_id)
-                if not version.text.strip():
-                    continue
-                parts.extend([("## " if markdown else "") + chapter.title, version.text])
-            return "\n\n".join(parts) + "\n"
+    def export_preview(self, novel_id: str, confirmed: bool = True,
+                       start_position: int | None = None,
+                       end_position: int | None = None) -> dto.ExportPreviewOut:
+        return preview_export(self.ws, novel_id, confirmed, start_position, end_position)
 
-    def export_chapters(self, novel_id: str, confirmed: bool = True) -> bytes:
-        import io
-        import re
-        import zipfile
-        buffer = io.BytesIO()
-        with self.ws.session() as s, zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-            require_novel(s, novel_id)
-            chapters = s.scalars(select(Chapter).where(Chapter.novel_id == novel_id).order_by(
-                Chapter.position)).all()
-            for chapter in chapters:
-                if confirmed and chapter.review_state != "confirmed":
-                    continue
-                version_id = chapter.accepted_version_id if confirmed else chapter.working_version_id
-                version = s.get(Version, version_id) if version_id else None
-                if version is None or not version.text.strip():
-                    continue
-                title = re.sub(r'[\\/:*?"<>|\x00-\x1f]', "_", chapter.title).strip(" .")[:90] or "章节"
-                filename = f"{chapter.position:04d}_{title}.txt"
-                archive.writestr(filename, chapter.title + "\n\n" + version.text + "\n")
-            if not archive.namelist():
-                raise DomainError("NO_EXPORT_CHAPTERS", "所选范围没有可导出的正文。请先写作或定稿章节。")
-        return buffer.getvalue()
+    def export(self, novel_id: str, confirmed: bool = False, markdown: bool = True,
+               start_position: int | None = None, end_position: int | None = None,
+               expected_fingerprint: str | None = None) -> str:
+        return export_text(self.ws, novel_id, confirmed, markdown,
+                           start_position, end_position, expected_fingerprint)
+
+    def export_chapters(self, novel_id: str, confirmed: bool = True,
+                        start_position: int | None = None, end_position: int | None = None,
+                        expected_fingerprint: str | None = None) -> bytes:
+        return export_archive(self.ws, novel_id, confirmed,
+                              start_position, end_position, expected_fingerprint)
 
     def import_manuscript(self, data: dto.ImportInput) -> dto.NovelOut:
         # The full import is atomic; partial books are not left after a failed chapter.

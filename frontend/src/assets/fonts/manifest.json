@@ -1,0 +1,32 @@
+{
+  "family": "Noto Sans SC",
+  "upstream": "https://github.com/google/fonts/tree/main/ofl/notosanssc",
+  "license": "SIL OFL 1.1",
+  "licenseUrl": "https://raw.githubusercontent.com/google/fonts/main/ofl/notosanssc/OFL.txt",
+  "files": [
+    {
+      "name": "inkloom-ui-42801f8a9707.woff2",
+      "bytes": 15192,
+      "source": "https://fonts.gstatic.com/l/font?kit=k3kXo84MPvpLmixcA63oeALhLJDS0S7c0Yi_PTCulKZMRNn900B4wgRYGnzdbP1rG1MohGNwli1RS-LPHtAJkT8dz1xQisx75AiJuHLecHRZu6shwpb4vNZyOrcmDHWv1-YgVWX0lKIoTiq7c3KPtyJFZYs&skey=cf0bb10b5602fdc3&v=v41",
+      "characters": 95
+    },
+    {
+      "name": "inkloom-ui-08868e011d0b.woff2",
+      "bytes": 58512,
+      "source": "https://fonts.gstatic.com/l/font?kit=k3kXo84MPvpLmixcA63oeALhLJBd9O1-bk4ahvUGG27n0RZTRpPJcdTsralq3ifRq4utOriIUIuqhkMx03z4UJDpD_anVHmRJLhkesE-v8q6RRLHORIhdFGu8jX53vh9B270s-49bDTisbt0m-5Pa72DnhHKr0g4ufkwbbNxbVb7VBiKxEckHfSCgU1Yv0eBMXsgt3KQUACUGamy8kj_H1HMnJgN18F0hPlTzxrSkaG2rt1wBjDGQ1oG8dR2n7P3T_qzogI-f-DvcarG-2Gs0DezqFbar_-N_dpXP6_z8EEDvOTwNeuGiBteMESWXnE9TpUsgdHAZEtkvcsYx-Jr5Tmv4hnpfc8V6As24FW5I5uq8UoaLN_V2JpMWrXM46-cdhnWjlP9DGT5cUIq5SF_J9IZw7XrR1rVqFyLSz0D2HXyFYsp9DrKK5PmR7yPjlY0JVbk7ZNkUEBSXwya5etYIPLJoZr8Csm7g_-uoYpz7qy4Uq5RRHiIVT05IS5gj7NORRxakOhd1DPO7NZG-OnXHLHdg8Y6_iWoWfUENDSqCCgaquNYOgzEBH6rjX1Wvz9Dot_m2F6AQ9aVxXQ213dmyNqTs7cPDiF5R6dq_yZ7joIPi8eehsD1PmogBPP2fO-otEk_BIzbMCqI6Yv6C4lwm5jyvTj09i8GKMD7_ZQ4Ld7v54UcY10qPPnHwlaOZ1w3SEO01IXxR4vg7e1cOKwjVZUs4dvlts49mtUD05H6L0QIVtWfl905xFtwXeMv3RRP3lQgJv1Bu2GowJhLWN9dwhpGvwOrq2vAVxctNjWR8ULtz5P3ubEWWUUYjN6TK-LuWOgEJImjjzZ0xvedMnPqCkh3woaF7o6IoukXuYvHts7pAFbDtxcpOO5hGjhKMtwqNPAIgoY9eMJ-Wk2qp6LcMgeVc1LZpgcD7Q_vKiaQxR5MDoz-DEBd8fVvUsQzmji2NrP487TgjKxN58LaQcugyRjvAxxwIA&skey=cf0bb10b5602fdc3&v=v41",
+      "characters": 240
+    },
+    {
+      "name": "inkloom-ui-15620a310a6a.woff2",
+      "bytes": 74700,
+      "source": "https://fonts.gstatic.com/l/font?kit=k3kXo84MPvpLmixcA63oeALhLJBd9OpGVEkitfI_OGne2xFqSpXwS9LVkq9Q2yHrs4qvLrmKcYqptUI12X38WJHtDfejT3iVDblhfMA7usu_chPCPxMkb1Co2zT_4fl6P2_yvu87YzXkkbpysex2TL-5lhPwuUoCkvsKWLFKXlTAYBqyzEUdIva6sk9ntUW-JXkTqnCjTwKnHauB_ErMLFP-v5o_-cNGv_th6xjgjaOEut9FMDLzZ1gw5NZAlrHBT_iFhgAIQOLeZaj35WOdxTWDqlTqvv2-wdhnNq3DyEMztObAOOm2mhluAUamXXItQJY-vNLTVUhxncgN6-F-wDq59Br5fcwF6Agm-lapHpi64EkJA9zG8plfcLbf-ayPehrGslDsAGfoRkE72SJuMtEI2bb7d1nKqV-UdT4cxnbsPIg34DnYL5D1dL-co1UgMlXw_ZBwRkNGZA-O3uhMIfHdupnoEMqvjvy7mYln86-saq1FSnufaz4uAC13kLBaYB9OoutJ4TDdzNVq6er7BLLxjsUXySaFdfYpKTeGPis2keB0Lg_oFX2Ghn5-ojxluNzF-12iadW37HcU_nRE_NmykLQvFiJZS6RU5CVGpYEyjsSjnMPJDWkcBvDNUeySmkoFP4_hDSmx1ojcKYpXqJvatDvc2iwuCcPT1JcSG93D2IYxYV87JvvVwFSbbF4gY0Gu3YfrY4n58e9CEq45TZc7zdnwh8woitcI4ZP1CkYHQNeXjt8w-Fl5fuEn-BZH81YrPf9GjWOv1ZpOV91Z7hh9lwGRtGn5bBUUFjeuykDV1JHOvrMtT0cjv9yoHODqfuoAAYunsTRw7fWZEXHuGUp1-oSE3oyCv-sdv4nNnszgMlTFsBUvLexnPzpNGt4tL_IMuoQ4acB6Tk-uvqDfGAWWW1DFhgUfzg3yMiSNyxxRKY7iF0JC8_dwT8YsrjqoL7H-7bblqq5IzcDQfsmr8BrjKR58Cw&skey=cf0bb10b5602fdc3&v=v41",
+      "characters": 240
+    },
+    {
+      "name": "inkloom-ui-12816188c3b8.woff2",
+      "bytes": 64832,
+      "source": "https://fonts.gstatic.com/l/font?kit=k3kXo84MPvpLmixcA63oeALhLJAd9ehEVEsgvPA8D2vd2xNpQ5fydtDXoK1RxSPqs4iuL7uLToipk0Ayxn_7fJPqKPWkd3qVN7tgfcI6v8m-ThHDJxEkT1Kr8Tb-3_RFP2LNvuIFbzjarrdOueJyRLG9qR33jkQFhvUNV79DVlrIfRS64ksSJPi1hUFus0u0DXcUpn67Ywy-GKWQ8ETlCl3Wq5QX181umvVK0xbPq62rldFrCDzdW1Ydxdhtpb_tQfapvQ4kT-z6ZKbVw22_7jugrFrJufOd2NZHFKPj300ToujhE-eWkxdOHEiGZXwSQZgDutzvfUZKlMY28O9F1jSC_hTDT8I_2wYD6liMLZaf3EcrIdLk35d9Vbj80KKsehTlvF7NBGnIeU8b0yxOJt8n2rjWalfvi1GxYTA5xXjLLIYQ3jf8Pp7QXrG5pVsCDFvT855TW01lbgGt1eZvE__-iJfLJ8SMqvKZqoZ646CxdKJYYnSCXjEzKSJqtb9FYxBRq-RWwj_BwdpJ0-XeKL3Xq8ow9imiRvkOGTigNSQQlu9HKADYK3K3qHFLmjNZmdP921KbZdqN4ngu9Ht-7daEoLsYIi1vW6t84yptvY4Zi8uLrMzgDGY0EP_lUOO6hUUtFIDJICaY7YfLOoVBqpTDizTFwCM3GMzK05gKD9Ld1IkvQVEfI_X99Vq1flAOXE-czY_eQoHPzud1MqYJS58J0tHCtw&skey=cf0bb10b5602fdc3&v=v41",
+      "characters": 176
+    }
+  ]
+}
