@@ -14,6 +14,8 @@
 
 ## 架构选择
 
+2026-10-31 修正长篇上下文范围与检索：outline 使用独立 narrative_position 读取此前有效定稿，保留挂载章的并发基线；旧任务缺失字段时按旧章序校验。`retrieval.py` 负责有限中文片段、同书前文段落词频加权、受范围约束的原文候选和匹配分数；`context.py` 继续冻结最终资料与预算。目录仅关联查询摘要/字数。兼容传输增加冻结的整次与无有效输出时限，超时仍走不确定结果与显式重试。没有数据库迁移，见 [决策 0018](decisions/0018-context-and-generation-boundaries.md) 与 [实际验证](IMPLEMENTATION-CONTEXT-BOUNDARIES.md)。
+
 故事脉络采用前端只读投影：`storyMap.ts` 从本书 ChapterSummary 与 Thread 关联生成章序视图，同时核对进展有效性与当前定稿版本；`StoryMap.tsx` 沿用已有 API、Query 缓存和原文查看。路由查询参数保存地图/伏笔入口，编辑继续走原细纲服务。没有新增数据库或任务类型，不复制图状态。见 [决策 0017](decisions/0017-story-map.md)。
 
 编辑 HTTP 边界统一携带读到的基线：ChapterUpdate 使用细纲修订与分卷原值，PlanUpdate 使用 updated_at；普通正文保存不改变细纲修订。OutlineState.operation_revision 标记已执行操作对应的历史修订，revision/document 始终表示当前状态，二者不同时客户端保留输入并要求明确比较。元数据和规划表单记录 touched 字段，重读时只合并未编辑字段。见 [决策 0015](decisions/0015-edit-gateways-receipts.md)。现有数据库无变更。

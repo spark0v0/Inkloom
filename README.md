@@ -1,28 +1,22 @@
 # Inkloom
 
-从一个故事想法，走到可以持续连载的长篇小说。
+面向中文长篇连载的 AI 小说创作工作台。接入自己的模型，从故事想法开始，规划全书、生成章节、审稿修稿、整理记忆，最后导出稿件。作者决定采用什么，已有正文保留版本。
 
-Inkloom 是中文 AI 小说创作工作台。接入自己的大模型，让 AI 策划全书、设计人物与世界、规划分卷和章节、生成整章正文、审稿并整理记忆。作者负责选择方向和确认稿件，已有正文始终保留版本。
+**当前为 0.2.0 本地测试版。** 支持面向番茄、起点等平台的创作目标和稿件导出，发布由作者自行完成。真实长篇成稿质量与费用仍待评测；演示模型只用于体验固定流程。
 
-**当前版本：0.2.0 本地测试版。** 源码：[spark0v0/Inkloom](https://github.com/spark0v0/Inkloom)。实际能力见 [0.2 实现记录](docs/IMPLEMENTATION-V0.2.md)，最新交互修订与验证见 [V4 记录](docs/IMPLEMENTATION-UX-V4.md)。
+[本地启动](#本地运行) · [创作流程](#开始创作) · [当前限制](#当前限制) · [最近修复](docs/IMPLEMENTATION-CONTEXT-BOUNDARIES.md)
 
-最新改进：[长篇目录与参考资料](docs/IMPLEMENTATION-LONGFORM.md)。支持目录搜索、分卷折叠、状态筛选和前后切章；AI 按本章细纲与人物别名召回相关资料，修复较早设定被遗漏的问题。
+## 可以做什么
 
-模型接入改进：检查连接后可从服务目录选择模型，错误在对应连接旁显示；读取模型响应时执行大小限制。详见 [本轮代码审查、调研与后续优先级](docs/REVIEW-2026-10-23.md)。
+| 创作环节 | 当前能力 |
+| --- | --- |
+| 开书与规划 | AI 全书方案、人物与世界设定，按卷分批规划章节；细纲可手动编辑、查看历史，或让 AI 修改指定字段 |
+| 整章写作 | 按细纲生成整章、续写、重写；输出先进入候选，作者采纳后才形成正文新版本 |
+| 卡剧情与修稿 | 比较三个剧情方向，再按选定方向续写；选段润色、扩写、缩写；从单条审稿意见准备对应段落改写 |
+| 长篇资料 | 本章必读参考、作品文风、带原文依据的记忆，以及伏笔埋设/推进/回收；故事脉络支持按章查看、筛选和进入细纲编辑 |
+| 保存与交付 | 自动保存、浏览器恢复副本、版本冲突保护、生成历史与中断片段；TXT/Markdown、按章 TXT 压缩包、备份与恢复 |
 
-写作卡住时，在写作助手点 **找灵感**，选择卡点，获取三个剧情走向；可展开人物动机、选择、代价、铺垫和前文依据。选中方向后，再点 **按此方向续写** 生成候选正文。灵感与正文分开保存，原稿修改后旧方向不可直接用于续写。详见 [实现与验证记录](docs/IMPLEMENTATION-INSPIRATION.md)。
-
-需要 AI 记住远处的伏笔、人物或特殊约束时，打开 **本章参考**，搜索并勾选必读设定、此前定稿，或粘贴本章补充资料。选择按章保存，保存不调用模型；前文修改后须重新确认，必读超出上下文容量时会在发送前提示。切换写作方式保留所选模型；生成截断并重试后，可在调用记录中取回前一次片段。详见 [本轮实现](docs/IMPLEMENTATION-REFERENCES.md) 与 [竞品对照和后续缺口](docs/REVIEW-2026-10-24.md)。
-
-审稿后，在具体意见下点 **准备改写这一段**，检查原文、建议和写作模型，再点 **按建议改写**。准备不调用模型，生成后可返回原审稿比较，采纳仅修改对应段落。**生成记录** 支持搜索、类型和状态筛选，以及加载更早记录。详见 [实现与验证](docs/IMPLEMENTATION-REVIEW-REVISION.md) 和 [最新开源项目对照](docs/REVIEW-2026-10-25.md)。
-
-长篇伏笔可在 **人物与设定 → 伏笔** 安排回收章节，关联定稿段落记录埋设、推进和回收。改稿后旧依据显示待复核；关联可撤销、恢复，正文不变。写作会带入到期或命中的伏笔及此前有效依据，未来回收不会倒灌前章。详见 [伏笔跟进与验证](docs/IMPLEMENTATION-THREAD-TRACKING.md)。
-
-在写作助手点 **写作风格**，为本书保存叙述视角、语言节奏、避免写法和作者表达示例。选中文字后，可就近点 **润色、扩写、缩写**，检查原文和要求，再明确生成候选；模板、保存和准备都不调用模型。详见 [实现与截图](docs/IMPLEMENTATION-WRITING-ASSISTANCE.md) / [本轮开源项目对照](docs/REVIEW-2026-10-27.md)。
-
-在 **大纲与章节** 点击某章，可直接编辑目标、冲突、情节节点和章末钩子，也可让 AI 只修改指定部分，再对照采纳。细纲有历史版本和浏览器草稿恢复；修改标题、恢复旧细纲或采纳建议都不会替换正文。详见 [细纲编辑与验证](docs/IMPLEMENTATION-CHAPTER-OUTLINES.md)。
-
-在 **大纲与章节 → 故事脉络**，按章查看细纲、定稿状态和伏笔推进；可按卷、状态、伏笔或关键词定位，进入细纲修改后返回。计划回收与正文进展分别显示，旧版本依据标记待复核并可回看。详见 [实现与截图](docs/IMPLEMENTATION-STORY-MAP.md) / [最新竞品对照与剩余缺口](docs/REVIEW-2026-10-30.md)。
+最近修复了后续章纲未读取最近定稿、自然中文细纲漏召回旧线索、无关人物卡占满预算及目录加载完整正文的问题；模型请求新增整次时限和无正文输出时限。实现边界与实际验证见 [工程改进记录](docs/IMPLEMENTATION-CONTEXT-BOUNDARIES.md)。
 
 ## 开始创作
 
@@ -37,15 +31,13 @@ Inkloom 是中文 AI 小说创作工作台。接入自己的大模型，让 AI �
 
 ## 实际界面
 
-以下是应用运行截图，先生成的 UI 概念图与完整提示词在 [设计记录](docs/design/IMPLEMENTATION-V4.md)。
+以下为实际运行截图，内容使用虚构测试材料。工作台与故事脉络的概念图、提示词和实现分别见 [工作台设计](docs/design/IMPLEMENTATION-UI-POLISH-2026-10-29.md) / [脉络设计](docs/design/UI-STORY-MAP-2026-10-30-PROMPT.md)。
 
-![连续开书](docs/screenshots/setup-v4-desktop.png)
+![章节写作工作台](docs/screenshots/ui-polish/editor-desktop.png)
 
-![AI 草稿阅读](docs/screenshots/draft-v4-desktop.png)
+![故事脉络：细纲、定稿与伏笔](docs/screenshots/story-map-desktop.png)
 
-![本章参考](docs/screenshots/references-desktop.png)
-
-![按审稿意见准备局部改写](docs/screenshots/review-rewrite-desktop.png)
+![章节细纲编辑与 AI 建议](docs/screenshots/chapter-outline-ai-desktop.png)
 
 ## 本地运行
 
@@ -86,11 +78,21 @@ pwsh -File .\scripts\start.ps1 -Port 8766 -DataDirectory D:\StoryWorkspace
 
 密钥仅交给本机后端，Windows 使用 DPAPI 加密保管，不读回前端，不随备份导出。**选中的小说上下文会发送到配置的模型服务。** 费用缺少价格或 usage 时显示未知；生成中断且上游状态未知时，不自动重发付费请求。
 
+模型请求默认最长 15 分钟；连续 3 分钟没有有效正文输出时停止等待，已有片段仍保留。另有网络阶段超时和响应大小限制。慢模型可在启动前调整 `INKLOOM_REQUEST_TIMEOUT_SECONDS`、`INKLOOM_PROGRESS_TIMEOUT_SECONDS`，取值 1—3600 秒；新任务会记录本次时限，详见 [配置说明](docs/IMPLEMENTATION-CONTEXT-BOUNDARIES.md#模型时限)。
+
 正文、候选稿、规划和记忆分别保存。旧稿修改后，相关记忆与候选会失效；定稿会检查章节顺序与原文版本。备份使用一致性快照，恢复先校验到新目录，保留原工作区；0.1.0 工作区及备份支持升级。
+
+## 当前限制
+
+- 以作者审阅、逐章定稿推进；修改早期定稿后，后续章节需要复核。尚无精细的影响范围分析和批量复核助手。
+- 中文资料召回使用有范围与预算限制的词法检索；不是完整的语义记忆系统，也不能保证自动发现全部剧情矛盾。
+- 尚未实现带作品上下文的持续规划聊天、完整的场景级生成、多章自动改纲、云同步或多人协作。
+- 真实模型连续十章的成稿、人物一致性、返工量和费用，以及百万字性能、完整 Windows 输入法人工体验与跨浏览器表现，仍待独立验证。
 
 ## 开发文档
 
 - [当前实现、验证和限制](docs/IMPLEMENTATION-V0.2.md)
+- [本轮工程 review 修复、配置与验证](docs/IMPLEMENTATION-CONTEXT-BOUNDARIES.md) / [竞品对照与后续优先级](docs/REVIEW-2026-10-30.md)
 - [项目规范 AGENTS.md](AGENTS.md)
 - [产品方案](docs/PRODUCT.md) / [技术方案](docs/ARCHITECTURE.md) / [路线](docs/ROADMAP.md)
 - [新版工作流与调研取舍](docs/decisions/0004-serial-production.md)
@@ -104,10 +106,11 @@ pwsh -File .\scripts\start.ps1 -Port 8766 -DataDirectory D:\StoryWorkspace
 - [作品写作风格、选段快捷操作与验证](docs/IMPLEMENTATION-WRITING-ASSISTANCE.md) / [开源交互对照](docs/REVIEW-2026-10-27.md)
 - [生成进度读取优化、断线补偿与验证](docs/IMPLEMENTATION-LIVE-PROGRESS.md)
 - [章节细纲编辑、历史恢复与 AI 局部修改](docs/IMPLEMENTATION-CHAPTER-OUTLINES.md)
+- [故事脉络、伏笔依据与截图](docs/IMPLEMENTATION-STORY-MAP.md)
 - [编辑入口并发、迟到回执修复与开源实现对照](docs/REVIEW-2026-10-28.md)
 - [多窗口恢复副本、原始基线与作品设置保护](docs/IMPLEMENTATION-RECOVERY-BOUNDARIES.md)
 - [工作台 UI 优化、概念图与浏览器截图](docs/design/IMPLEMENTATION-UI-POLISH-2026-10-29.md)
 - [大纲、人物与模型设置的长内容和手机界面优化](docs/design/IMPLEMENTATION-UI-DETAIL-2026-10-30.md)
 - [开发启动提示词](START_PROMPT.md) / [运行时提示词](prompts/)
 
-真实云模型的长篇质量、完整 Windows 输入法人工体验、跨浏览器与百万字性能仍待独立验证。当前不提供云同步、多人协作或完整剧情分支。项目独立实现，运行数据和密钥不进入源码仓库。
+技术栈为 React + TypeScript + Vite + Tiptap、FastAPI + SQLAlchemy + SQLite。项目独立实现，运行数据和密钥不进入源码仓库。

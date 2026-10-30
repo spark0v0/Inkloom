@@ -124,6 +124,7 @@ function ProductionPanel({ novel, kind, volume, resumeId, onSettings, onClose, o
     try {
       if (!pending.current) {
         const chapters = await api.chapters(novel.id)
+        // The server derives outline reading scope from the catalog, independently of this mount.
         const anchor = chapters[0] || await api.createChapter(novel.id, { title: '第1章', volume: '第一卷', goal: '' })
         const contextInput = { chapter_id: anchor.id, base_version_id: anchor.working_version_id, task: kind, provider_id: providerId, instruction, chapter_batch: batch, volume_plan_id: kind === 'outline' ? volume?.id : null, target_chars: novel.chapter_words }
         await api.context(novel.id, contextInput)

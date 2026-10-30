@@ -154,8 +154,12 @@ class Library:
     def chapters(self, novel_id: str) -> list[dto.ChapterSummary]:
         with self.ws.session() as s:
             require_novel(s, novel_id)
-            return [chapter_out(s, c, False) for c in s.scalars(select(Chapter).where(
-                Chapter.novel_id == novel_id).order_by(Chapter.position)).all()]
+            columns = [getattr(Chapter, name) for name in dto.ChapterSummary.model_fields
+                       if name != "char_count"]
+            rows = s.execute(select(*columns, Version.char_count).join(Version,
+                (Version.id == Chapter.working_version_id) & (Version.chapter_id == Chapter.id))
+                .where(Chapter.novel_id == novel_id).order_by(Chapter.position)).mappings()
+            return [dto.ChapterSummary(**row) for row in rows]
 
     def create_chapter(self, novel_id: str, data: dto.ChapterInput) -> dto.ChapterOut:
         with self.ws.session(write=True) as s:

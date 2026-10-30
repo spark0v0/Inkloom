@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
+import os
 import re
+from contextlib import aclosing
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
@@ -12,6 +15,25 @@ from urllib.parse import urlsplit, urlunsplit
 import httpx
 
 from .domain import DomainError
+
+DEFAULT_REQUEST_TIMEOUT = 900.0
+DEFAULT_PROGRESS_TIMEOUT = 180.0
+
+
+def request_limits() -> dict[str, float]:
+    result = {}
+    for key, env, default in (
+        ("request_timeout_seconds", "INKLOOM_REQUEST_TIMEOUT_SECONDS", DEFAULT_REQUEST_TIMEOUT),
+        ("progress_timeout_seconds", "INKLOOM_PROGRESS_TIMEOUT_SECONDS", DEFAULT_PROGRESS_TIMEOUT),
+    ):
+        try:
+            value = float(os.environ.get(env, default))
+            if not math.isfinite(value) or not 1 <= value <= 3600:
+                raise ValueError
+        except ValueError as exc:
+            raise DomainError("INVALID_REQUEST_TIMEOUT", f"{env} 必须为 1—3600 秒。") from exc
+        result[key] = value
+    return result
 
 
 class ProviderFailure(Exception):
@@ -244,6 +266,24 @@ async def stream_completion(config: dict[str, Any], key: str, messages: list[dic
             yield StreamPart(text=output[start:start + 12])
         yield StreamPart(finish="stop")
         return
+    # Limits are frozen in new job snapshots; historical jobs use the same safe defaults.
+    total = config.get("request_timeout_seconds", DEFAULT_REQUEST_TIMEOUT)
+    idle = config.get("progress_timeout_seconds", DEFAULT_PROGRESS_TIMEOUT)
+    overall = asyncio.timeout(total)
+    try:
+        async with overall, asyncio.timeout(idle) as progress:
+            async with aclosing(_compatible_completion(config, key, messages, task)) as stream:
+                async for part in stream:
+                    if part.text.strip():
+                        progress.reschedule(asyncio.get_running_loop().time() + idle)
+                    yield part
+    except TimeoutError as exc:
+        code = "REQUEST_TIMEOUT" if overall.expired() else "NO_CONTENT_PROGRESS"
+        message = "模型请求超过整次时限。" if overall.expired() else "模型长时间没有返回有效正文。"
+        raise ProviderFailure(code, message + "已停止等待并保留可用片段；上游执行和费用可能未知，请核实后再重试。", True) from exc
+
+
+async def _compatible_completion(config: dict[str, Any], key: str, messages: list[dict[str, str]], task: str):
     if not key:
         raise ProviderFailure("PROVIDER_KEY_MISSING", "模型密钥未配置，请在模型设置中添加。")
     payload: dict[str, Any] = {"model": config["model"], "messages": messages,
