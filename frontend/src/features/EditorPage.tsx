@@ -53,6 +53,7 @@ export function EditorPage({ novel, chapter, chapters, workspaceId, providers, r
   const [focused, setFocused] = useState(false)
   const [changes, setChanges] = useState<{ versionId: string; values: MemoryProposal[] } | null>(null)
   const [canonVersion, setCanonVersion] = useState<Version | null>(null)
+  const [quickEntityText, setQuickEntityText] = useState<string | null>(null)
   const [title, setTitle] = useState(chapter.title)
   const [volume, setVolume] = useState(chapter.volume)
   const [goal, setGoal] = useState(chapter.goal)
@@ -122,7 +123,27 @@ export function EditorPage({ novel, chapter, chapters, workspaceId, providers, r
   const chapterIndex = ordered.findIndex(c => c.id === chapter.id)
   const previousChapter = ordered[chapterIndex - 1]
   const nextChapter = ordered[chapterIndex + 1]
-  const assistantProps = { novel, chapter, providers, roles, flush: manuscript.flush, selection, quickRewrite, onQuickPrepared: quickPrepared, onWritingStyle: () => setStyleOpen(true), onAdopt: adopt, onEvidence, onExtractReady: extraction, blockedChapter: previous?.title, onResolvePrevious: () => { if (previous) void navigate({ page: 'write', novelId: novel.id, chapterId: previous.id }).catch(e => setError(errorText(e))) } }
+  const assistantProps = {
+    novel,
+    chapter,
+    providers,
+    roles,
+    flush: manuscript.flush,
+    selection,
+    quickRewrite,
+    onQuickPrepared: quickPrepared,
+    onWritingStyle: () => setStyleOpen(true),
+    onAdopt: adopt,
+    onEvidence,
+    onExtractReady: extraction,
+    blockedChapter: previous?.title,
+    onResolvePrevious: () => {
+      if (previous) void navigate({ page: 'write', novelId: novel.id, chapterId: previous.id }).catch(e => setError(errorText(e)))
+    },
+    onInsertText: (text: string) => {
+      editor?.chain().focus().insertContent(text).run()
+    }
+  }
   async function prepareSelection(action: RewriteAction) {
     if (!selection || preparingSelection || manuscript.composing.current) return
     const selected = { ...selection }
@@ -186,7 +207,42 @@ export function EditorPage({ novel, chapter, chapters, workspaceId, providers, r
     <section className={`editor-panel ${candidateView ? 'viewing-candidate' : ''}`} aria-label="章节写作">
       {!compact && <nav className="document-tabs" aria-label="稿件视图"><button aria-pressed={!candidateView} onClick={() => setCandidateView(false)}>正文</button><button aria-pressed={candidateView} disabled={!hasCandidate || !assistantOpen} onClick={() => setCandidateView(true)}>{candidateLabel}</button><span>{chapter.title}</span></nav>}
       <div className="editor-toolbar"><div className="button-row"><button className="icon-button mobile-directory-toggle" aria-label="打开章节目录" onClick={() => setDirectoryOpen(true)}><List size={20} /></button><span className="editor-volume">{chapter.volume}</span><span className="toolbar-divider" /><button className={`icon-button ${editor?.isActive('bold') ? 'selected' : ''}`} aria-label="加粗" aria-pressed={editor?.isActive('bold')} onMouseDown={e => e.preventDefault()} onClick={() => editor?.chain().focus().toggleBold().run()}><TextB size={18} /></button><button className="icon-button" aria-label="斜体" onMouseDown={e => e.preventDefault()} onClick={() => editor?.chain().focus().toggleItalic().run()}><TextItalic size={18} /></button><button className="icon-button" aria-label="撤销" onClick={() => editor?.chain().focus().undo().run()}><ArrowCounterClockwise size={17} /></button><button className="icon-button" aria-label="重做" onClick={() => editor?.chain().focus().redo().run()}><ArrowClockwise size={17} /></button></div><div className="button-row"><button className="icon-button pane-toggle desktop-directory-toggle" aria-label={directoryVisible ? '收起章节目录' : '展开章节目录'} aria-expanded={directoryVisible} title={directoryVisible ? '收起章节目录' : '展开章节目录'} onClick={() => setDirectoryVisible(!directoryVisible)}><List size={18} /><span className="toolbar-label">目录</span></button><label className="reading-font"><span className="sr-only">正文字体</span><select aria-label="正文字体" value={fontFamily} onChange={e => setFontFamily(e.target.value === 'serif' ? 'serif' : 'sans')}><option value="sans">黑体</option><option value="serif">宋体</option></select></label><label className="font-size-label"><span className="sr-only">正文字号</span><select aria-label="正文字号" value={fontSize} onChange={e => setFontSize(Number(e.target.value))}><option value={16}>16</option><option value={18}>18</option><option value={20}>20</option><option value={22}>22</option></select></label><button className="icon-button focus-toggle" aria-label={focused ? '退出专注写作' : '专注写作'} onClick={() => setFocused(!focused)}><Article size={19} /></button><button className="icon-button pane-toggle desktop-assistant-toggle" aria-expanded={assistantOpen} title={assistantOpen ? '收起写作助手' : '展开写作助手'} aria-label={assistantOpen ? '收起写作助手' : '展开写作助手'} onClick={() => { setAssistantOpen(!assistantOpen); setCandidateView(false) }}><SidebarSimple size={19} /><span className="toolbar-label">助手</span></button><button className="icon-button mobile-assistant-toggle" aria-label="打开写作助手" onClick={() => setMobileAssistant(true)}><Sparkle size={20} /></button></div></div>
-      {!candidateView && selection && <div className="selection-actions" role="group" aria-label="选段快捷操作"><span>已选 {Array.from(selection.text).length} 字符</span>{Object.entries(rewriteActions).map(([action, value]) => <Button key={action} disabled={preparingSelection} onMouseDown={e => e.preventDefault()} onClick={() => void prepareSelection(action as RewriteAction)} aria-label={`准备${value.name}选段`}>{value.name}</Button>)}<Button variant="ghost" disabled={preparingSelection} aria-label="收起选段快捷操作" onMouseDown={e => e.preventDefault()} onClick={() => setSelection(null)}><X size={16} /></Button></div>}
+      {!candidateView && selection && (
+        <div className="selection-actions" role="group" aria-label="选段快捷操作" style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ fontWeight: 600, color: 'var(--ink)', marginRight: '4px' }}>已选 {Array.from(selection.text).length} 字</span>
+          {Object.entries(rewriteActions).map(([action, value]) => (
+            <Button
+              key={action}
+              disabled={preparingSelection}
+              onMouseDown={e => e.preventDefault()}
+              onClick={() => void prepareSelection(action as RewriteAction)}
+              aria-label={`准备${value.name}选段`}
+              style={{ fontSize: '12px', padding: '3px 8px' }}
+            >
+              {value.name}
+            </Button>
+          ))}
+          <Button
+            variant="ghost"
+            disabled={preparingSelection}
+            onMouseDown={e => e.preventDefault()}
+            onClick={() => setQuickEntityText(selection.text)}
+            title="将选中的词条快速存入设定库"
+            style={{ fontSize: '12px', padding: '3px 8px' }}
+          >
+            + 记为设定
+          </Button>
+          <Button
+            variant="ghost"
+            disabled={preparingSelection}
+            aria-label="收起选段快捷操作"
+            onMouseDown={e => e.preventDefault()}
+            onClick={() => setSelection(null)}
+          >
+            <X size={16} />
+          </Button>
+        </div>
+      )}
       <div className="candidate-host" ref={setCandidateHost} hidden={!candidateView} />
       <div className="editor-scroll" hidden={candidateView}>
         <div className="editor-notices">{novel.dirty_from_order != null && <Notice action={<Button onClick={() => void manuscript.flush().then(() => setImpactOpen(true)).catch(e => setError(errorText(e)))}>查看复核清单</Button>}>第 {novel.dirty_from_order} 章起需要复核，请按顺序检查后重新定稿。</Notice>}{manuscript.recoveries.map(value => <Notice key={value.key} action={<Button onClick={() => void restoreBuffer(value)}>恢复草稿</Button>}>发现一份 {dateLabel(value.updatedAt)} 的浏览器恢复副本。<button className="inline-link" onClick={() => { downloadText(value.text, `${chapter.title}-恢复副本.txt`); manuscript.dismissRecovery(value) }}>先下载副本</button><details><summary>查看恢复副本</summary><pre className="outline-readable">{value.text}</pre></details></Notice>)}{(manuscript.message || error) && <Notice action={manuscript.status === 'error' ? <Button onClick={() => void manuscript.flush().catch(() => undefined)}>重试保存</Button> : undefined}>{manuscript.message || error}</Notice>}</div>
@@ -212,7 +268,94 @@ export function EditorPage({ novel, chapter, chapters, workspaceId, providers, r
     {impactOpen && <ReviewImpactDialog novelId={novel.id} workspaceId={workspaceId} navigate={navigate} onClose={() => setImpactOpen(false)} />}
     {canonOpen && canonVersion && <CanonDialog workspaceId={workspaceId} novel={novel} chapter={chapter} version={canonVersion} proposed={changes?.versionId === canonVersion.id ? changes.values : []} onEvidence={onEvidence} onClose={() => setCanonOpen(false)} providers={providers} roles={roles} onNext={async () => { const next = chapters.find(c => c.position === chapter.position + 1); await navigate(next ? { page: 'write', novelId: novel.id, chapterId: next.id } : { page: 'plot', novelId: novel.id }) }} />}
     {styleOpen && <WritingStyleDialog novel={novel} onClose={() => setStyleOpen(false)} />}
+    {quickEntityText !== null && <InlineQuickEntityModal novelId={novel.id} initialName={quickEntityText} onClose={() => setQuickEntityText(null)} />}
   </div>
+}
+
+function InlineQuickEntityModal({
+  novelId,
+  initialName,
+  onClose
+}: {
+  novelId: string
+  initialName: string
+  onClose: () => void
+}) {
+  const cache = useQueryClient()
+  const [kind, setKind] = useState<'character' | 'world'>('character')
+  const [name, setName] = useState(initialName.trim().slice(0, 40))
+  const [summary, setSummary] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleSave() {
+    if (!name.trim()) return
+    setBusy(true)
+    setError('')
+    try {
+      await api.saveEntity(novelId, {
+        kind,
+        name: name.trim(),
+        summary: summary.trim(),
+        body: '',
+        aliases: [name.trim()],
+        status: 'author'
+      })
+      await cache.invalidateQueries({ queryKey: ['entities', novelId] })
+      onClose()
+    } catch (e) {
+      setError(errorText(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal
+      open
+      onOpenChange={v => !v && onClose()}
+      title="快速记录设定词条"
+      description="无需离开写作页面，直接将词条添加进小说世界观与人物库。"
+    >
+      <form
+        onSubmit={e => {
+          e.preventDefault()
+          void handleSave()
+        }}
+        className="form-stack"
+      >
+        <div className="form-row">
+          <Field label="设定类型">
+            <select value={kind} onChange={e => setKind(e.target.value as 'character' | 'world')}>
+              <option value="character">人物 / 配角</option>
+              <option value="world">世界设定 / 功法 / 宗门</option>
+            </select>
+          </Field>
+          <Field label="名称">
+            <input required maxLength={80} value={name} onChange={e => setName(e.target.value)} />
+          </Field>
+        </div>
+        <Field label="一句话简述（可选）" help="简短记录其身份、功法境界或关键特征">
+          <textarea
+            rows={2}
+            maxLength={1000}
+            value={summary}
+            onChange={e => setSummary(e.target.value)}
+            placeholder="例如：云岚宗外门长老，对主角怀有敌意"
+          />
+        </Field>
+        {error && <Notice>{error}</Notice>}
+        <div className="modal-actions" style={{ marginTop: '12px' }}>
+          <Button type="button" onClick={onClose}>
+            取消
+          </Button>
+          <Button type="submit" variant="primary" disabled={busy || !name.trim()}>
+            {busy ? '正在保存…' : '存入设定库'}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  )
 }
 
 function VersionHistory({ novelId, chapter, onClose, flush, onAdopt }: { novelId: string; chapter: Chapter; onClose: () => void; flush: () => Promise<Version>; onAdopt: (v: Version, expected: Version) => void }) {

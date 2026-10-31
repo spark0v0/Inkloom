@@ -26,14 +26,47 @@ export const negativeConstraintPills = [
 ]
 
 export const rewriteActions = {
-  polish: { name: '润色', instruction: '润色所选文字，保持篇幅接近原段，保留情节事实、人物动机、视角和关键信息。改善措辞与句子衔接，不为凑字数添加剧情。' },
-  expand: { name: '扩写', instruction: '扩写所选文字，补充有作用的动作、感官细节或对白，保留原有情节方向和视角。不要虚构前文已经交代的事件，不重复解释设定。' },
-  shorten: { name: '缩写', instruction: '压缩所选文字，删去重复解释、冗余修饰和无效过渡，保留关键行动、对白意图及因果。不要为凑字数扩写。' },
+  combat: {
+    name: '打斗强化',
+    ratio: 1.4,
+    instruction: '强化所选文字中的打斗交锋。加强招式威能、速度与气浪破坏力，注重出招动作的干脆白描，拳拳到肉、刀光剑影，营造强烈的视觉冲击与压迫感。'
+  },
+  reaction: {
+    name: '围观反响',
+    ratio: 1.3,
+    instruction: '为所选文字补充经典网文围观反响。侧面描写周围路人、同门弟子、敌对长老的不可置信、震撼失色与私下议论，烘托主角此刻出手的威慑力与悬殊差距。'
+  },
+  sensory: {
+    name: '五感细节',
+    ratio: 1.4,
+    instruction: '为所选文字增加多维感官细节（视觉光影、破空呼啸、杀气寒意、血腥气息或兵刃嗡鸣）。增强场景氛围与沉浸感，避免空洞的形容词堆砌。'
+  },
+  dialogue: {
+    name: '霸气对白',
+    ratio: 1.0,
+    instruction: '重塑所选文字中的人物对话。让对白更加杀伐果断、气场沉雄、冷酷有力，去掉软弱或拖泥带水的废话，字字诛心。'
+  },
+  polish: {
+    name: '润色精修',
+    ratio: 1.0,
+    instruction: '润色所选文字，保持篇幅接近原段，保留情节事实、人物动机、视角和关键信息。改善措辞与句子衔接，不为凑字数添加剧情。'
+  },
+  expand: {
+    name: '扩写',
+    ratio: 1.5,
+    instruction: '扩写所选文字，补充有作用的动作、感官细节或对白，保留原有情节方向和视角。不要虚构前文已经交代的事件，不重复解释设定。'
+  },
+  shorten: {
+    name: '精炼去水',
+    ratio: 0.65,
+    instruction: '压缩所选文字，删去重复解释、冗余修饰和无效过渡，保留关键行动、对白意图及因果。不要为凑字数扩写。'
+  },
 } as const
 
 export type RewriteAction = keyof typeof rewriteActions
-export type SelectionRewrite = { id: string; base_version_id: string; action: RewriteAction; selection: Selection }
+export type SelectionRewrite = { id: string; base_version_id: string; action: RewriteAction; selection: Selection; autoStart?: boolean }
 export function rewriteTarget(request: SelectionRewrite) {
-  const ratio = request.action === 'expand' ? 1.5 : request.action === 'shorten' ? .65 : 1
-  return Math.min(6000, Math.max(100, Math.round(countChars(request.selection.text) * ratio)))
+  const meta = rewriteActions[request.action]
+  const ratio = meta?.ratio ?? 1.0
+  return Math.min(6000, Math.max(50, Math.round(countChars(request.selection.text) * ratio)))
 }

@@ -23,6 +23,8 @@
 
 ### 重点创作增强
 
+- 新增 **作家级行内微操作工具箱 (Craft Toolbox) 与非阻塞写作流**：参考 Sudowrite 与 Novelcrafter 设计，在编辑器中选中文本直接呼出专业网文微操作（**打斗动作强化**、**围观震惊反响**、**五感细节扩写**、**紧凑霸气对白**、**润色精修**、**精炼去水**），一键唤起即时改写；划词可直接“+ 记为设定”瞬间保存配角与世界观，无需跳出编辑器；彻底解除前章未定稿禁止后章写作的硬锁，保障日更连载心流。详见 [架构决策 ADR 0025](docs/decisions/0025-author-centric-craft-and-brainstorm.md)。
+- 新增 **灵感脑暴器 (Brainstorm Engine) 与光标接写 200 字**：在“找灵感”中内置起名废急救包（功法秘籍、宗门势力、上古神兵、角色道号）、剧情危机反转、章末黄金留钩（断章悬念）、杀伐交锋对白等高频脑暴卡片，支持一键复制与一键插入当前光标处；在写作区提供“接写 200 字”极小步长接续模式，迅速突破卡文困局。
 - 新增 **人物关系网络与图谱可视化 (Relationship Graph)**：在“人物与设定”中可直观查看与编辑全书人物羁绊拓扑。纯 React 19 + 原生 SVG 自适应双层拓扑布局，支持缩放、重置与节点悬浮提示；点击角色节点聚焦一度人际圈并虚化无关节点；连线根据道侣、师徒、敌对、同门、盟友等关系类别色彩区分；在章节生成时，若本章活跃角色达到两位或以上，系统自动查询其两两之间关系并结构化注入 `character_relations`，在长篇多人出场时消除人际幻觉与人物 OOC。详见 [架构决策 ADR 0024](docs/decisions/0024-entity-relationships-graph.md)。
 - 新增 **2026 最新主流模型预设**：在“模型设置”支持一键填入 DeepSeek-V3 / R1 (满血版)、Claude 3.7 Sonnet / Thinking、Gemini 2.5 Pro / Flash、阿里百炼 Qwen 2.5、Moonshot Kimi 等最新高分推荐端点与配置，包含上下文窗口、最大输出上限和官方价格预估；作者只需填入自己的 API Key 即可快速开写。
 - 新增 **场景节拍起承转合 (Scene Beats) 连续写作**：单场写作模式支持“开局冲突、解密探索、对峙博弈、情感高潮”经典四步节拍连续推进；采纳当前小场后支持一键推进到下一节拍并自动衔接细纲。
@@ -110,6 +112,7 @@ pwsh -File .\scripts\start.ps1 -Port 8766 -DataDirectory D:\StoryWorkspace
 
 ## 开发文档
 
+- [作家级即时微操作工具箱、灵感脑暴器与非阻塞写作流 (ADR 0025)](docs/decisions/0025-author-centric-craft-and-brainstorm.md)
 - [实体关系表、图谱可视化与上下文关系注入 (ADR 0024)](docs/decisions/0024-entity-relationships-graph.md)
 - [规划讨论、资料范围、历史读取与迁移](docs/IMPLEMENTATION-PLANNING-DISCUSSIONS.md)
 - [结项交付、最终竞品对照与实际验证](docs/PROJECT-CLOSEOUT-2026-10-31.md)
