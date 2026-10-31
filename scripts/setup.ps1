@@ -1,5 +1,11 @@
 #requires -Version 7.0
 $ErrorActionPreference = 'Stop'
+
+if ($Host.Name -eq 'ConsoleHost') {
+    try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
+}
+$OutputEncoding = [System.Text.Encoding]::UTF8
+
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 Push-Location $projectRoot
 try {

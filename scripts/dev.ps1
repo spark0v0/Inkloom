@@ -1,7 +1,18 @@
 #requires -Version 7.0
 $ErrorActionPreference = 'Stop'
+
+if ($Host.Name -eq 'ConsoleHost') {
+    try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
+}
+$OutputEncoding = [System.Text.Encoding]::UTF8
+
+$isWin = $IsWindows -or ($env:OS -like '*Windows*')
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$python = Join-Path $projectRoot 'backend/.venv/Scripts/python.exe'
+$python = if ($isWin) {
+    Join-Path $projectRoot 'backend/.venv/Scripts/python.exe'
+} else {
+    Join-Path $projectRoot 'backend/.venv/bin/python'
+}
 if (-not (Test-Path -LiteralPath $python)) { throw '请先运行 scripts/setup.ps1。' }
 foreach ($port in @(8765, 5173)) {
     $client = [Net.Sockets.TcpClient]::new()

@@ -9,12 +9,23 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
+
+if ($Host.Name -eq 'ConsoleHost') {
+    try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
+}
+$OutputEncoding = [System.Text.Encoding]::UTF8
+
+$isWin = $IsWindows -or ($env:OS -like '*Windows*')
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 if (-not $DataDirectory) { $DataDirectory = Join-Path $projectRoot 'data' }
 if (-not [IO.Path]::IsPathRooted($DataDirectory)) { $DataDirectory = Join-Path $projectRoot $DataDirectory }
 $workspaceRoot = [IO.Path]::GetFullPath($DataDirectory)
 $runtime = Join-Path $projectRoot '.runtime'
-$python = Join-Path $projectRoot 'backend/.venv/Scripts/python.exe'
+$python = if ($isWin) {
+    Join-Path $projectRoot 'backend/.venv/Scripts/python.exe'
+} else {
+    Join-Path $projectRoot 'backend/.venv/bin/python'
+}
 $ports = if ($PSBoundParameters.ContainsKey('Port')) { @($Port) } else { @(8765..8774) }
 
 function Get-WorkspaceId {
@@ -69,7 +80,15 @@ function Find-InkloomService {
 
 function Open-Inkloom([string]$Url) {
     if ($NoBrowser) { return }
-    try { Start-Process $Url }
+    try {
+        if ($isWin) {
+            Start-Process $Url
+        } elseif ($IsMacOS) {
+            & open $Url
+        } else {
+            & xdg-open $Url
+        }
+    }
     catch { Write-Host "无法自动打开浏览器，请手动访问：$Url" -ForegroundColor Yellow }
 }
 
@@ -88,9 +107,20 @@ function Invoke-Checked([string]$Command, [string[]]$Arguments, [string]$Failure
 }
 
 function Require-Command([string]$Name, [string]$Hint) {
-    $command = Get-Command $Name -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
-    if (-not $command) { throw $Hint }
-    return $command.Source
+    $candidates = if ($isWin) {
+        @($Name, "$Name.exe", "$Name.cmd", "$Name.bat", "$Name.ps1") | Select-Object -Unique
+    } else {
+        @($Name)
+    }
+    foreach ($candidate in $candidates) {
+        $command = Get-Command $candidate -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($command -and $command.Source) { return $command.Source }
+    }
+    foreach ($candidate in $candidates) {
+        $command = Get-Command $candidate -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($command -and $command.Source) { return $command.Source }
+    }
+    throw $Hint
 }
 
 $lock = $null
@@ -137,12 +167,15 @@ try {
     $needBuild = $Rebuild -or $needFrontend -or -not (Test-Path -LiteralPath 'frontend/dist/index.html') -or $state.build -ne $buildHash
 
     # Check prerequisites before starting either installation.
-    if ($needBackend) { $uv = Require-Command 'uv.exe' '缺少 uv。请安装 uv 并加入 PATH，然后重新双击启动入口。' }
+    if ($needBackend) { $uv = Require-Command 'uv' '缺少 uv。请安装 uv 并加入 PATH，然后重新双击启动入口。' }
     if ($needFrontend -or $needBuild) {
-        $node = Require-Command 'node.exe' '缺少 Node.js。请安装 Node.js 22.12+ 并重新打开启动器。'
-        $npm = Require-Command 'npm.cmd' '缺少 npm，请修复 Node.js 安装后重新打开启动器。'
-        $nodeVersion = & $node --version
-        if ($LASTEXITCODE -ne 0 -or [version]($nodeVersion -replace '^v', '') -lt [version]'22.12.0') { throw '需要 Node.js 22.12+，请升级后重新启动。' }
+        $node = Require-Command 'node' '缺少 Node.js。请安装 Node.js 22.12+ 并重新打开启动器。'
+        $npm = Require-Command 'npm' '缺少 npm，请修复 Node.js 安装后重新打开启动器。'
+        $nodeVersionRaw = & $node --version
+        $nodeVersionClean = (($nodeVersionRaw -split "`r?`n" | Where-Object { $_ -match '^\s*v?\d+\.' } | Select-Object -First 1) -replace '^\s*v', '').Trim()
+        if ($LASTEXITCODE -ne 0 -or -not $nodeVersionClean -or [version]$nodeVersionClean -lt [version]'22.12.0') {
+            throw "需要 Node.js 22.12+（检测到：$($nodeVersionRaw.Trim())），请升级后重新启动。"
+        }
     }
     if ($needBackend) {
         Write-Host '正在准备 Python 与后端依赖，首次运行可能需要下载…' -ForegroundColor Cyan
