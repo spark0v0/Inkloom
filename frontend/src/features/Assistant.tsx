@@ -1,15 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowRight, Check, FileText, Pause, Play, Stop, ArrowCounterClockwise, PenNib, Sparkle, SlidersHorizontal, X } from '@phosphor-icons/react'
+import { ArrowRight, Check, FileText, Pause, Play, Stop, ArrowCounterClockwise, PenNib, Sparkle, SlidersHorizontal, User, X } from '@phosphor-icons/react'
 import { activeStates, ApiError, api, countChars, dateLabel, downloadText, errorText, jobStateNames, number, uuid } from '../lib/api'
 import type { Chapter, Context, ContextInput, Evidence, JobInput, MemoryProposal, Novel, Provider, ReviewRewritePreparation, Roles, Selection, Task, Version } from '../lib/api'
 import { Badge, Button, Field, Modal, Notice } from '../components/ui'
 import { AttemptHistory, ContextDetails, JobResult } from './JobPresentation'
 import { useJobStream } from '../lib/useJobStream'
 import { ChapterReferencesDialog } from './ChapterReferencesDialog'
+import { QuickEntitiesDialog } from './QuickEntitiesDialog'
 import { rewriteActions, rewriteTarget } from '../lib/writing'
 import type { SelectionRewrite } from '../lib/writing'
+import { deriveBeatsFromOutline } from '../lib/sceneBeats'
 
 export type AssistantProps = {
   novel: Novel; chapter: Chapter; providers: Provider[]; roles: Roles;
@@ -50,6 +52,26 @@ export function Assistant({ novel, chapter, providers, roles, flush, selection, 
   const [error, setError] = useState('')
   const [showCompare, setShowCompare] = useState(false)
   const [referencesOpen, setReferencesOpen] = useState(false)
+  const [entitiesOpen, setEntitiesOpen] = useState(false)
+  const [activeBeatIndex, setActiveBeatIndex] = useState<number>(0)
+  const [justAdoptedBeat, setJustAdoptedBeat] = useState<number | null>(null)
+  const outlineQuery = useQuery({ queryKey: ['chapter-outline', novel.id, chapter.id], queryFn: () => api.chapterOutline(novel.id, chapter.id) })
+  const { beats, isFromOutline } = deriveBeatsFromOutline(outlineQuery.data)
+
+  function applyBeat(index: number) {
+    const b = beats[index]
+    if (!b) return
+    setActiveBeatIndex(index)
+    setScene(current => ({
+      ...current,
+      goal: b.goal,
+      conflict: b.conflict ?? current.conflict,
+      turn: b.turn ?? current.turn,
+      ending: b.ending ?? current.ending
+    }))
+    setTarget(b.suggestedTarget || 800)
+    setContext(null)
+  }
   const [adopting, setAdopting] = useState(false)
   const [budget, setBudget] = useState('')
   const [maxAttempts, setMaxAttempts] = useState(3)
@@ -147,6 +169,7 @@ export function Assistant({ novel, chapter, providers, roles, flush, selection, 
       const version = await flush()
       const adopted = await api.adopt(job.data.id, novel.id, version.id)
       onAdopt(adopted, version); setShowCompare(false); setError('')
+      if (mode === 'scene') setJustAdoptedBeat(activeBeatIndex)
       await cache.invalidateQueries({ queryKey: ['job', job.data.id] }); await cache.invalidateQueries({ queryKey: ['chapters', novel.id] }); await cache.invalidateQueries({ queryKey: ['novel', novel.id] })
     } catch (e) { setError(errorText(e)) } finally { setAdopting(false) }
   }
@@ -219,6 +242,41 @@ export function Assistant({ novel, chapter, providers, roles, flush, selection, 
       {!['review', 'inspiration'].includes(task) && <div className="writing-mode-tabs"><button disabled={submissionLocked} className={mode === 'chapter' && task === 'continue' ? 'active' : ''} onClick={() => { setMode('chapter'); changeTask('continue') }}>写完整章</button><button disabled={submissionLocked} className={mode === 'continue' && task === 'continue' ? 'active' : ''} onClick={() => { setMode('continue'); changeTask('continue') }}>续写</button><button disabled={submissionLocked} className={mode === 'scene' && task === 'continue' ? 'active' : ''} onClick={() => { setMode('scene'); setTarget(800); changeTask('continue') }}>写一个场景</button><button disabled={submissionLocked} className={task === 'rewrite' ? 'active' : ''} onClick={() => { setMode('rewrite'); changeTask('rewrite') }}>润色选段</button></div>}
       {task === 'continue' && mode === 'scene' && <section className="scene-composer form-stack" aria-label="本场景要求">
         <p className="small muted">每次写一场；审阅采纳后接到当前正文末尾。</p>
+        <div className="scene-beat-selector" style={{ marginBottom: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+            <span className="small muted">{isFromOutline ? '本章细纲节拍' : '经典四步节拍'}：</span>
+            {isFromOutline && <Badge tone="green">已绑定细纲</Badge>}
+          </div>
+          <div className="scene-beat-row" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {beats.map((b, i) => (
+              <Button
+                key={i}
+                type="button"
+                variant={activeBeatIndex === i ? 'primary' : 'ghost'}
+                onClick={() => applyBeat(i)}
+                style={{ padding: '3px 8px', fontSize: '12px' }}
+              >
+                {b.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+        {justAdoptedBeat !== null && activeBeatIndex < beats.length - 1 && (
+          <div className="next-beat-banner" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: 'var(--green-soft)', borderRadius: '6px' }}>
+            <span className="small" style={{ color: 'var(--green-dark)' }}>上一场已采纳！</span>
+            <Button
+              type="button"
+              variant="primary"
+              style={{ fontSize: '12px', padding: '3px 8px' }}
+              onClick={() => {
+                applyBeat(activeBeatIndex + 1)
+                setJustAdoptedBeat(null)
+              }}
+            >
+              进入 {beats[activeBeatIndex + 1].label} <ArrowRight size={14} />
+            </Button>
+          </div>
+        )}
         <Field label="本场要发生什么"><textarea rows={2} maxLength={1200} value={scene.goal} onChange={e => { setScene({ ...scene, goal: e.target.value }); setContext(null) }} placeholder="例如：主角与守塔人交涉，争取进入灯塔" /></Field>
         <Field label="阻碍或冲突"><textarea rows={2} maxLength={1200} value={scene.conflict || ''} onChange={e => { setScene({ ...scene, conflict: e.target.value }); setContext(null) }} placeholder="例如：对方要求交出唯一的钥匙" /></Field>
         <details><summary>转折、收束与视角</summary><div className="form-stack">
@@ -230,6 +288,7 @@ export function Assistant({ novel, chapter, providers, roles, flush, selection, 
       <div className="assistant-resources">
       <Button className="writing-style-trigger" variant="ghost" disabled={submissionLocked || !!active} onClick={onWritingStyle}><PenNib size={18} />写作风格<span>{hasStyle ? '本书已设置' : '未限定'}</span></Button>
       <Button className="chapter-references-trigger" variant="ghost" disabled={submissionLocked || !!active} onClick={() => setReferencesOpen(true)}><FileText size={17} />本章参考<span>{(chapter.references.entity_ids?.length || 0) + (chapter.references.chapters?.length || 0) ? `${(chapter.references.entity_ids?.length || 0) + (chapter.references.chapters?.length || 0)} 项必读` : chapter.references.notes?.trim() ? '含补充资料' : '自动召回'}</span></Button>
+      <Button className="quick-entities-trigger" variant="ghost" disabled={submissionLocked || !!active} onClick={() => setEntitiesOpen(true)}><User size={17} />速查设定<span>主角/世界档案</span></Button>
       </div>
       {chapter.goal && <details className="assistant-outline"><summary><FileText size={18} /><span>本章细纲</span></summary><p>{chapter.goal}</p></details>}
       <div className="assistant-form"><fieldset className="assistant-inputs" disabled={submissionLocked}>{blockedChapter && <Notice action={<Button onClick={onResolvePrevious}>去处理前章</Button>}>先完成《{blockedChapter}》的定稿，再写后文。</Notice>}{task === 'inspiration' && <Field label="卡在哪里？"><select value={problem} onChange={e => { setProblem(e.target.value); setContext(null) }}>{['不知道接下来发生什么', '知道要发生什么，但过渡生硬', '这段太平，缺少冲突', '人物没有理由行动', '剧情重复，想换一种走法'].map(value => <option key={value}>{value}</option>)}</select></Field>}{selectedDirection && <div className="selected-direction" role="status"><strong>已选：{selectedDirection.title}</strong><p className="small">点击下方按钮生成候选正文。</p><Button variant="ghost" onClick={() => setDirection(null)}>移除方向</Button></div>}<Field label={task === 'review' ? '审稿重点' : task === 'inspiration' ? '补充想法（可选）' : '补充要求'}><textarea aria-label="本次写作要求" rows={3} value={instruction} onChange={e => setInstruction(e.target.value)} placeholder={task === 'inspiration' ? '可留空，让 AI 根据本章给出三个不同走法' : task === 'review' ? '例如：检查人物动机、前后矛盾、重复和节奏' : '例如：加快节奏，让章末留下悬念'} maxLength={12000} /></Field>
@@ -247,6 +306,7 @@ export function Assistant({ novel, chapter, providers, roles, flush, selection, 
       <button className="text-link context-trigger" onClick={() => preparing.mutate()} disabled={preparing.isPending}>查看将引用的资料<ArrowRight size={15} /></button>
     </div><footer className="assistant-footer">{provider?.kind === 'demo' ? '演示模式 · 固定样例' : `发送至 ${provider?.name || '所选模型服务'}`}</footer>
     {referencesOpen && <ChapterReferencesDialog novelId={novel.id} chapter={chapter} onClose={() => setReferencesOpen(false)} onSaved={() => { setReferencesOpen(false); setContext(null); setExcluded([]); setDirection(null); setPreparedRevision(null); setError('') }} />}
+    {entitiesOpen && <QuickEntitiesDialog novelId={novel.id} chapter={chapter} onClose={() => setEntitiesOpen(false)} onReferencesChanged={() => { void cache.invalidateQueries({ queryKey: ['chapters', novel.id] }); setContext(null) }} />}
     <Modal open={tab === 'context'} onOpenChange={value => !value && setTab('assistant')} title="本次引用资料" wide>{context && <ContextDetails context={context} onEvidence={onEvidence} excluded={excluded} onToggle={id => setExcluded(previous => previous.includes(id) ? previous.filter(x => x !== id) : [...previous, id])} />}</Modal>
     <Modal open={showCompare} onOpenChange={setShowCompare} title="对比原稿" wide className="candidate-modal"><div className="comparison"><div><h4>当前原稿</h4><div className="comparison-text">{chapter.version.text || '空白'}</div></div><div><h4>{job.data?.task === 'rewrite' ? '替换内容' : '新增内容'}</h4><div className="comparison-text comparison-new">{job.data?.output_text}</div></div></div>{job.data && job.data.base_version_id !== chapter.working_version_id && <Notice>原稿已更新，请核对后重新生成。</Notice>}{error && <Notice>{error}</Notice>}<div className="modal-actions"><Button onClick={() => setShowCompare(false)}>返回</Button><Button variant="primary" disabled={adopting} onClick={() => void adopt()}>采纳正文</Button></div></Modal>
   </aside>

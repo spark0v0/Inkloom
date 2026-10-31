@@ -175,6 +175,18 @@ TERMINAL_JOB_STATES = {"succeeded", "failed", "cancelled", "interrupted_uncertai
 TASKS = {"continue", "rewrite", "plan", "extract", "review", "handoff"}
 
 
+def entity_terms(name: str, aliases: list[str] | None = None) -> list[str]:
+    """Return canonical name and all normalized alias terms for smart entity matching."""
+    terms: list[str] = [name.strip()] if name and name.strip() else []
+    for raw in aliases or []:
+        if isinstance(raw, str):
+            for part in re.split(r"[,，、\n\t/]+", raw):
+                cleaned = part.strip()
+                if cleaned and cleaned not in terms:
+                    terms.append(cleaned)
+    return terms
+
+
 def split_manuscript(text: str) -> list[dict[str, str]]:
     text = normalize(text).lstrip("\ufeff")
     pattern = re.compile(r"^(?:#{1,3}\s+)?(第[零一二三四五六七八九十百千万两\d]+[章节卷][^\n]*)$", re.M)

@@ -25,7 +25,7 @@ from .storage import Workspace
 
 FORMAT_VERSION = 1
 SCHEMA_REVISIONS = ("924486b5f963", "a12c7e604bc9", "b73d2f809a61", "c84e3a190b72",
-                    "d95f4b207c83", "e06a5c318d94", "f17b6d429ea5")
+                    "d95f4b207c83", "e06a5c318d94", "f17b6d429ea5", "1b8c6e431fa7")
 SCHEMA_REVISION = SCHEMA_REVISIONS[-1]
 SUPPORTED_REVISIONS = set(SCHEMA_REVISIONS)
 MAX_ARCHIVE = 64 * 1024 * 1024
@@ -186,6 +186,13 @@ def restore(workspace: Workspace, contents: bytes) -> dict:
         if schema_includes(revision[0], "f17b6d429ea5"):
             from .discussions import validate_restored_discussions
             validate_restored_discussions(connection)
+        if schema_includes(revision[0], "1b8c6e431fa7"):
+            for row in connection.execute("SELECT r.novel_id, r.source_id, r.target_id, e1.novel_id, e2.novel_id FROM entity_relations r "
+                                          "LEFT JOIN entities e1 ON r.source_id=e1.id "
+                                          "LEFT JOIN entities e2 ON r.target_id=e2.id").fetchall():
+                r_nid, s_id, t_id, e1_nid, e2_nid = row
+                if e1_nid != r_nid or e2_nid != r_nid or s_id == t_id:
+                    raise DomainError("INVALID_DATABASE", "人物关系引用的实体不匹配或跨作品。")
         connection.execute("UPDATE jobs SET state='interrupted_uncertain', lease_epoch=lease_epoch+1, "
                            "error_code='RESTORED_TASK', error_message='从备份恢复；需要作者明确重试。' "
                            "WHERE state IN ('queued','running','pausing','cancelling','paused')")

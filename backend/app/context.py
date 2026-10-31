@@ -10,9 +10,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from . import schemas as dto
-from .domain import DomainError, digest, source_for
+from .domain import DomainError, digest, entity_terms, source_for
 from .library import require_chapter, require_novel
-from .models import Chapter, Entity, Fact, Job, Plan, Provider, Version
+from .models import Chapter, Entity, EntityRelation, Fact, Job, Plan, Provider, Version
 from .references import resolve_references
 from .retrieval import match_score, retrieval_terms, retrieve_source_ids, weight_terms
 from .storage import PROJECT_DIR
@@ -138,9 +138,9 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
     query_goal = outline_volume.body if request.task == "outline" else chapter.goal
     recent_plan_text = "\n".join(c["goal"][:1500] for c in catalog[-6:]) if request.task == "outline" else ""
     query_text = "\n".join([request.instruction, query_title, query_goal, direction_query, recent_plan_text,
-                            *(" ".join([e.name, *e.aliases]) for e in pinned_entities),
+                            *(" ".join(entity_terms(e.name, e.aliases)) for e in pinned_entities),
                             *(p.body for p in chapter_plans)])
-    recent_text = version.text[-6000:]
+    recent_text = version.text
     if request.task == "outline":
         recent_text = ""
         if prior_chapters:
@@ -148,8 +148,8 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
     relevance_text = (query_text + "\n" + recent_text).casefold()
     all_entities = session.scalars(select(Entity).where(Entity.novel_id == novel_id,
                     Entity.status == "author").order_by(Entity.updated_at.desc(), Entity.id)).all()
-    matched = [e for e in all_entities if any(name and name.casefold() in relevance_text
-                                             for name in [e.name, *e.aliases])]
+    matched = [e for e in all_entities if any(term and term.casefold() in relevance_text
+                                             for term in entity_terms(e.name, e.aliases))]
     # Match BEFORE limiting. All matched settings and world rules are mandatory;
     # the context budget rejects an oversized request instead of silently dropping them.
     required_ids = {e.id for e in matched} | {e.id for e in all_entities if e.kind == "world"} | {
@@ -161,7 +161,7 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
     required_ids.update(item.entity_id for item in thread_guidance)
     required = [e for e in all_entities if e.id in required_ids]
     entities = required + [e for e in all_entities if e.id not in required_ids][:max(0, 60 - len(required))]
-    terms, terms_omitted = retrieval_terms(query_text, [name for e in matched for name in [e.name, *e.aliases]])
+    terms, terms_omitted = retrieval_terms(query_text, [term for e in matched for term in entity_terms(e.name, e.aliases)])
     terms = weight_terms(session, novel_id, narrative_position, terms)
     ranked_ids = retrieve_source_ids(session, novel_id, narrative_position, terms, request.excluded_source_ids)
     relevant_ids = set(ranked_ids)
@@ -284,6 +284,44 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
         "sources": reading_sources(),
         "selection": request.selection.model_dump() if request.selection else None,
     }
+    active_entity_ids = {e.id for e in entities}
+    character_relations: list[dto.RelationOut] = []
+    if len(active_entity_ids) >= 2:
+        rel_rows = session.scalars(
+            select(EntityRelation).where(
+                EntityRelation.novel_id == novel_id,
+                EntityRelation.source_id.in_(active_entity_ids),
+                EntityRelation.target_id.in_(active_entity_ids),
+            )
+        ).all()
+        entity_name_map = {e.id: e.name for e in all_entities}
+        character_relations = [
+            dto.RelationOut(
+                id=r.id,
+                novel_id=r.novel_id,
+                source_id=r.source_id,
+                target_id=r.target_id,
+                source_name=entity_name_map.get(r.source_id, "未知"),
+                target_name=entity_name_map.get(r.target_id, "未知"),
+                relation_type=r.relation_type,
+                description=r.description,
+                bidirectional=r.bidirectional,
+                created_at=r.created_at,
+                updated_at=r.updated_at,
+            )
+            for r in rel_rows
+        ]
+        if character_relations:
+            input_body["character_relations"] = [
+                {
+                    "source": r.source_name,
+                    "target": r.target_name,
+                    "type": r.relation_type,
+                    "description": r.description,
+                    "bidirectional": r.bidirectional,
+                }
+                for r in character_relations
+            ]
     if production is not None:
         input_body["production"] = production
     if direction is not None:
@@ -391,6 +429,7 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
         sources=[dto.Source(**s) for s in
             input_body["draft_sources"] + input_body["sources"]],
         entities=[dto.EntityOut.model_validate(e) for e in entities],
+        character_relations=character_relations,
         facts=[dto.FactOut.model_validate(f) for f in facts],
         plans=[dto.PlanOut(**plan_context(p)) for p in plans],
         estimated_input_tokens=estimate(), max_output_tokens=output, context_window=window,

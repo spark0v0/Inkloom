@@ -287,6 +287,29 @@ class EntityUpdate(EntityInput):
     base_updated_at: str = Field(min_length=1, max_length=60)
 
 
+class RelationInput(Schema):
+    source_id: str = Field(min_length=1, max_length=64)
+    target_id: str = Field(min_length=1, max_length=64)
+    relation_type: str = Field(min_length=1, max_length=80)
+    description: str = Field(default="", max_length=2000)
+    bidirectional: bool = Field(default=True)
+
+
+class RelationOut(RelationInput):
+    id: str
+    novel_id: str
+    source_name: str
+    target_name: str
+    created_at: str
+    updated_at: str
+
+
+class RelationUpdate(Schema):
+    relation_type: str | None = Field(default=None, min_length=1, max_length=80)
+    description: str | None = Field(default=None, max_length=2000)
+    bidirectional: bool | None = None
+
+
 class PlanInput(Schema):
     title: str = Field(min_length=1, max_length=240)
     level: Literal["book", "volume", "chapter", "scene"] = "chapter"
@@ -743,6 +766,7 @@ class ContextOut(Schema):
     rewrite_surroundings: dict[str, str] = Field(default_factory=dict)
     sources: list[Source]
     entities: list[EntityOut]
+    character_relations: list[RelationOut] = Field(default_factory=list)
     facts: list[FactOut]
     plans: list[PlanOut]
     estimated_input_tokens: int

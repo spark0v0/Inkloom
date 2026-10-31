@@ -304,6 +304,23 @@ def create_app(data_dir: Path | None = None, *, worker: bool = True, port: int =
     def edit_entity(novel_id: str, entity_id: str, data: dto.EntityUpdate, request: Request):
         return request.app.state.library.put_entity(novel_id, data, entity_id)
 
+    @app.get(prefix + "/novels/{novel_id}/relations", response_model=list[dto.RelationOut])
+    def relations(novel_id: str, request: Request, entity_id: str | None = None):
+        return request.app.state.library.relations(novel_id, entity_id)
+
+    @app.post(prefix + "/novels/{novel_id}/relations", response_model=dto.RelationOut)
+    def create_relation(novel_id: str, data: dto.RelationInput, request: Request):
+        return request.app.state.library.create_relation(novel_id, data)
+
+    @app.put(prefix + "/novels/{novel_id}/relations/{relation_id}", response_model=dto.RelationOut)
+    def edit_relation(novel_id: str, relation_id: str, data: dto.RelationUpdate, request: Request):
+        return request.app.state.library.update_relation(novel_id, relation_id, data)
+
+    @app.delete(prefix + "/novels/{novel_id}/relations/{relation_id}")
+    def remove_relation(novel_id: str, relation_id: str, request: Request):
+        request.app.state.library.delete_relation(novel_id, relation_id)
+        return {"ok": True}
+
     @app.get(prefix + "/novels/{novel_id}/threads", response_model=list[dto.ThreadOut])
     def threads(novel_id: str, request: Request):
         return request.app.state.threads.list(novel_id)

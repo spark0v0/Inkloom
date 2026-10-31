@@ -331,6 +331,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/novels/{novel_id}/relations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Relations */
+        get: operations["relations_api_v1_novels__novel_id__relations_get"];
+        put?: never;
+        /** Create Relation */
+        post: operations["create_relation_api_v1_novels__novel_id__relations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/novels/{novel_id}/relations/{relation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Edit Relation */
+        put: operations["edit_relation_api_v1_novels__novel_id__relations__relation_id__put"];
+        post?: never;
+        /** Remove Relation */
+        delete: operations["remove_relation_api_v1_novels__novel_id__relations__relation_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/novels/{novel_id}/threads": {
         parameters: {
             query?: never;
@@ -1323,6 +1359,8 @@ export interface components {
             sources: components["schemas"]["Source"][];
             /** Entities */
             entities: components["schemas"]["EntityOut"][];
+            /** Character Relations */
+            character_relations?: components["schemas"]["RelationOut"][];
             /** Facts */
             facts: components["schemas"]["FactOut"][];
             /** Plans */
@@ -2493,6 +2531,65 @@ export interface components {
             /** Base Revision */
             base_revision: number;
             selection: components["schemas"]["ReferenceSelection"];
+        };
+        /** RelationInput */
+        RelationInput: {
+            /** Source Id */
+            source_id: string;
+            /** Target Id */
+            target_id: string;
+            /** Relation Type */
+            relation_type: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Bidirectional
+             * @default true
+             */
+            bidirectional: boolean;
+        };
+        /** RelationOut */
+        RelationOut: {
+            /** Source Id */
+            source_id: string;
+            /** Target Id */
+            target_id: string;
+            /** Relation Type */
+            relation_type: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Bidirectional
+             * @default true
+             */
+            bidirectional: boolean;
+            /** Id */
+            id: string;
+            /** Novel Id */
+            novel_id: string;
+            /** Source Name */
+            source_name: string;
+            /** Target Name */
+            target_name: string;
+            /** Created At */
+            created_at: string;
+            /** Updated At */
+            updated_at: string;
+        };
+        /** RelationUpdate */
+        RelationUpdate: {
+            /** Relation Type */
+            relation_type?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Bidirectional */
+            bidirectional?: boolean | null;
         };
         /** RestoreOut */
         RestoreOut: {
@@ -3879,6 +3976,142 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EntityOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    relations_api_v1_novels__novel_id__relations_get: {
+        parameters: {
+            query?: {
+                entity_id?: string | null;
+            };
+            header?: never;
+            path: {
+                novel_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelationOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_relation_api_v1_novels__novel_id__relations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                novel_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RelationInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_relation_api_v1_novels__novel_id__relations__relation_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                novel_id: string;
+                relation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RelationUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_relation_api_v1_novels__novel_id__relations__relation_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                novel_id: string;
+                relation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

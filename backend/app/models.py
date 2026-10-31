@@ -94,6 +94,22 @@ class Entity(Base):
     updated_at: Mapped[str] = mapped_column(String, default=now)
 
 
+class EntityRelation(Base):
+    __tablename__ = "entity_relations"
+    __table_args__ = (
+        UniqueConstraint("novel_id", "source_id", "target_id", "relation_type", name="uq_entity_relation_pair"),
+    )
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    novel_id: Mapped[str] = mapped_column(ForeignKey("novels.id"), index=True)
+    source_id: Mapped[str] = mapped_column(ForeignKey("entities.id"), index=True)
+    target_id: Mapped[str] = mapped_column(ForeignKey("entities.id"), index=True)
+    relation_type: Mapped[str] = mapped_column(String(80))
+    description: Mapped[str] = mapped_column(Text, default="")
+    bidirectional: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[str] = mapped_column(String, default=now)
+    updated_at: Mapped[str] = mapped_column(String, default=now)
+
+
 class ThreadTrack(Base):
     __tablename__ = "thread_tracks"
     entity_id: Mapped[str] = mapped_column(ForeignKey("entities.id"), primary_key=True)

@@ -12,6 +12,7 @@ from .domain import (
     DomainError,
     char_count,
     digest,
+    entity_terms,
     normalize,
     now,
     paragraphs,
@@ -21,7 +22,7 @@ from .domain import (
     validate_document,
 )
 from .manuscript_export import export_archive, export_text, preview_export
-from .models import CanonRevision, Chapter, Entity, Fact, Job, Novel, Plan, Version
+from .models import CanonRevision, Chapter, Entity, EntityRelation, Fact, Job, Novel, Plan, Version
 from .storage import Workspace
 
 
@@ -310,6 +311,126 @@ class Library:
             s.flush()
             return dto.EntityOut.model_validate(entity)
 
+    def relations(self, novel_id: str, entity_id: str | None = None) -> list[dto.RelationOut]:
+        with self.ws.session() as s:
+            require_novel(s, novel_id)
+            query = select(EntityRelation).where(EntityRelation.novel_id == novel_id)
+            if entity_id:
+                query = query.where(
+                    or_(
+                        EntityRelation.source_id == entity_id,
+                        and_(EntityRelation.target_id == entity_id, EntityRelation.bidirectional.is_(True)),
+                    )
+                )
+            rows = s.scalars(query.order_by(EntityRelation.updated_at.desc())).all()
+            entity_names = dict(s.execute(select(Entity.id, Entity.name).where(Entity.novel_id == novel_id)).all())
+            return [
+                dto.RelationOut(
+                    id=r.id,
+                    novel_id=r.novel_id,
+                    source_id=r.source_id,
+                    target_id=r.target_id,
+                    source_name=entity_names.get(r.source_id, "未知实体"),
+                    target_name=entity_names.get(r.target_id, "未知实体"),
+                    relation_type=r.relation_type,
+                    description=r.description,
+                    bidirectional=r.bidirectional,
+                    created_at=r.created_at,
+                    updated_at=r.updated_at,
+                )
+                for r in rows
+            ]
+
+    def create_relation(self, novel_id: str, data: dto.RelationInput) -> dto.RelationOut:
+        if data.source_id == data.target_id:
+            raise DomainError("INVALID_RELATION", "不能将实体与自身建立关系。", 400)
+        with self.ws.session(write=True) as s:
+            novel = require_novel(s, novel_id)
+            source = s.get(Entity, data.source_id)
+            target = s.get(Entity, data.target_id)
+            if not source or source.novel_id != novel_id or not target or target.novel_id != novel_id:
+                raise DomainError("ENTITY_NOT_FOUND", "所选人物/实体不存在或不属于本书。", 404)
+            rel_type = data.relation_type.strip()
+            existing = s.scalar(
+                select(EntityRelation).where(
+                    EntityRelation.novel_id == novel_id,
+                    EntityRelation.source_id == data.source_id,
+                    EntityRelation.target_id == data.target_id,
+                    EntityRelation.relation_type == rel_type,
+                )
+            )
+            if existing:
+                raise DomainError("RELATION_EXISTS", "该关系记录已存在。", 409)
+            rel = EntityRelation(
+                id=uid("rel"),
+                novel_id=novel_id,
+                source_id=data.source_id,
+                target_id=data.target_id,
+                relation_type=rel_type,
+                description=data.description.strip(),
+                bidirectional=data.bidirectional,
+                created_at=now(),
+                updated_at=now(),
+            )
+            s.add(rel)
+            novel.settings_revision += 1
+            novel.updated_at = now()
+            s.flush()
+            return dto.RelationOut(
+                id=rel.id,
+                novel_id=novel_id,
+                source_id=rel.source_id,
+                target_id=rel.target_id,
+                source_name=source.name,
+                target_name=target.name,
+                relation_type=rel.relation_type,
+                description=rel.description,
+                bidirectional=rel.bidirectional,
+                created_at=rel.created_at,
+                updated_at=rel.updated_at,
+            )
+
+    def update_relation(self, novel_id: str, relation_id: str, data: dto.RelationUpdate) -> dto.RelationOut:
+        with self.ws.session(write=True) as s:
+            novel = require_novel(s, novel_id)
+            rel = s.get(EntityRelation, relation_id)
+            if rel is None or rel.novel_id != novel_id:
+                raise DomainError("RELATION_NOT_FOUND", "关系记录不存在。", 404)
+            if data.relation_type is not None:
+                rel.relation_type = data.relation_type.strip()
+            if data.description is not None:
+                rel.description = data.description.strip()
+            if data.bidirectional is not None:
+                rel.bidirectional = data.bidirectional
+            rel.updated_at = now()
+            novel.settings_revision += 1
+            novel.updated_at = now()
+            s.flush()
+            entity_names = dict(s.execute(select(Entity.id, Entity.name).where(Entity.novel_id == novel_id)).all())
+            return dto.RelationOut(
+                id=rel.id,
+                novel_id=rel.novel_id,
+                source_id=rel.source_id,
+                target_id=rel.target_id,
+                source_name=entity_names.get(rel.source_id, "未知实体"),
+                target_name=entity_names.get(rel.target_id, "未知实体"),
+                relation_type=rel.relation_type,
+                description=rel.description,
+                bidirectional=rel.bidirectional,
+                created_at=rel.created_at,
+                updated_at=rel.updated_at,
+            )
+
+    def delete_relation(self, novel_id: str, relation_id: str) -> None:
+        with self.ws.session(write=True) as s:
+            novel = require_novel(s, novel_id)
+            rel = s.get(EntityRelation, relation_id)
+            if rel is None or rel.novel_id != novel_id:
+                raise DomainError("RELATION_NOT_FOUND", "关系记录不存在。", 404)
+            s.delete(rel)
+            novel.settings_revision += 1
+            novel.updated_at = now()
+
     def plans(self, novel_id: str) -> list[dto.PlanOut]:
         with self.ws.session() as s:
             require_novel(s, novel_id)
@@ -479,8 +600,9 @@ class Library:
             terms = [query]
             for entity in s.scalars(select(Entity).where(Entity.novel_id == novel_id,
                                                          Entity.status == "author")).all():
-                if query.casefold() in {name.casefold() for name in [entity.name, *entity.aliases]}:
-                    terms.extend([entity.name, *entity.aliases])
+                names = entity_terms(entity.name, entity.aliases)
+                if query.casefold() in {name.casefold() for name in names}:
+                    terms.extend(names)
             for term in list(dict.fromkeys(terms))[:50]:
                 term_hits = []
                 if len(term) >= 3:
