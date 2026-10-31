@@ -83,15 +83,14 @@ function Stop-InkloomPort([int]$TargetPort, [bool]$IsPortListening) {
     }
 
     Write-Host "正在停止 Inkloom 服务 (端口: $TargetPort, PID: $($proc.Id), 进程: $($proc.ProcessName))..." -ForegroundColor Cyan
+    # Remove receipt first as tombstone so launcher knows shutdown is intentional
+    if (Test-Path -LiteralPath $receipt) { Remove-Item -LiteralPath $receipt -Force -ErrorAction SilentlyContinue }
     try {
         $proc.Kill($true)
         $proc.WaitForExit(3000)
     } catch {
         Write-Host "终止进程时遇到提示：$($_.Exception.Message)" -ForegroundColor Yellow
     }
-
-    # Clean up receipt and release any stale launcher locks
-    if (Test-Path -LiteralPath $receipt) { Remove-Item -LiteralPath $receipt -Force -ErrorAction SilentlyContinue }
     $lockFile = Join-Path $runtime 'launcher.lock'
     if (Test-Path -LiteralPath $lockFile) {
         try {

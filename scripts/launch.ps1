@@ -260,9 +260,14 @@ try {
     Write-Host "运行日志：$errLog"
     Open-Inkloom $url
     while (-not $server.WaitForExit(500)) { }
-    if ($server.ExitCode -ne 0) {
-        Get-Content -LiteralPath $errLog -Tail 25 | Write-Host
+    Start-Sleep -Milliseconds 100
+    $receiptPath = Join-Path $runtime "server-$serverPort.json"
+    $wasStoppedExternally = (-not (Test-Path -LiteralPath $receiptPath)) -or ($server.ExitCode -eq -1)
+    if ($server.ExitCode -ne 0 -and -not $wasStoppedExternally) {
+        if (Test-Path -LiteralPath $errLog) { Get-Content -LiteralPath $errLog -Tail 25 | Write-Host }
         throw "服务异常退出（$($server.ExitCode)）。诊断日志：$errLog"
+    } else {
+        Write-Host "Inkloom 服务已安全退出。" -ForegroundColor Gray
     }
 } catch {
     Write-Host "启动失败：$($_.Exception.Message)" -ForegroundColor Red
@@ -272,7 +277,9 @@ try {
     if ($null -ne $server -and -not $server.HasExited) { $server.Kill($true); $server.WaitForExit() }
     if ($null -ne $serverPort) {
         $receipt = Join-Path $runtime "server-$serverPort.json"
-        if (Test-Path -LiteralPath $receipt) { Remove-Item -LiteralPath $receipt -Force -ErrorAction SilentlyContinue }
+        try {
+            if (Test-Path -LiteralPath $receipt) { [IO.File]::Delete($receipt) }
+        } catch { }
     }
     if ($null -ne $lock) { $lock.Dispose() }
     Pop-Location
