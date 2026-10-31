@@ -381,18 +381,25 @@ test('备份下载、校验与新工作区恢复', async ({ page }) => {
   const dialog = page.getByRole('dialog', { name: '备份已通过校验' })
   await expect(dialog).toBeVisible()
   await dialog.getByRole('button', { name: '切换到恢复的工作区' }).click()
-  await expect(page.getByRole('heading', { name: '我的作品', exact: true })).toBeVisible()
-  const restored = await page.evaluate(async () => (await (await fetch('/api/v1/health')).json()).workspace_id)
-  expect(restored).not.toBe(original)
-  const search = page.getByRole('textbox', { name: '搜索作品', exact: true })
-  if (await search.isVisible()) await search.fill('恢复验收')
-  else {
-    await page.getByRole('button', { name: '搜索作品', exact: true }).click()
-    await page.getByRole('textbox', { name: '输入搜索内容' }).fill('恢复验收')
-    await page.getByRole('dialog').getByRole('button', { name: '搜索作品', exact: true }).click()
+  try {
+    await expect(page.getByRole('heading', { name: '我的作品', exact: true })).toBeVisible()
+    const restored = await page.evaluate(async () => (await (await fetch('/api/v1/health')).json()).workspace_id)
+    expect(restored).not.toBe(original)
+    const search = page.getByRole('textbox', { name: '搜索作品', exact: true })
+    if (await search.isVisible()) await search.fill('恢复验收')
+    else {
+      await page.getByRole('button', { name: '搜索作品', exact: true }).click()
+      await page.getByRole('textbox', { name: '输入搜索内容' }).fill('恢复验收')
+      await page.getByRole('dialog').getByRole('button', { name: '搜索作品', exact: true }).click()
+    }
+    await page.getByRole('button', { name: '继续写作', exact: true }).first().click()
+    await expect(page.getByRole('textbox', { name: '小说正文' })).toHaveText('这份正文需要在恢复后完整保留。')
+  } finally {
+    // Workspace activation is server-wide; later cases must start in the disposable original.
+    const response = await page.request.post('/api/v1/workspace/use-original', { headers: { Origin: new URL(page.url()).origin } })
+    expect(response.ok()).toBeTruthy()
+    expect((await (await page.request.get('/api/v1/health')).json()).workspace_id).toBe(original)
   }
-  await page.getByRole('button', { name: '继续写作', exact: true }).first().click()
-  await expect(page.getByRole('textbox', { name: '小说正文' })).toHaveText('这份正文需要在恢复后完整保留。')
 })
 
 test('编辑器与助手的自动可访问性检查', async ({ page }) => {

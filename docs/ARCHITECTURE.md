@@ -1,5 +1,9 @@
 # 技术方案与关键契约
 
+2026-10-31 连续创作流程复查：`job_history.py` 在分页前过滤任务集合、分卷、正文版本和待处理状态，页面仅取摘要，再加载选中详情；章纲详情显式带生成时分卷 ID，旧快照从原生产输入读取。`Library.prepare_canon` 提供只读定稿准备；同一正文和记忆不增加修订，修改已确认记忆检查修订基线。`ChapterFinalizeDialog` 管理冻结提交、未确认重放、冲突比较和回执后的状态复读。无新迁移，见 [决策 0022](decisions/0022-workflow-resumption-finalization.md) 与 [流程复查](REVIEW-WORKFLOW-2026-10-31.md)。
+
+2026-10-31 新增有范围的持续规划讨论：`discussions.py` 管理会话、参考快照、预算和字段采纳，消息沿用 `jobs`，前端复用轻量进度。迁移 `f17b6d429ea5` 增加会话、任务轮次及版本历史索引；恢复保持旧版细纲结构验证，并校验会话的同书范围与消息链。结构化任务共用结果注册表，正文历史采用元数据投影与游标分页。见 [决策 0021](decisions/0021-planning-discussions.md) 与 [实现记录](IMPLEMENTATION-PLANNING-DISCUSSIONS.md)。
+
 2026-10-31 补充连载范围导出：`manuscript_export.py` 用单条关联查询绑定作品、章节范围与版本元数据，预览不加载正文，实际下载只读取纳入的正文；TXT/Markdown/ZIP 共用选择及空稿校验。前端下载携带预览指纹，变更返回 409，不自动重试。无迁移，见 [决策 0020](decisions/0020-serial-export-preview.md) 与 [结项说明](PROJECT-CLOSEOUT-2026-10-31.md)。
 
 2026-10-31 补充自动资料预算边界：最近两章全文和自动记忆可按优先级让出空间，保留最近章末、明确必读及伏笔依据；记忆与引文同步重新组装，预览、消息与来源指纹使用同一结果。保护层仍超限时拒绝发送，不调用模型自动压缩。见 [决策 0019](decisions/0019-continuity-context-budget.md) 与 [review 记录](REVIEW-2026-10-31.md)。

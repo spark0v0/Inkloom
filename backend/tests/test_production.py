@@ -62,6 +62,25 @@ def outline(library, generation, novel, anchor, volume, count=3):
     return finished
 
 
+def test_outline_resume_keeps_the_requested_volume_in_new_and_old_snapshots(library, generation, workspace):
+    from app.models import Job
+
+    novel, anchor, first = blueprint(library, generation)
+    second = library.put_plan(novel.id, dto.PlanInput(title='第二卷', level='volume', body='新的航程。'))
+    job = generation.create(novel.id, dto.JobInput(chapter_id=anchor.id,
+        base_version_id=anchor.working_version_id, task='outline', volume_plan_id=second.id,
+        idempotency_key=uid('outline')))
+    assert job.context.volume_plan_id == second.id != first.id
+    assert generation.history(novel_id=novel.id, volume_plan_id=first.id).items == []
+    assert generation.history(novel_id=novel.id, volume_plan_id=second.id).items[0].id == job.id
+    with workspace.session(write=True) as session:
+        row = session.get(Job, job.id)
+        snapshot = json.loads(json.dumps(row.context))
+        snapshot['preview'].pop('volume_plan_id')
+        row.context = snapshot
+    assert generation.get(novel.id, job.id).context.volume_plan_id == second.id
+
+
 def test_book_to_chapter_to_memory_and_next_chapter(library, generation):
     novel, anchor, job = create(library, generation)
     assert library.plans(novel.id) == []
@@ -221,7 +240,7 @@ def test_context_scales_by_selected_volume_and_keeps_older_relevant_memory(libra
     assert any(f.subject == "玄令" for f in recalled.facts)
 
 
-@pytest.mark.parametrize("old_revision", ["924486b5f963", "a12c7e604bc9"])
+@pytest.mark.parametrize("old_revision", ["924486b5f963", "a12c7e604bc9", "e06a5c318d94"])
 def test_old_workspace_migrates_and_old_backup_restores(tmp_path, workspace, old_revision):
     root = tmp_path / "old-workspace"
     old = Workspace(root)

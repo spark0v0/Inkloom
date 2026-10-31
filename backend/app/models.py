@@ -66,7 +66,8 @@ class Chapter(Base):
 
 class Version(Base):
     __tablename__ = "versions"
-    __table_args__ = (UniqueConstraint("chapter_id", "operation_id"),)
+    __table_args__ = (UniqueConstraint("chapter_id", "operation_id"),
+                      Index("ix_versions_chapter_history", "chapter_id", "created_at", "id"))
     id: Mapped[str] = mapped_column(String, primary_key=True)
     chapter_id: Mapped[str] = mapped_column(ForeignKey("chapters.id"), index=True)
     parent_id: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -198,10 +199,24 @@ class Provider(Base):
     key_env: Mapped[str] = mapped_column(String, default="")
 
 
+class PlanningConversation(Base):
+    __tablename__ = "planning_conversations"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    novel_id: Mapped[str] = mapped_column(ForeignKey("novels.id"), index=True)
+    title: Mapped[str] = mapped_column(String(100))
+    chapter_ids: Mapped[list[str]] = mapped_column(JSON, default=list)
+    last_job_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[str] = mapped_column(String, default=now)
+    updated_at: Mapped[str] = mapped_column(String, default=now)
+
+
 class Job(Base):
     __tablename__ = "jobs"
+    conversation_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    conversation_turn: Mapped[int | None] = mapped_column(Integer, nullable=True)
     __table_args__ = (
         UniqueConstraint("novel_id", "idempotency_key"),
+        Index("uq_discussion_turn", "conversation_id", "conversation_turn", unique=True),
         Index("one_active_job_per_novel", "novel_id", unique=True,
               sqlite_where=text("state IN ('queued','running','pausing','cancelling')")),
     )

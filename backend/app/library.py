@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import func, select, text, update
+from sqlalchemy import and_, func, or_, select, text, update
 from sqlalchemy.orm import Session
 
 from . import schemas as dto
@@ -48,6 +48,18 @@ def require_job(session: Session, novel_id: str, job_id: str) -> Job:
 
 def version_out(version: Version) -> dto.VersionOut:
     return dto.VersionOut.model_validate(version)
+
+
+def memory_proposal(fact: Fact) -> dto.MemoryProposal:
+    return dto.MemoryProposal(**{key: getattr(fact, key) for key in dto.MemoryProposal.model_fields
+        if key != "evidence"}, evidence=fact.evidence)
+
+
+def memory_signature(proposal: dto.MemoryProposal) -> str:
+    value = proposal.model_dump()
+    value["evidence"] = [{"source_id": item.source_id, "quote": item.quote} for item in proposal.evidence]
+    value["known_by"] = sorted(set(proposal.known_by))
+    return digest(value)
 
 
 def chapter_out(session: Session, chapter: Chapter, detail: bool = True):
@@ -237,8 +249,26 @@ class Library:
     def versions(self, novel_id: str, chapter_id: str) -> list[dto.VersionSummary]:
         with self.ws.session() as s:
             require_chapter(s, novel_id, chapter_id)
-            return [dto.VersionSummary.model_validate(v) for v in s.scalars(select(Version).where(
-                Version.chapter_id == chapter_id).order_by(Version.created_at.desc())).all()]
+            return [dto.VersionSummary.model_validate(v) for v in s.execute(select(
+                Version.id, Version.parent_id, Version.char_count, Version.content_hash, Version.created_at
+            ).where(Version.chapter_id == chapter_id).order_by(
+                Version.created_at.desc(), Version.id.desc())).mappings().all()]
+
+    def version_history(self, novel_id: str, chapter_id: str, before: str | None = None) -> dto.VersionHistoryPage:
+        with self.ws.session() as s:
+            require_chapter(s, novel_id, chapter_id)
+            query = select(Version.id, Version.parent_id, Version.char_count,
+                           Version.content_hash, Version.created_at).where(Version.chapter_id == chapter_id)
+            if before is not None:
+                cursor = s.execute(select(Version.id, Version.created_at).where(
+                    Version.id == before, Version.chapter_id == chapter_id)).first()
+                if cursor is None:
+                    raise DomainError("INVALID_VERSION_CURSOR", "版本位置不属于此章节，请重新读取。", 400)
+                query = query.where(or_(Version.created_at < cursor.created_at,
+                    and_(Version.created_at == cursor.created_at, Version.id < cursor.id)))
+            rows = s.execute(query.order_by(Version.created_at.desc(), Version.id.desc()).limit(31)).mappings().all()
+            return dto.VersionHistoryPage(items=[dto.VersionSummary.model_validate(v) for v in rows[:30]],
+                next_before=rows[29]["id"] if len(rows) > 30 else None)
 
     def version(self, novel_id: str, chapter_id: str, version_id: str) -> dto.VersionOut:
         with self.ws.session() as s:
@@ -351,8 +381,22 @@ class Library:
             return [dto.FactOut.model_validate(f) for f in s.scalars(query.order_by(
                 Fact.created_at.desc())).all()]
 
+    def prepare_canon(self, novel_id: str, chapter_id: str) -> dto.CanonPreparation:
+        with self.ws.session() as s:
+            novel = require_novel(s, novel_id)
+            chapter = require_chapter(s, novel_id, chapter_id)
+            confirmed = chapter.review_state == "confirmed" and chapter.accepted_version_id == chapter.working_version_id
+            facts = s.scalars(select(Fact).where(Fact.chapter_id == chapter.id, Fact.novel_id == novel.id,
+                Fact.active.is_(True), Fact.version_id == chapter.working_version_id)
+                .order_by(Fact.created_at, Fact.id)).all() if confirmed else []
+            return dto.CanonPreparation(version_id=chapter.working_version_id, canon_revision=novel.canon_revision,
+                confirmed=confirmed, changes=[memory_proposal(row) for row in facts])
+
     def confirm(self, novel_id: str, chapter_id: str, data: dto.CanonInput) -> dto.CanonOut:
-        request_hash = digest({"chapter": chapter_id, **data.model_dump()})
+        payload = data.model_dump()
+        if data.base_canon_revision is None:
+            payload.pop("base_canon_revision")  # Keep pre-baseline idempotent receipts replayable.
+        request_hash = digest({"chapter": chapter_id, **payload})
         with self.ws.session(write=True) as s:
             novel = require_novel(s, novel_id)
             chapter = require_chapter(s, novel_id, chapter_id)
@@ -385,6 +429,17 @@ class Library:
                 resolved = {**proposed.model_dump(), "evidence": [resolve_evidence(e.model_dump(), sources)
                             for e in proposed.evidence]}
                 changes.append(resolved)
+            if chapter.accepted_version_id == version.id and chapter.review_state == "confirmed":
+                facts = s.scalars(select(Fact).where(Fact.chapter_id == chapter.id, Fact.novel_id == novel.id,
+                    Fact.active.is_(True), Fact.version_id == version.id)).all()
+                if sorted(memory_signature(memory_proposal(row)) for row in facts) == sorted(
+                        memory_signature(change) for change in data.changes):
+                    return dto.CanonOut(revision=novel.canon_revision, confirmed_chapter_id=chapter.id,
+                        dirty_from_order=novel.dirty_from_order, fact_count=len(facts))
+                if data.base_canon_revision is None:
+                    raise DomainError("CANON_CONFLICT", "本章已有定稿记忆，请重新读取后再修改。", 409)
+            if data.base_canon_revision is not None and data.base_canon_revision != novel.canon_revision:
+                raise DomainError("CANON_CONFLICT", "定稿记忆已变化，本次修改未覆盖它。请比较最新记忆后再确认。", 409)
             if chapter.accepted_version_id and chapter.review_state == "confirmed":
                 mark_dirty(s, novel, chapter.position)
             s.execute(update(Fact).where(Fact.chapter_id == chapter_id).values(active=False))

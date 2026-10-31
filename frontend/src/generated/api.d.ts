@@ -227,6 +227,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/novels/{novel_id}/chapters/{chapter_id}/versions-page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Version History */
+        get: operations["version_history_api_v1_novels__novel_id__chapters__chapter_id__versions_page_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/novels/{novel_id}/chapters/{chapter_id}/versions/{version_id}": {
         parameters: {
             query?: never;
@@ -251,10 +268,28 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Prepare Canon */
+        get: operations["prepare_canon_api_v1_novels__novel_id__chapters__chapter_id__canon_get"];
         put?: never;
         /** Confirm */
         post: operations["confirm_api_v1_novels__novel_id__chapters__chapter_id__canon_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/novels/{novel_id}/review-impact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Review Impact */
+        get: operations["review_impact_api_v1_novels__novel_id__review_impact_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -759,6 +794,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/novels/{novel_id}/discussions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Discussions */
+        get: operations["discussions_api_v1_novels__novel_id__discussions_get"];
+        put?: never;
+        /** Create Discussion */
+        post: operations["create_discussion_api_v1_novels__novel_id__discussions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/novels/{novel_id}/discussions/{conversation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Discussion */
+        get: operations["discussion_api_v1_novels__novel_id__discussions__conversation_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/novels/{novel_id}/jobs/{job_id}/discussion-proposal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Adopt Discussion */
+        post: operations["adopt_discussion_api_v1_novels__novel_id__jobs__job_id__discussion_proposal_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/novels/{novel_id}/export-preview": {
         parameters: {
             query?: never;
@@ -969,6 +1056,8 @@ export interface components {
             operation_id: string;
             /** Changes */
             changes?: components["schemas"]["MemoryProposal"][];
+            /** Base Canon Revision */
+            base_canon_revision?: number | null;
         };
         /** CanonOut */
         CanonOut: {
@@ -980,6 +1069,17 @@ export interface components {
             dirty_from_order: number | null;
             /** Fact Count */
             fact_count: number;
+        };
+        /** CanonPreparation */
+        CanonPreparation: {
+            /** Version Id */
+            version_id: string;
+            /** Canon Revision */
+            canon_revision: number;
+            /** Confirmed */
+            confirmed: boolean;
+            /** Changes */
+            changes: components["schemas"]["MemoryProposal"][];
         };
         /** ChapterInput */
         ChapterInput: {
@@ -1116,6 +1216,8 @@ export interface components {
         };
         /** ContextInput */
         ContextInput: {
+            scene?: components["schemas"]["SceneIntent"] | null;
+            discussion?: components["schemas"]["DiscussionReference"] | null;
             /** Chapter Id */
             chapter_id: string;
             /** Base Version Id */
@@ -1126,7 +1228,7 @@ export interface components {
              * Task
              * @enum {string}
              */
-            task: "continue" | "rewrite" | "plan" | "extract" | "review" | "handoff" | "blueprint" | "outline" | "inspiration" | "outline_edit";
+            task: "continue" | "rewrite" | "plan" | "extract" | "review" | "handoff" | "blueprint" | "outline" | "inspiration" | "outline_edit" | "discuss";
             /**
              * Instruction
              * @default
@@ -1158,6 +1260,14 @@ export interface components {
         };
         /** ContextOut */
         ContextOut: {
+            scene?: components["schemas"]["SceneIntent"] | null;
+            /** Discussion Manuscripts */
+            discussion_manuscripts?: components["schemas"]["DiscussionManuscript"][];
+            /** Volume Plan Id */
+            volume_plan_id?: string | null;
+            discussion?: components["schemas"]["DiscussionReference"] | null;
+            /** Discussion Outlines */
+            discussion_outlines?: components["schemas"]["DiscussionOutline"][];
             outline_edit?: components["schemas"]["OutlineEditReference"] | null;
             writing_preferences?: components["schemas"]["WritingPreferences"] | null;
             /** Thread Guidance */
@@ -1254,6 +1364,126 @@ export interface components {
             review_explanation?: string | null;
             /** Review Suggestion */
             review_suggestion?: string | null;
+        };
+        /** ConversationInput */
+        ConversationInput: {
+            /**
+             * Title
+             * @default 新的规划讨论
+             */
+            title: string;
+        };
+        /** ConversationOut */
+        ConversationOut: {
+            /** Id */
+            id: string;
+            /** Novel Id */
+            novel_id: string;
+            /** Title */
+            title: string;
+            /** Chapter Ids */
+            chapter_ids: string[];
+            /** Last Job Id */
+            last_job_id: string | null;
+            /** Created At */
+            created_at: string;
+            /** Updated At */
+            updated_at: string;
+        };
+        /** DiscussionManuscript */
+        DiscussionManuscript: {
+            /** Chapter Id */
+            chapter_id: string;
+            /** Title */
+            title: string;
+            /** Position */
+            position: number;
+            /** Version Id */
+            version_id: string;
+            /** Review State */
+            review_state: string;
+            /** Char Count */
+            char_count: number;
+        };
+        /** DiscussionOutline */
+        DiscussionOutline: {
+            /** Chapter Id */
+            chapter_id: string;
+            /** Volume */
+            volume: string;
+            /** Revision */
+            revision: number;
+            /** Document */
+            document: components["schemas"]["StructuredOutline"] | components["schemas"]["TextOutline"];
+        };
+        /** DiscussionPage */
+        DiscussionPage: {
+            conversation: components["schemas"]["ConversationOut"];
+            /** Items */
+            items: components["schemas"]["DiscussionTurn"][];
+            /** Next Before */
+            next_before: string | null;
+        };
+        /** DiscussionProposal */
+        DiscussionProposal: {
+            /** Chapter Id */
+            chapter_id: string;
+            /** Fields */
+            fields: ("goal" | "conflict" | "beats" | "ending_hook" | "text")[];
+            /** Document */
+            document: components["schemas"]["StructuredOutline"] | components["schemas"]["TextOutline"];
+            /** Summary */
+            summary: string;
+        };
+        /** DiscussionReference */
+        DiscussionReference: {
+            /** Conversation Id */
+            conversation_id: string;
+            /** Last Job Id */
+            last_job_id?: string | null;
+            /** Chapter Ids */
+            chapter_ids: string[];
+            /** Source Fingerprint */
+            source_fingerprint?: string | null;
+            /** Manuscripts */
+            manuscripts?: components["schemas"]["ChapterReferenceVersion"][];
+            /** Entity Ids */
+            entity_ids?: string[];
+        };
+        /** DiscussionResult */
+        DiscussionResult: {
+            /**
+             * Kind
+             * @constant
+             */
+            kind: "discussion";
+            /** Reply */
+            reply: string;
+            /** Referenced Chapter Ids */
+            referenced_chapter_ids?: string[];
+            proposal?: components["schemas"]["DiscussionProposal"] | null;
+            /** Evidence */
+            evidence?: components["schemas"]["Evidence"][];
+        };
+        /** DiscussionTurn */
+        DiscussionTurn: {
+            /** Id */
+            id: string;
+            /** Instruction */
+            instruction: string;
+            /** State */
+            state: string;
+            /** Candidate Status */
+            candidate_status: string;
+            result: components["schemas"]["DiscussionResult"] | null;
+            /** Error Message */
+            error_message: string | null;
+            /** Is Demo */
+            is_demo: boolean;
+            /** Created At */
+            created_at: string;
+            /** Applied */
+            applied: boolean;
         };
         /** EntityInput */
         EntityInput: {
@@ -1625,7 +1855,7 @@ export interface components {
             /** Output Text */
             output_text: string;
             /** Result */
-            result: components["schemas"]["ExtractResult"] | components["schemas"]["ReviewResult"] | components["schemas"]["PlanResult"] | components["schemas"]["HandoffResult"] | components["schemas"]["BlueprintResult"] | components["schemas"]["OutlineResult"] | components["schemas"]["InspirationResult"] | components["schemas"]["OutlineEditResult"] | null;
+            result: components["schemas"]["ExtractResult"] | components["schemas"]["ReviewResult"] | components["schemas"]["PlanResult"] | components["schemas"]["HandoffResult"] | components["schemas"]["BlueprintResult"] | components["schemas"]["OutlineResult"] | components["schemas"]["InspirationResult"] | components["schemas"]["OutlineEditResult"] | components["schemas"]["DiscussionResult"] | null;
             /** Candidate Status */
             candidate_status: string;
             /** Adopted Version Id */
@@ -1664,6 +1894,8 @@ export interface components {
             novel_id: string;
             /** Chapter Id */
             chapter_id: string;
+            /** Base Version Id */
+            base_version_id: string;
             /** Novel Title */
             novel_title: string;
             /** Chapter Title */
@@ -1694,6 +1926,8 @@ export interface components {
         };
         /** JobInput */
         JobInput: {
+            scene?: components["schemas"]["SceneIntent"] | null;
+            discussion?: components["schemas"]["DiscussionReference"] | null;
             /** Chapter Id */
             chapter_id: string;
             /** Base Version Id */
@@ -1704,7 +1938,7 @@ export interface components {
              * Task
              * @enum {string}
              */
-            task: "continue" | "rewrite" | "plan" | "extract" | "review" | "handoff" | "blueprint" | "outline" | "inspiration" | "outline_edit";
+            task: "continue" | "rewrite" | "plan" | "extract" | "review" | "handoff" | "blueprint" | "outline" | "inspiration" | "outline_edit" | "discuss";
             /**
              * Instruction
              * @default
@@ -1764,7 +1998,7 @@ export interface components {
             /** Output Text */
             output_text: string;
             /** Result */
-            result: components["schemas"]["ExtractResult"] | components["schemas"]["ReviewResult"] | components["schemas"]["PlanResult"] | components["schemas"]["HandoffResult"] | components["schemas"]["BlueprintResult"] | components["schemas"]["OutlineResult"] | components["schemas"]["InspirationResult"] | components["schemas"]["OutlineEditResult"] | null;
+            result: components["schemas"]["ExtractResult"] | components["schemas"]["ReviewResult"] | components["schemas"]["PlanResult"] | components["schemas"]["HandoffResult"] | components["schemas"]["BlueprintResult"] | components["schemas"]["OutlineResult"] | components["schemas"]["InspirationResult"] | components["schemas"]["OutlineEditResult"] | components["schemas"]["DiscussionResult"] | null;
             /** Candidate Status */
             candidate_status: string;
             /** Adopted Version Id */
@@ -2271,6 +2505,49 @@ export interface components {
             /** Message */
             message: string;
         };
+        /** ReviewImpactItem */
+        ReviewImpactItem: {
+            /** Chapter Id */
+            chapter_id: string;
+            /** Title */
+            title: string;
+            /** Position */
+            position: number;
+            /** Working Version Id */
+            working_version_id: string;
+            /** Accepted Version Id */
+            accepted_version_id: string;
+            /** Manuscript Changed */
+            manuscript_changed: boolean;
+            /** References */
+            references: components["schemas"]["ReviewImpactReference"][];
+        };
+        /** ReviewImpactPage */
+        ReviewImpactPage: {
+            /** Total */
+            total: number;
+            /** Items */
+            items: components["schemas"]["ReviewImpactItem"][];
+            /** Next After */
+            next_after: number | null;
+            /** Source Fingerprint */
+            source_fingerprint: string;
+            /** First Chapter Id */
+            first_chapter_id: string | null;
+        };
+        /** ReviewImpactReference */
+        ReviewImpactReference: {
+            /** Chapter Id */
+            chapter_id: string;
+            /** Title */
+            title: string;
+            /** Selected Version Id */
+            selected_version_id: string;
+            /** Current Version Id */
+            current_version_id: string | null;
+            /** Review State */
+            review_state: string;
+        };
         /** ReviewReference */
         ReviewReference: {
             /** Job Id */
@@ -2344,6 +2621,31 @@ export interface components {
             editor_doc?: {
                 [key: string]: unknown;
             } | null;
+        };
+        /** SceneIntent */
+        SceneIntent: {
+            /** Goal */
+            goal: string;
+            /**
+             * Conflict
+             * @default
+             */
+            conflict: string;
+            /**
+             * Turn
+             * @default
+             */
+            turn: string;
+            /**
+             * Ending
+             * @default
+             */
+            ending: string;
+            /**
+             * Viewpoint
+             * @default
+             */
+            viewpoint: string;
         };
         /** ScenePlan */
         ScenePlan: {
@@ -2575,6 +2877,13 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** VersionHistoryPage */
+        VersionHistoryPage: {
+            /** Items */
+            items: components["schemas"]["VersionSummary"][];
+            /** Next Before */
+            next_before: string | null;
         };
         /** VersionOut */
         VersionOut: {
@@ -3311,6 +3620,40 @@ export interface operations {
             };
         };
     };
+    version_history_api_v1_novels__novel_id__chapters__chapter_id__versions_page_get: {
+        parameters: {
+            query?: {
+                before?: string | null;
+            };
+            header?: never;
+            path: {
+                novel_id: string;
+                chapter_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionHistoryPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_version_api_v1_novels__novel_id__chapters__chapter_id__versions__version_id__get: {
         parameters: {
             query?: never;
@@ -3331,6 +3674,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VersionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    prepare_canon_api_v1_novels__novel_id__chapters__chapter_id__canon_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                novel_id: string;
+                chapter_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CanonPreparation"];
                 };
             };
             /** @description Validation Error */
@@ -3367,6 +3742,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CanonOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_impact_api_v1_novels__novel_id__review_impact_get: {
+        parameters: {
+            query?: {
+                after?: number;
+                fingerprint?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                novel_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewImpactPage"];
                 };
             };
             /** @description Validation Error */
@@ -3897,7 +4307,7 @@ export interface operations {
             query?: {
                 novel_id?: string | null;
                 chapter_id?: string | null;
-                task?: ("continue" | "rewrite" | "plan" | "extract" | "review" | "handoff" | "blueprint" | "outline" | "inspiration" | "outline_edit") | null;
+                task?: ("continue" | "rewrite" | "plan" | "extract" | "review" | "handoff" | "blueprint" | "outline" | "inspiration" | "outline_edit" | "discuss") | null;
             };
             header?: never;
             path?: never;
@@ -3930,11 +4340,15 @@ export interface operations {
             query?: {
                 novel_id?: string | null;
                 chapter_id?: string | null;
-                task?: ("continue" | "rewrite" | "plan" | "extract" | "review" | "handoff" | "blueprint" | "outline" | "inspiration" | "outline_edit") | null;
+                task?: ("continue" | "rewrite" | "plan" | "extract" | "review" | "handoff" | "blueprint" | "outline" | "inspiration" | "outline_edit" | "discuss") | null;
                 state?: ("queued" | "running" | "pausing" | "paused" | "cancelling" | "succeeded" | "failed" | "cancelled" | "interrupted_uncertain") | null;
                 query?: string;
                 cursor?: string | null;
                 limit?: number;
+                tasks?: ("continue" | "rewrite" | "plan" | "extract" | "review" | "handoff" | "blueprint" | "outline" | "inspiration" | "outline_edit" | "discuss")[] | null;
+                volume_plan_id?: string | null;
+                base_version_id?: string | null;
+                pending_only?: boolean;
             };
             header?: never;
             path?: never;
@@ -4504,6 +4918,142 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NovelOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    discussions_api_v1_novels__novel_id__discussions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                novel_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_discussion_api_v1_novels__novel_id__discussions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                novel_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConversationInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    discussion_api_v1_novels__novel_id__discussions__conversation_id__get: {
+        parameters: {
+            query?: {
+                before?: string | null;
+            };
+            header?: never;
+            path: {
+                novel_id: string;
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscussionPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    adopt_discussion_api_v1_novels__novel_id__jobs__job_id__discussion_proposal_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                novel_id: string;
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OutlineApplyInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutlineState"];
                 };
             };
             /** @description Validation Error */

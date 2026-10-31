@@ -1,0 +1,8 @@
+.review-impact-list { display: grid; gap: 12px; }
+.review-impact-list article { border: 1px solid var(--line); border-radius: var(--radius-md, 10px); padding: 16px; }
+.review-impact-list article > .btn { margin-top: 10px; }
+.review-impact-list details { margin: 12px 0; }
+.review-impact-comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 12px; }
+.review-impact-comparison section { min-width: 0; }
+.review-impact-comparison pre { max-height: 300px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; line-height: 1.9; background: var(--surface); padding: 12px; }
+@media (max-width: 600px) { .review-impact-comparison { grid-template-columns: 1fr; } .review-impact-list article { padding: 12px; } }

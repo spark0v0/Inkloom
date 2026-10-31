@@ -6,6 +6,7 @@ import io
 import json
 import sqlite3
 import zipfile
+import zlib
 
 from . import schemas as dto
 from .domain import (
@@ -23,10 +24,29 @@ from .references import validate_restored_references
 from .storage import Workspace
 
 FORMAT_VERSION = 1
-SCHEMA_REVISION = "e06a5c318d94"
-SUPPORTED_REVISIONS = {"924486b5f963", "a12c7e604bc9", "b73d2f809a61", "c84e3a190b72", "d95f4b207c83", SCHEMA_REVISION}
+SCHEMA_REVISIONS = ("924486b5f963", "a12c7e604bc9", "b73d2f809a61", "c84e3a190b72",
+                    "d95f4b207c83", "e06a5c318d94", "f17b6d429ea5")
+SCHEMA_REVISION = SCHEMA_REVISIONS[-1]
+SUPPORTED_REVISIONS = set(SCHEMA_REVISIONS)
 MAX_ARCHIVE = 64 * 1024 * 1024
 MAX_DATABASE = 256 * 1024 * 1024
+MAX_MANIFEST = 32000
+
+
+def schema_includes(revision: str, introduced: str) -> bool:
+    """The supported migrations form one chain; later heads retain earlier checks."""
+    return SCHEMA_REVISIONS.index(revision) >= SCHEMA_REVISIONS.index(introduced)
+
+
+def read_backup_entry(archive: zipfile.ZipFile, name: str, maximum: int) -> bytes:
+    """Bound each inflate as well as the result; ZIP metadata is untrusted."""
+    result = bytearray()
+    with archive.open(name) as entry:
+        while chunk := entry.read(min(64 * 1024, maximum - len(result) + 1)):
+            result.extend(chunk)
+            if len(result) > maximum:
+                raise DomainError("INVALID_ARCHIVE", "备份解压内容超过限制，未恢复。")
+    return bytes(result)
 
 
 def backup(workspace: Workspace) -> bytes:
@@ -72,16 +92,18 @@ def restore(workspace: Workspace, contents: bytes) -> dict:
             for info in archive.infolist():
                 if info.file_size > MAX_DATABASE or info.is_dir() or info.external_attr >> 16 & 0o170000 == 0o120000:
                     raise DomainError("INVALID_ARCHIVE", "备份包含过大文件或链接。")
-            if archive.getinfo("manifest.json").file_size > 32000:
+                if info.compress_type not in {zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED}:
+                    raise DomainError("INVALID_ARCHIVE", "备份包含不支持的压缩方式。")
+            if archive.getinfo("manifest.json").file_size > MAX_MANIFEST:
                 raise DomainError("INVALID_ARCHIVE", "备份清单过大。")
-            manifest = json.loads(archive.read("manifest.json"))
+            manifest = json.loads(read_backup_entry(archive, "manifest.json", MAX_MANIFEST))
             if not isinstance(manifest, dict):
                 raise DomainError("INVALID_ARCHIVE", "备份清单必须是对象。")
             if (manifest.get("format") != "story-workshop-backup"
                     or manifest.get("format_version") != FORMAT_VERSION
                     or manifest.get("schema_revision") not in SUPPORTED_REVISIONS):
                 raise DomainError("UNSUPPORTED_BACKUP", "备份格式或数据库版本不受支持，原工作区未改变。")
-            raw = archive.read("workspace.db")
+            raw = read_backup_entry(archive, "workspace.db", MAX_DATABASE)
             import hashlib
             expected = manifest["files"]["workspace.db"]
             if expected["bytes"] != len(raw) or expected["sha256"] != hashlib.sha256(raw).hexdigest():
@@ -90,7 +112,7 @@ def restore(workspace: Workspace, contents: bytes) -> dict:
                 raise DomainError("INVALID_DATABASE", "备份中的数据库格式不正确。")
     except DomainError:
         raise
-    except (ValueError, KeyError, TypeError, zipfile.BadZipFile, RuntimeError, OSError) as exc:
+    except (ValueError, KeyError, TypeError, zipfile.BadZipFile, zlib.error, RuntimeError, OSError) as exc:
         raise DomainError("INVALID_ARCHIVE", "备份包已损坏或不属于叙事工坊。") from exc
     restore_id = uid("restored")
     target = (workspace.home / "restored" / restore_id).resolve()
@@ -129,13 +151,13 @@ def restore(workspace: Workspace, contents: bytes) -> dict:
         if connection.execute("SELECT c.id FROM chapters c LEFT JOIN versions v ON c.accepted_version_id=v.id "
                               "WHERE c.accepted_version_id IS NOT NULL AND (v.id IS NULL OR v.chapter_id!=c.id)").fetchone():
             raise DomainError("INVALID_DATABASE", "正史版本引用无效。")
-        validate_restored_references(connection, required=revision[0] in {"b73d2f809a61", "c84e3a190b72", "d95f4b207c83", SCHEMA_REVISION})
+        validate_restored_references(connection, required=schema_includes(revision[0], "b73d2f809a61"))
         from .thread_restore import validate_restored_threads
-        validate_restored_threads(connection, required=revision[0] in {"c84e3a190b72", "d95f4b207c83", SCHEMA_REVISION})
+        validate_restored_threads(connection, required=schema_includes(revision[0], "c84e3a190b72"))
         from .writing_preferences import validate_restored_writing_preferences
-        validate_restored_writing_preferences(connection, required=revision[0] in {"d95f4b207c83", SCHEMA_REVISION})
+        validate_restored_writing_preferences(connection, required=schema_includes(revision[0], "d95f4b207c83"))
         from .outline_restore import validate_restored_outlines
-        validate_restored_outlines(connection, required=revision[0] == SCHEMA_REVISION)
+        validate_restored_outlines(connection, required=schema_includes(revision[0], "e06a5c318d94"))
         # Restored connections must be configured again, including environment references.
         connection.execute("UPDATE providers SET key_env='', revision=revision+1 WHERE kind!='demo'")
         for job_id, raw_context in connection.execute("SELECT id,context FROM jobs").fetchall():
@@ -161,6 +183,9 @@ def restore(workspace: Workspace, contents: bytes) -> dict:
             characters = {r[0] for r in connection.execute("SELECT id FROM entities WHERE novel_id=? AND kind='character'", (nid,))}
             if any(character not in characters for character in json.loads(known_json)):
                 raise DomainError("INVALID_DATABASE", "人物知识引用不属于当前作品。")
+        if schema_includes(revision[0], "f17b6d429ea5"):
+            from .discussions import validate_restored_discussions
+            validate_restored_discussions(connection)
         connection.execute("UPDATE jobs SET state='interrupted_uncertain', lease_epoch=lease_epoch+1, "
                            "error_code='RESTORED_TASK', error_message='从备份恢复；需要作者明确重试。' "
                            "WHERE state IN ('queued','running','pausing','cancelling','paused')")

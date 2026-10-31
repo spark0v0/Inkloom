@@ -120,6 +120,11 @@ class VersionSummary(Schema):
     created_at: str
 
 
+class VersionHistoryPage(Schema):
+    items: list[VersionSummary]
+    next_before: str | None
+
+
 class ChapterInput(Schema):
     title: str = Field(default="新章节", min_length=1, max_length=240)
     volume: str = Field(default="第一卷", max_length=160)
@@ -417,6 +422,14 @@ class CanonInput(Schema):
     version_id: str
     operation_id: str = Field(min_length=8, max_length=160)
     changes: list[MemoryProposal] = Field(default_factory=list, max_length=100)
+    base_canon_revision: int | None = Field(default=None, ge=0)
+
+
+class CanonPreparation(Schema):
+    version_id: str
+    canon_revision: int
+    confirmed: bool
+    changes: list[MemoryProposal]
 
 
 class CanonOut(Schema):
@@ -430,6 +443,32 @@ class ExtractResult(Schema):
     kind: Literal["extract"]
     changes: list[MemoryProposal] = Field(max_length=100)
     uncertainties: list[str] = Field(default_factory=list, max_length=50)
+
+
+class ReviewImpactReference(Schema):
+    chapter_id: str
+    title: str
+    selected_version_id: str
+    current_version_id: str | None
+    review_state: str
+
+
+class ReviewImpactItem(Schema):
+    chapter_id: str
+    title: str
+    position: int
+    working_version_id: str
+    accepted_version_id: str
+    manuscript_changed: bool
+    references: list[ReviewImpactReference]
+
+
+class ReviewImpactPage(Schema):
+    total: int
+    items: list[ReviewImpactItem]
+    next_after: int | None
+    source_fingerprint: str
+    first_chapter_id: str | None
 
 
 class Finding(Schema):
@@ -554,9 +593,81 @@ class ProductionApplyOut(Schema):
     plan_ids: list[str]
 
 
-TaskResult = ExtractResult | ReviewResult | PlanResult | HandoffResult | BlueprintResult | OutlineResult | InspirationResult | OutlineEditResult
+class DiscussionProposal(Schema):
+    chapter_id: str
+    fields: list[OutlineField] = Field(min_length=1, max_length=4)
+    document: OutlineDocument
+    summary: str = Field(min_length=1, max_length=2000)
 
-TaskName = Literal["continue", "rewrite", "plan", "extract", "review", "handoff", "blueprint", "outline", "inspiration", "outline_edit"]
+
+class DiscussionResult(Schema):
+    kind: Literal["discussion"]
+    reply: str = Field(min_length=1, max_length=12000)
+    referenced_chapter_ids: list[str] = Field(default_factory=list, max_length=6)
+    proposal: DiscussionProposal | None = None
+    evidence: list[Evidence] = Field(default_factory=list, max_length=12)
+
+
+class DiscussionReference(Schema):
+    conversation_id: str
+    last_job_id: str | None = None
+    chapter_ids: list[str] = Field(min_length=1, max_length=3)
+    source_fingerprint: str | None = None
+    manuscripts: list[ChapterReferenceVersion] = Field(default_factory=list, max_length=3)
+    entity_ids: list[str] = Field(default_factory=list, max_length=12)
+
+
+class DiscussionManuscript(Schema):
+    chapter_id: str
+    title: str
+    position: int
+    version_id: str
+    review_state: str
+    char_count: int
+
+
+class DiscussionOutline(Schema):
+    chapter_id: str
+    volume: str
+    revision: int = Field(ge=0)
+    document: OutlineDocument
+
+
+class ConversationInput(Schema):
+    title: str = Field(default="新的规划讨论", min_length=1, max_length=100)
+
+
+class ConversationOut(Schema):
+    id: str
+    novel_id: str
+    title: str
+    chapter_ids: list[str]
+    last_job_id: str | None
+    created_at: str
+    updated_at: str
+
+
+class DiscussionTurn(Schema):
+    id: str
+    instruction: str
+    state: str
+    candidate_status: str
+    result: DiscussionResult | None
+    error_message: str | None
+    is_demo: bool
+    created_at: str
+    applied: bool
+
+
+class DiscussionPage(Schema):
+    conversation: ConversationOut
+    items: list[DiscussionTurn]
+    next_before: str | None
+
+
+TaskResult = ExtractResult | ReviewResult | PlanResult | HandoffResult | BlueprintResult | OutlineResult | InspirationResult | OutlineEditResult | DiscussionResult
+
+TaskName = Literal["continue", "rewrite", "plan", "extract", "review", "handoff", "blueprint", "outline", "inspiration", "outline_edit", "discuss"]
 
 
 class Selection(Schema):
@@ -578,7 +689,17 @@ class ReviewRewritePreparation(Schema):
     suggested_target_chars: int = Field(ge=100, le=6000)
 
 
+class SceneIntent(Schema):
+    goal: str = Field(min_length=1, max_length=1200)
+    conflict: str = Field(default="", max_length=1200)
+    turn: str = Field(default="", max_length=1200)
+    ending: str = Field(default="", max_length=1200)
+    viewpoint: str = Field(default="", max_length=160)
+
+
 class ContextInput(Schema):
+    scene: SceneIntent | None = None
+    discussion: DiscussionReference | None = None
     chapter_id: str
     base_version_id: str
     references_revision: int | None = Field(default=None, ge=0)
@@ -596,6 +717,11 @@ class ContextInput(Schema):
 
 
 class ContextOut(Schema):
+    scene: SceneIntent | None = None
+    discussion_manuscripts: list[DiscussionManuscript] = Field(default_factory=list)
+    volume_plan_id: str | None = None
+    discussion: DiscussionReference | None = None
+    discussion_outlines: list[DiscussionOutline] = Field(default_factory=list)
     outline_edit: OutlineEditReference | None = None
     writing_preferences: WritingPreferences | None = None
     thread_guidance: list[ThreadGuidance] = Field(default_factory=list)
@@ -709,6 +835,7 @@ class JobHistoryItem(Schema):
     id: str
     novel_id: str
     chapter_id: str
+    base_version_id: str
     novel_title: str
     chapter_title: str
     task: str

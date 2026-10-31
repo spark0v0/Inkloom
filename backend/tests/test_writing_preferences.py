@@ -1,7 +1,4 @@
-import io
 import json
-import sqlite3
-import zipfile
 
 import pytest
 
@@ -67,33 +64,14 @@ def test_style_sample_is_not_fact_or_extraction_input_and_counts_towards_budget(
     assert oversized.value.code == 'CONTEXT_TOO_LARGE'
 
 
-def test_style_backup_round_trip_and_c84_upgrade(library, workspace, tmp_path):
+def test_style_backup_round_trip_and_c84_upgrade(library, workspace, backup_at_revision):
     novel, chapter, version = setup(library)
     saved = save_writing_style(workspace, novel.id, style(novel))
     archive = backup(workspace)
     result = restore(workspace, archive)
     activate_restore(workspace, result['restore_id'])
     assert library.novel(novel.id).writing_preferences == saved.writing_preferences
-    # Build a genuine pre-feature schema inside an isolated archive.
-    with zipfile.ZipFile(io.BytesIO(archive)) as contents:
-        manifest = json.loads(contents.read('manifest.json'))
-        database = tmp_path / 'before-writing-style.db'
-        database.write_bytes(contents.read('workspace.db'))
-    with sqlite3.connect(database) as connection:
-        connection.execute('DROP TABLE outline_revisions')
-        connection.execute('ALTER TABLE chapters DROP COLUMN outline_revision')
-        connection.execute('ALTER TABLE novels DROP COLUMN writing_preferences')
-        connection.execute("UPDATE alembic_version SET version_num='c84e3a190b72'")
-        connection.commit()
-        raw = connection.serialize()
-    import hashlib
-    manifest['schema_revision'] = 'c84e3a190b72'
-    manifest['files']['workspace.db'] = {'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()}
-    output = io.BytesIO()
-    with zipfile.ZipFile(output, 'w') as contents:
-        contents.writestr('manifest.json', json.dumps(manifest))
-        contents.writestr('workspace.db', raw)
-    result = restore(workspace, output.getvalue())
+    result = restore(workspace, backup_at_revision('c84e3a190b72'))
     activate_restore(workspace, result['restore_id'])
     assert library.novel(novel.id).style == saved.style
     assert library.novel(novel.id).writing_preferences == dto.WritingPreferences()

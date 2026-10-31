@@ -15,6 +15,7 @@ from urllib.parse import urlsplit, urlunsplit
 import httpx
 
 from .domain import DomainError
+from .task_contracts import RESULT_SCHEMAS
 
 DEFAULT_REQUEST_TIMEOUT = 900.0
 DEFAULT_PROGRESS_TIMEOUT = 180.0
@@ -164,6 +165,18 @@ def completion_cost(usage: dict[str, int] | None, config: dict[str, Any]) -> flo
 
 
 def demo_text(task: str, context: dict[str, Any]) -> str:
+    if task == "discuss":
+        chapters = context["input"]["chapter_outlines"]
+        target = chapters[0]
+        document = dict(target["document"])
+        field = "goal" if document["kind"] == "structured" else "text"
+        limit = 1200 if field == "goal" else 24000
+        document[field] = str(document[field])[:limit - 80] + "\n让主角为核实收到的线索而行动；对方的阻拦使他必须作出选择，并在章末发现新的问题。"
+        return json.dumps({"kind": "discussion", "reply": "【演示回复】这条行动可以与主角已经承担的目标相连。先让他得到需要核实的具体线索，再安排阻碍，使选择带来后果。下面是基于当前细纲的一章修改示例；它不是已发生事实。",
+            "referenced_chapter_ids": [c["chapter_id"] for c in chapters],
+            "evidence": [{"source_id": source["source_id"], "quote": source["text"][:120]} for source in context["input"].get("sources", [])[:1]],
+            "proposal": {"chapter_id": target["chapter_id"], "fields": [field], "document": document,
+                         "summary": "演示：为行动增加线索、阻碍与后果。"}}, ensure_ascii=False)
     body = context["input"]
     if task == "outline_edit":
         reference = body["outline_edit"]
@@ -290,7 +303,7 @@ async def _compatible_completion(config: dict[str, Any], key: str, messages: lis
         "stream": config["stream"], config["token_parameter"]: config["max_output_tokens"]}
     if config["stream"] and config["include_usage"]:
         payload["stream_options"] = {"include_usage": True}
-    if config["json_mode"] and task in {"extract", "review", "plan", "handoff", "blueprint", "outline", "outline_edit"}:
+    if config["json_mode"] and task in RESULT_SCHEMAS:
         payload["response_format"] = {"type": "json_object"}
     endpoint = config["base_url"].rstrip("/") + "/chat/completions"
     headers = {"Authorization": "Bearer " + key, "Content-Type": "application/json"}

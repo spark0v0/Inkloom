@@ -13,6 +13,13 @@ describe('规划与伏笔深链', () => {
     vi.stubGlobal('location', { hash })
     expect(readRoute()).toEqual({ page: 'plot', novelId: 'novel', chapterId: 'chapter', view: 'map' })
   })
+  it('规划讨论与细纲编辑保留返回讨论的入口', () => {
+    for (const chapterId of [undefined, 'chapter']) {
+      const route = { page: 'plot' as const, novelId: 'novel', chapterId, view: 'discuss' as const, discussionId: '讨论&特殊?' }
+      vi.stubGlobal('location', { hash: routeHash(route) })
+      expect(readRoute()).toEqual(route)
+    }
+  })
   it('伏笔参数经过编码并限定在档案页，未知视图忽略', () => {
     vi.stubGlobal('location', { hash: routeHash({ page: 'bible', novelId: 'novel', threadId: '伏笔&特殊?' }) })
     expect(readRoute().threadId).toBe('伏笔&特殊?')

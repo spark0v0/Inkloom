@@ -5,13 +5,17 @@ import sqlite3
 import zipfile
 
 import pytest
+from alembic.config import Config
+from sqlalchemy import create_engine
 
+from alembic import command
 from app import schemas as dto
 from app.chapter_outlines import ChapterOutlines, render_document
 from app.context import validate_result
 from app.domain import DomainError, uid
 from app.models import Plan
 from app.providers import StreamPart, demo_text
+from app.storage import BACKEND_DIR
 from app.workspace_io import activate_restore, backup, restore
 
 
@@ -138,10 +142,13 @@ def test_backup_history_roundtrip_old_upgrade_and_tamper_rejection(library, work
         connection.execute("UPDATE outline_revisions SET content_hash='wrong' WHERE revision=0")
     with pytest.raises(DomainError):
         restore(workspace, archive_database('e06a5c318d94'))
-    with sqlite3.connect(path) as connection:
-        connection.execute('DROP TABLE outline_revisions')
-        connection.execute('ALTER TABLE chapters DROP COLUMN outline_revision')
-        connection.execute("UPDATE alembic_version SET version_num='d95f4b207c83'")
+    engine = create_engine('sqlite:///' + path.as_posix())
+    config = Config(str(BACKEND_DIR / 'alembic.ini'))
+    config.set_main_option('script_location', str(BACKEND_DIR / 'alembic'))
+    with engine.begin() as connection:
+        config.attributes['connection'] = connection
+        command.downgrade(config, 'd95f4b207c83')
+    engine.dispose()
     target = restore(workspace, archive_database('d95f4b207c83'))
     activate_restore(workspace, target['restore_id'])
     assert service.get(novel.id, chapter.id).revision == 0

@@ -1,5 +1,5 @@
 import type { JSONContent } from '@tiptap/core'
-import type { OutlineDocument } from './api'
+import type { JobInput, OutlineDocument } from './api'
 
 export type RecoveryDraft = {
   key: string; baseVersion: string; text: string; doc: JSONContent; updatedAt: string
@@ -56,6 +56,18 @@ export const outlineDrafts = {
   get: (key: string) => operation<OutlineRecoveryDraft | undefined>('readonly', store => store.get(key)),
   list: (prefix: string) => operation<OutlineRecoveryDraft[]>('readonly', store => store.getAll(IDBKeyRange.bound(prefix, prefix + '\uffff'))),
   put: (draft: OutlineRecoveryDraft) => operation('readwrite', store => store.put(draft)),
+  remove: (key: string) => operation('readwrite', store => store.delete(key)),
+  removeIfUnchanged,
+}
+
+export type DiscussionDraft = {
+  key: string; instruction: string; chapterIds: string[]; providerId: string;
+  manuscriptIds?: string[]; entityIds?: string[];
+  pending: JobInput | null; updatedAt: string
+}
+export const discussionDrafts = {
+  list: (prefix: string) => operation<DiscussionDraft[]>('readonly', store => store.getAll(IDBKeyRange.bound(prefix, prefix + '\uffff'))),
+  put: (draft: DiscussionDraft) => operation('readwrite', store => store.put(draft)),
   remove: (key: string) => operation('readwrite', store => store.delete(key)),
   removeIfUnchanged,
 }

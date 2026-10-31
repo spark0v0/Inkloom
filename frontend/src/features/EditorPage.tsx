@@ -2,18 +2,18 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowCounterClockwise, ArrowClockwise, Article, Check, CheckCircle, ClockCounterClockwise, DotsThree, List, Plus, SidebarSimple, Sparkle, TextB, TextItalic, X } from '@phosphor-icons/react'
-import { activeStates, ApiError, api, countChars, dateLabel, downloadText, errorText, number, uuid } from '../lib/api'
-import type { Chapter, ChapterSummary, Evidence, JobInput, MemoryProposal, Novel, Provider, Roles, Selection, Version } from '../lib/api'
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ArrowCounterClockwise, ArrowClockwise, Article, Check, CheckCircle, ClockCounterClockwise, DotsThree, List, SidebarSimple, Sparkle, TextB, TextItalic, X } from '@phosphor-icons/react'
+import { api, countChars, dateLabel, downloadText, errorText, number, uuid } from '../lib/api'
+import type { Chapter, ChapterSummary, Evidence, MemoryProposal, Novel, Provider, Roles, Selection, Version } from '../lib/api'
 import type { Navigate } from '../lib/route'
 import { useManuscript } from '../lib/useManuscript'
 import { useReadingPreferences } from '../lib/useReadingPreferences'
 import type { RecoveryDraft } from '../lib/drafts'
-import { Badge, Button, Field, Loading, Modal, Notice } from '../components/ui'
+import { Button, Field, Loading, Modal, Notice } from '../components/ui'
 import { Assistant } from './Assistant'
-import { SourceButton } from './JobPresentation'
-import { useJobStream } from '../lib/useJobStream'
+import { CanonDialog } from './ChapterFinalizeDialog'
+import { ReviewImpactDialog } from './ReviewImpactDialog'
 import { ChapterList } from './ChapterList'
 import { WritingStyleDialog } from './WritingStyleDialog'
 import { rewriteActions } from '../lib/writing'
@@ -46,6 +46,7 @@ export function EditorPage({ novel, chapter, chapters, workspaceId, providers, r
   const [directoryVisible, setDirectoryVisible] = useState(true)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [canonOpen, setCanonOpen] = useState(false)
+  const [impactOpen, setImpactOpen] = useState(false)
   const [metadataOpen, setMetadataOpen] = useState(false)
   const [error, setError] = useState('')
   const { fontSize, fontFamily, setFontSize, setFontFamily } = useReadingPreferences()
@@ -188,7 +189,7 @@ export function EditorPage({ novel, chapter, chapters, workspaceId, providers, r
       {!candidateView && selection && <div className="selection-actions" role="group" aria-label="选段快捷操作"><span>已选 {Array.from(selection.text).length} 字符</span>{Object.entries(rewriteActions).map(([action, value]) => <Button key={action} disabled={preparingSelection} onMouseDown={e => e.preventDefault()} onClick={() => void prepareSelection(action as RewriteAction)} aria-label={`准备${value.name}选段`}>{value.name}</Button>)}<Button variant="ghost" disabled={preparingSelection} aria-label="收起选段快捷操作" onMouseDown={e => e.preventDefault()} onClick={() => setSelection(null)}><X size={16} /></Button></div>}
       <div className="candidate-host" ref={setCandidateHost} hidden={!candidateView} />
       <div className="editor-scroll" hidden={candidateView}>
-        <div className="editor-notices">{novel.dirty_from_order != null && novel.dirty_from_order < chapter.position && <Notice>第 {novel.dirty_from_order} 章已修改，请先重新定稿前文，再生成后续章节。</Notice>}{manuscript.recoveries.map(value => <Notice key={value.key} action={<Button onClick={() => void restoreBuffer(value)}>恢复草稿</Button>}>发现一份 {dateLabel(value.updatedAt)} 的浏览器恢复副本。<button className="inline-link" onClick={() => { downloadText(value.text, `${chapter.title}-恢复副本.txt`); manuscript.dismissRecovery(value) }}>先下载副本</button><details><summary>查看恢复副本</summary><pre className="outline-readable">{value.text}</pre></details></Notice>)}{(manuscript.message || error) && <Notice action={manuscript.status === 'error' ? <Button onClick={() => void manuscript.flush().catch(() => undefined)}>重试保存</Button> : undefined}>{manuscript.message || error}</Notice>}</div>
+        <div className="editor-notices">{novel.dirty_from_order != null && <Notice action={<Button onClick={() => void manuscript.flush().then(() => setImpactOpen(true)).catch(e => setError(errorText(e)))}>查看复核清单</Button>}>第 {novel.dirty_from_order} 章起需要复核，请按顺序检查后重新定稿。</Notice>}{manuscript.recoveries.map(value => <Notice key={value.key} action={<Button onClick={() => void restoreBuffer(value)}>恢复草稿</Button>}>发现一份 {dateLabel(value.updatedAt)} 的浏览器恢复副本。<button className="inline-link" onClick={() => { downloadText(value.text, `${chapter.title}-恢复副本.txt`); manuscript.dismissRecovery(value) }}>先下载副本</button><details><summary>查看恢复副本</summary><pre className="outline-readable">{value.text}</pre></details></Notice>)}{(manuscript.message || error) && <Notice action={manuscript.status === 'error' ? <Button onClick={() => void manuscript.flush().catch(() => undefined)}>重试保存</Button> : undefined}>{manuscript.message || error}</Notice>}</div>
         <div className="manuscript"><div className="chapter-eyebrow">{chapter.review_state === 'confirmed' ? <><CheckCircle size={15} />已定稿</> : chapter.review_state === 'needs_review' ? '待重新定稿' : '草稿'}</div><div className="manuscript-heading"><h1>{chapter.title}</h1><button className="icon-button" aria-label="编辑章节信息" onClick={openMetadata}><DotsThree size={24} /></button></div>{chapter.goal && <details className="chapter-goal"><summary>本章细纲</summary><p>{chapter.goal}</p></details>}<EditorContent editor={editor} /></div>
 
         <nav className="chapter-pagination" aria-label="前后章节">
@@ -208,13 +209,15 @@ export function EditorPage({ novel, chapter, chapters, workspaceId, providers, r
       <div className="modal-actions"><Button disabled={busy} onClick={() => setMetadataOpen(false)}>取消</Button><Button type="submit" variant="primary" disabled={busy}>{busy ? '正在保存…' : '保存信息'}</Button></div></form></Modal>
     <Modal dismissible={false} open={!!manuscript.conflict} onOpenChange={() => undefined} title="此章已有另一个版本" description="两份文字都已保留。请比较后选择，关闭页面前可先下载当前草稿。" wide><div className="comparison"><div><h4>本页尚未保存的草稿</h4><div className="comparison-text">{manuscript.localText}</div></div><div><h4>工作区最新版本</h4><div className="comparison-text">{manuscript.conflict?.text}</div></div></div><div className="modal-actions"><Button onClick={() => downloadText(manuscript.localText, `${chapter.title}-冲突草稿.txt`)}>下载本页草稿</Button><Button onClick={() => manuscript.conflict && adopt(manuscript.conflict)}>使用工作区版本</Button><Button variant="primary" onClick={() => void manuscript.rebase().then(value => value && adopt(value)).catch(e => setError(errorText(e)))}>将本页文字另存为新版本</Button></div></Modal>
     {historyOpen && <VersionHistory novelId={novel.id} chapter={chapter} onClose={() => setHistoryOpen(false)} flush={manuscript.flush} onAdopt={adopt} />}
-    {canonOpen && canonVersion && <CanonDialog novel={novel} chapter={chapter} version={canonVersion} proposed={changes?.versionId === canonVersion.id ? changes.values : []} onEvidence={onEvidence} onClose={() => setCanonOpen(false)} providers={providers} roles={roles} onNext={async () => { const next = chapters.find(c => c.position === chapter.position + 1); await navigate(next ? { page: 'write', novelId: novel.id, chapterId: next.id } : { page: 'plot', novelId: novel.id }) }} />}
+    {impactOpen && <ReviewImpactDialog novelId={novel.id} workspaceId={workspaceId} navigate={navigate} onClose={() => setImpactOpen(false)} />}
+    {canonOpen && canonVersion && <CanonDialog workspaceId={workspaceId} novel={novel} chapter={chapter} version={canonVersion} proposed={changes?.versionId === canonVersion.id ? changes.values : []} onEvidence={onEvidence} onClose={() => setCanonOpen(false)} providers={providers} roles={roles} onNext={async () => { const next = chapters.find(c => c.position === chapter.position + 1); await navigate(next ? { page: 'write', novelId: novel.id, chapterId: next.id } : { page: 'plot', novelId: novel.id }) }} />}
     {styleOpen && <WritingStyleDialog novel={novel} onClose={() => setStyleOpen(false)} />}
   </div>
 }
 
 function VersionHistory({ novelId, chapter, onClose, flush, onAdopt }: { novelId: string; chapter: Chapter; onClose: () => void; flush: () => Promise<Version>; onAdopt: (v: Version, expected: Version) => void }) {
-  const versions = useQuery({ queryKey: ['versions', novelId, chapter.id], queryFn: () => api.versions(novelId, chapter.id) })
+  const versions = useInfiniteQuery({ queryKey: ['versions', novelId, chapter.id], initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam }) => api.versionHistory(novelId, chapter.id, pageParam), getNextPageParam: page => page.next_before || undefined })
   const [selected, setSelected] = useState(chapter.working_version_id)
   const version = useQuery({ queryKey: ['version', selected], queryFn: () => api.version(novelId, chapter.id, selected) })
   const [error, setError] = useState('')
@@ -225,63 +228,5 @@ function VersionHistory({ novelId, chapter, onClose, flush, onAdopt }: { novelId
     try { const base = await flush(); const saved = await api.save(novelId, chapter.id, { base_version_id: base.id, operation_id: uuid(), text: version.data.text, editor_doc: version.data.editor_doc }); onAdopt(saved, base); onClose() }
     catch (e) { setError(errorText(e)) } finally { setBusy(false) }
   }
-  return <Modal open onOpenChange={value => !value && onClose()} title="章节版本" description="每次保存都是一个独立版本。恢复会另存新版本，已有文字不会被删除。" wide><div className="version-layout"><div className="version-list">{versions.data?.map(v => <button key={v.id} className={selected === v.id ? 'active' : ''} onClick={() => setSelected(v.id)}><strong>{dateLabel(v.created_at)}</strong><span>{number(v.char_count)} 字 {v.id === chapter.accepted_version_id ? '· 已确认版本' : ''}</span></button>)}</div><div className="version-body">{version.isPending ? <Loading /> : version.error ? <Notice>{errorText(version.error)}</Notice> : <div className="comparison-text">{version.data?.text || '此版本为空。'}</div>}</div></div>{error && <Notice>{error}</Notice>}<div className="modal-actions"><Button onClick={onClose}>关闭</Button><Button variant="primary" disabled={!version.data || busy || selected === chapter.working_version_id} onClick={() => void restore()}>恢复为新版本</Button></div></Modal>
-}
-
-function CanonDialog({ novel, chapter, version, proposed: initialProposed, onEvidence, onClose, providers, roles, onNext }: { novel: Novel; chapter: Chapter; version: Version; proposed: MemoryProposal[]; onEvidence: (e: Evidence) => void; onClose: () => void; providers: Provider[]; roles: Roles; onNext: () => Promise<void> }) {
-  const cache = useQueryClient()
-  const entities = useQuery({ queryKey: ['entities', novel.id], queryFn: () => api.entities(novel.id) })
-  const [proposed, setProposed] = useState(initialProposed)
-  const [providerId, setProviderId] = useState(roles.extractor || 'demo')
-  const [jobId, setJobId] = useState<string | null>(null)
-  const jobs = useQuery({ queryKey: ['jobs', novel.id, chapter.id, 'extract'], queryFn: () => api.jobs(novel.id, { chapter_id: chapter.id, task: 'extract' }) })
-  const matching = jobId || jobs.data?.find(j => j.chapter_id === chapter.id && j.base_version_id === version.id && j.task === 'extract' && !['cancelled', 'failed'].includes(j.state))?.id
-  const job = useQuery({ queryKey: ['job', matching], queryFn: () => api.job(matching!, novel.id), enabled: !!matching })
-  useJobStream(job.data)
-  const active = job.data && activeStates.has(job.data.state)
-  const applied = useRef<string | null>(null)
-  const pending = useRef<JobInput | null>(null)
-  const provider = providers.find(p => p.id === providerId)
-  useEffect(() => {
-    if (job.data?.state === 'succeeded' && job.data.result?.kind === 'extract' && job.data.base_version_id === version.id && applied.current !== job.data.id) {
-      applied.current = job.data.id
-      setProposed(job.data.result.changes)
-      setSelected(job.data.result.changes.map((_, i) => i))
-    }
-  }, [job.data, version.id])
-  async function summarize() {
-    setBusy(true); setError('')
-    try {
-      pending.current ||= { chapter_id: chapter.id, base_version_id: version.id, task: 'extract', provider_id: providerId, target_chars: novel.chapter_words, chapter_batch: 5, instruction: '整理本章影响后续连载的人物变化、重要事件、角色新获知的信息和未回收伏笔。每条必须有可验证的原文依据，不写未来计划。', idempotency_key: uuid(), max_attempts: 3 }
-      const created = await api.createJob(novel.id, pending.current)
-      pending.current = null; setJobId(created.id); cache.setQueryData(['job', created.id], created)
-      await cache.invalidateQueries({ queryKey: ['jobs', novel.id] })
-    } catch (e) {
-      if (e instanceof ApiError && e.status >= 400 && e.status < 500) pending.current = null
-      setError(errorText(e))
-    } finally { setBusy(false) }
-  }
-  const [selected, setSelected] = useState<number[]>(initialProposed.map((_, i) => i))
-  const [manual, setManual] = useState<MemoryProposal[]>([])
-  const [paragraph, setParagraph] = useState(version.paragraphs[0]?.paragraph_id || '')
-  const [claim, setClaim] = useState('')
-  const [kind, setKind] = useState<MemoryProposal['kind']>('event')
-  const [storyTime, setStoryTime] = useState('')
-  const [knownBy, setKnownBy] = useState<string[]>([])
-  const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
-  const operationId = useRef(uuid())
-  function add() {
-    const source = version.paragraphs.find(p => p.paragraph_id === paragraph)
-    if (!claim.trim() || !source) return
-    setManual(previous => [...previous, { kind, claim, subject: '', story_time: storyTime || null, known_by: knownBy, evidence: [{ source_id: `${version.id}:${source.paragraph_id}`, quote: source.text }] }]); setClaim(''); setKnownBy([])
-  }
-  async function confirm(next = false) {
-    setBusy(true)
-    try {
-      await api.confirm(novel.id, chapter.id, { version_id: version.id, operation_id: operationId.current, changes: [...proposed.filter((_, i) => selected.includes(i)), ...manual] })
-      await Promise.all([['novel', novel.id], ['chapter', novel.id, chapter.id], ['chapters', novel.id], ['facts', novel.id], ['novels']].map(queryKey => cache.invalidateQueries({ queryKey }))); onClose(); if (next) await onNext()
-    } catch (e) { setError(errorText(e)) } finally { setBusy(false) }
-  }
-  return <Modal open onOpenChange={value => !value && onClose()} title="本章定稿" wide><div className="canon-summary"><CheckCircle size={24} /><div><strong>{chapter.title}</strong><span>{number(version.char_count)} 字 · {dateLabel(version.created_at)}</span></div><Badge>正文将用于后续章节</Badge></div><section className="finalize-memory"><div className="section-heading"><div><h3>本章记忆</h3><p className="muted small">整理人物变化与伏笔，供后文引用。</p></div><Badge tone={provider?.kind === 'demo' ? 'amber' : 'neutral'}>{provider?.kind === 'demo' ? '演示样例' : provider?.model}</Badge></div><div className="finalize-model-row"><label><span className="sr-only">记忆整理模型</span><select aria-label="记忆整理模型" disabled={busy || !!active || !!pending.current} value={providerId} onChange={e => setProviderId(e.target.value)}>{providers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label><Button onClick={() => void summarize()} disabled={busy || !!active || !provider || (provider.kind !== 'demo' && !provider.has_key)}><Sparkle size={17} />{active ? '正在整理…' : pending.current ? '确认上次提交' : 'AI 整理本章记忆'}</Button></div>{pending.current && <Notice>上次提交尚未确认，将使用原模型确认同一次请求。</Notice>}{job.data?.error_message && <Notice>{job.data.error_message}</Notice>}{!proposed.length && !active && <p className="small muted">也可以直接定稿，仅将正文用于后续创作。</p>}</section>{proposed.map((p, i) => <div className="canon-proposal" key={i}><label><input type="checkbox" checked={selected.includes(i)} onChange={() => setSelected(value => value.includes(i) ? value.filter(n => n !== i) : [...value, i])} /><span>{p.claim}</span></label>{p.evidence.map((e, j) => <SourceButton key={j} evidence={e} onEvidence={onEvidence} />)}</div>)}{manual.map((p, i) => <div className="canon-proposal" key={`manual-${i}`}><div className="button-row"><Badge>手动整理</Badge><p>{p.claim}</p><button className="icon-button" aria-label="移除此项变化" onClick={() => setManual(items => items.filter((_, n) => n !== i))}><X size={16} /></button></div><blockquote>{p.evidence[0].quote}</blockquote></div>)}<details className="manual-fact"><summary><Plus size={16} />手动添加一条变化</summary><div className="form-stack"><Field label="原文依据"><select value={paragraph} onChange={e => setParagraph(e.target.value)}>{version.paragraphs.map(p => <option key={p.paragraph_id} value={p.paragraph_id}>{p.text.slice(0, 85)}</option>)}</select></Field><Field label="概括发生了什么"><textarea rows={2} maxLength={3000} value={claim} onChange={e => setClaim(e.target.value)} /></Field><div className="form-row"><Field label="变化类型"><select value={kind} onChange={e => setKind(e.target.value as MemoryProposal['kind'])}><option value="event">事件</option><option value="state">人物或世界状态</option><option value="knowledge">人物获知的信息</option><option value="thread">伏笔</option></select></Field><Field label="故事发生时间（可选）"><input maxLength={240} value={storyTime} onChange={e => setStoryTime(e.target.value)} placeholder="如：抵达雾港的第二天" /></Field></div>{kind === 'knowledge' && <Field label="谁在此时获知此事？"><div className="checkbox-list">{entities.data?.filter(e => e.kind === 'character').map(e => <label key={e.id}><input type="checkbox" checked={knownBy.includes(e.id)} onChange={() => setKnownBy(values => values.includes(e.id) ? values.filter(v => v !== e.id) : [...values, e.id])} />{e.name}</label>)}</div></Field>}<Button disabled={!claim.trim() || !paragraph} onClick={add}>添加到本次确认</Button></div></details>{error && <Notice>{error}</Notice>}<div className="modal-actions"><Button onClick={onClose}>返回修改</Button><Button disabled={busy || !!active || !version.text.trim()} onClick={() => void confirm()}>仅定稿</Button><Button variant="primary" disabled={busy || !!active || !version.text.trim()} onClick={() => void confirm(true)}><CheckCircle size={17} />{busy ? '正在定稿…' : '确认定稿，下一章'}</Button></div></Modal>
+  return <Modal open onOpenChange={value => !value && onClose()} title="章节版本" description="每次保存都是一个独立版本。恢复会另存新版本，已有文字不会被删除。" wide><div className="version-layout"><div className="version-list">{versions.isPending && <Loading label="正在读取版本…" />}{versions.error && <Notice action={<Button onClick={() => void versions.refetch()}>重试</Button>}>{errorText(versions.error)}</Notice>}{versions.data?.pages.flatMap(page => page.items).map(v => <button key={v.id} className={selected === v.id ? 'active' : ''} onClick={() => setSelected(v.id)}><strong>{dateLabel(v.created_at)}</strong><span>{number(v.char_count)} 字 {v.id === chapter.accepted_version_id ? '· 已确认版本' : ''}</span></button>)}{versions.hasNextPage && <Button disabled={versions.isFetchingNextPage} onClick={() => void versions.fetchNextPage()}>{versions.isFetchingNextPage ? '读取中…' : '更早的版本'}</Button>}</div><div className="version-body">{version.isPending ? <Loading /> : version.error ? <Notice>{errorText(version.error)}</Notice> : <div className="comparison-text">{version.data?.text || '此版本为空。'}</div>}</div></div>{error && <Notice>{error}</Notice>}<div className="modal-actions"><Button onClick={onClose}>关闭</Button><Button variant="primary" disabled={!version.data || busy || selected === chapter.working_version_id} onClick={() => void restore()}>恢复为新版本</Button></div></Modal>
 }

@@ -2,6 +2,7 @@
 import base64
 import json
 from datetime import datetime
+from typing import get_args
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
@@ -9,12 +10,14 @@ from sqlalchemy.orm import Session
 from . import schemas as dto
 from .domain import DomainError, digest
 from .library import require_chapter, require_novel
-from .models import Chapter, Job, Novel
+from .models import Chapter, Job, Novel, Plan, Version
 
 
 def history_page(session: Session, novel_id: str | None = None, chapter_id: str | None = None,
                  task: dto.TaskName | None = None, state: dto.JobStateName | None = None,
-                 query: str = "", cursor: str | None = None, limit: int = 30) -> dto.JobHistoryPage:
+                 query: str = "", cursor: str | None = None, limit: int = 30,
+                 tasks: list[dto.TaskName] | None = None, volume_plan_id: str | None = None,
+                 base_version_id: str | None = None, pending_only: bool = False) -> dto.JobHistoryPage:
     if not 1 <= limit <= 100 or len(query) > 200:
         raise DomainError("INVALID_PAGE", "请缩小查询范围。")
     if novel_id:
@@ -23,9 +26,23 @@ def history_page(session: Session, novel_id: str | None = None, chapter_id: str 
         if not novel_id:
             raise DomainError("NOVEL_REQUIRED", "按章节查询记录时需要指定作品。")
         require_chapter(session, novel_id, chapter_id)
+    if tasks is not None and (not 1 <= len(tasks) <= 11 or not set(tasks) <= set(get_args(dto.TaskName))):
+        raise DomainError("INVALID_PAGE", "任务类型范围无效。")
+    if volume_plan_id:
+        volume = session.get(Plan, volume_plan_id)
+        if not novel_id or volume is None or volume.novel_id != novel_id or volume.level != "volume":
+            raise DomainError("VOLUME_NOT_FOUND", "分卷不属于当前作品。", 404)
+    if base_version_id and (not chapter_id or not session.scalar(select(Version.id).where(
+            Version.id == base_version_id, Version.chapter_id == chapter_id))):
+        raise DomainError("VERSION_NOT_FOUND", "版本不属于当前章节。", 404)
     query = query.strip()
-    scope = digest({"novel": novel_id, "chapter": chapter_id, "task": task, "state": state, "query": query})
-    statement = select(Job.id, Job.novel_id, Job.chapter_id, Novel.title.label("novel_title"),
+    scope_values = {"novel": novel_id, "chapter": chapter_id, "task": task, "state": state, "query": query}
+    for key, value in {"tasks": sorted(set(tasks)) if tasks else None, "volume": volume_plan_id,
+                       "version": base_version_id, "pending": pending_only or None}.items():
+        if value is not None:
+            scope_values[key] = value
+    scope = digest(scope_values)
+    statement = select(Job.id, Job.novel_id, Job.chapter_id, Job.base_version_id, Novel.title.label("novel_title"),
         Chapter.title.label("chapter_title"), Job.task, Job.state,
         func.substr(Job.instruction, 1, 240).label("instruction_preview"), Job.candidate_status,
         Job.attempt_count, Job.max_attempts, Job.is_demo, Job.created_at).select_from(Job).join(
@@ -36,6 +53,15 @@ def history_page(session: Session, novel_id: str | None = None, chapter_id: str 
         statement = statement.where(Job.chapter_id == chapter_id)
     if task:
         statement = statement.where(Job.task == task)
+    if tasks:
+        statement = statement.where(Job.task.in_(tasks))
+    if volume_plan_id:
+        statement = statement.where(Job.task == "outline",
+            Job.context["input"]["production"]["volume_plan_id"].as_string() == volume_plan_id)
+    if base_version_id:
+        statement = statement.where(Job.base_version_id == base_version_id)
+    if pending_only:
+        statement = statement.where(Job.candidate_status.not_in(["adopted", "rejected"]), Job.state != "cancelled")
     if state:
         statement = statement.where(Job.state == state)
     if query:

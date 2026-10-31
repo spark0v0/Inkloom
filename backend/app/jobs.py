@@ -44,8 +44,12 @@ def emit(session, job: Job, kind: str, data: dict[str, Any]) -> None:
 
 def public_job(session, job: Job, detail: bool = False):
     values = {key: getattr(job, key) for key in dto.JobOut.model_fields}
+    if detail and job.task == "discuss" and job.candidate_status == "ready" and not context_current(session, job):
+        values["candidate_status"] = "needs_rebase"
     if detail:
         values["context"] = {"target_chars": job.context.get("target_chars"), **job.context["preview"]}
+        if job.task == "outline" and not values["context"].get("volume_plan_id"):
+            values["context"]["volume_plan_id"] = job.context["input"]["production"]["volume_plan_id"]
         values["attempts"] = [dto.AttemptOut.model_validate(a) for a in session.scalars(
             select(Attempt).where(Attempt.job_id == job.id).order_by(Attempt.number)).all()]
         return dto.JobDetail(**values)
@@ -149,7 +153,15 @@ class Generation:
             return dto.ContextOut(**build_context(s, novel_id, request)["preview"])
 
     def create(self, novel_id: str, request: dto.JobInput) -> dto.JobDetail:
-        request_hash = digest(request.model_dump())
+        payload = request.model_dump()
+        # New opt-in defaults must keep pre-upgrade operation receipts replayable.
+        if payload["scene"] is None:
+            payload.pop("scene")
+        if payload.get("discussion"):
+            for key in ("manuscripts", "entity_ids"):
+                if not payload["discussion"][key]:
+                    payload["discussion"].pop(key)
+        request_hash = digest(payload)
         with self.ws.session(write=True) as s:
             existing = s.scalar(select(Job).where(Job.novel_id == novel_id,
                                                   Job.idempotency_key == request.idempotency_key))
@@ -177,6 +189,17 @@ class Generation:
                       reserved_cost=estimate, is_demo=config["kind"] == "demo")
             s.add(job)
             s.flush()
+            if request.task == "discuss":
+                from .discussions import require_conversation
+                conversation = require_conversation(s, novel_id, request.discussion.conversation_id)
+                job.conversation_id = conversation.id
+                prior = s.get(Job, conversation.last_job_id) if conversation.last_job_id else None
+                job.conversation_turn = prior.conversation_turn + 1 if prior else 1
+                conversation.last_job_id = job.id
+                conversation.chapter_ids = request.discussion.chapter_ids
+                conversation.updated_at = now()
+                if conversation.title == "新的规划讨论":
+                    conversation.title = request.instruction.strip().splitlines()[0][:100]
             emit(s, job, "state", {"state": "queued"})
             return public_job(s, job, True)
 

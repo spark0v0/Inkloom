@@ -1,6 +1,6 @@
 """Cursor history must retain early records without loading manuscript payloads."""
 import pytest
-from sqlalchemy import event
+from sqlalchemy import event, select
 
 from app import schemas as dto
 from app.domain import DomainError, uid
@@ -80,3 +80,38 @@ def test_history_api_route_and_input_validation(client):
     assert client.get("/api/v1/jobs/page?limit=101").status_code == 422
     assert client.get("/api/v1/jobs/page?state=unknown").status_code == 422
     assert client.get("/api/v1/jobs/page?chapter_id=missing").status_code == 400
+
+
+def test_task_group_is_filtered_before_pagination_and_binds_cursor(library, generation, workspace):
+    novel, chapter = history(library, generation, workspace)
+    with workspace.session(write=True) as session:
+        for row in session.scalars(select(Job).where(Job.id != 'history_0000')).all():
+            row.task = 'discuss'
+    assert not any(row.task == 'rewrite' for row in generation.list(novel.id, chapter.id))
+    page = generation.history(novel_id=novel.id, chapter_id=chapter.id, tasks=['rewrite', 'review'])
+    assert [row.id for row in page.items] == ['history_0000']
+    assert 'DO_NOT_READ' not in page.model_dump_json()
+    first = generation.history(novel_id=novel.id, tasks=['discuss'], limit=1)
+    with pytest.raises(DomainError) as error:
+        generation.history(novel_id=novel.id, tasks=['rewrite'], cursor=first.next_cursor)
+    assert error.value.code == 'CURSOR_SCOPE'
+
+
+def test_volume_and_version_filters_do_not_recover_other_scope(library, generation, workspace):
+    novel, chapter = history(library, generation, workspace, 3)
+    volume = library.put_plan(novel.id, dto.PlanInput(title='第一卷', level='volume'))
+    with workspace.session(write=True) as session:
+        for number in range(3):
+            row = session.get(Job, f'history_{number:04}')
+            row.task = 'outline'
+            row.context = {'input': {'production': {'volume_plan_id': volume.id if number == 0 else 'other'}}}
+            row.candidate_status = 'ready'
+        session.get(Job, 'history_0001').candidate_status = 'adopted'
+        session.get(Job, 'history_0002').state = 'cancelled'
+    page = generation.history(novel_id=novel.id, task='outline', volume_plan_id=volume.id, pending_only=True)
+    assert [row.id for row in page.items] == ['history_0000']
+    assert generation.history(novel_id=novel.id, chapter_id=chapter.id,
+        base_version_id=chapter.working_version_id).items
+    other = library.create_novel(dto.NovelInput(title='其他书'))
+    with pytest.raises(DomainError):
+        generation.history(novel_id=other.id, volume_plan_id=volume.id)

@@ -9,6 +9,7 @@ import os
 import secrets
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
+from typing import Annotated
 from urllib.parse import quote, urlsplit
 
 from fastapi import FastAPI, Header, Query, Request
@@ -16,10 +17,13 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import SQLAlchemyError
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.datastructures import MutableHeaders
+from starlette.requests import ClientDisconnect
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from . import schemas as dto
 from .chapter_outlines import ChapterOutlines
+from .discussions import Discussions
 from .domain import TERMINAL_JOB_STATES, DomainError, split_manuscript
 from .jobs import Generation
 from .library import Library
@@ -33,11 +37,14 @@ from .writing_preferences import save_writing_style
 logger = logging.getLogger("story_workshop")
 
 
-class LocalSessionMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, session_token: str, port: int):
-        super().__init__(app)
+class LocalSessionMiddleware:
+    def __init__(self, app: ASGIApp, session_token: str, port: int):
+        self.app = app
         self.token = session_token
         self.allowed_ports = {port, 5173, 4173}
+        cookie = Response()
+        cookie.set_cookie("story_session", self.token, httponly=True, samesite="strict", path="/api")
+        self.cookie_header = cookie.headers["set-cookie"]
 
     def local_url(self, value: str, origin: bool = False) -> bool:
         try:
@@ -48,42 +55,85 @@ class LocalSessionMiddleware(BaseHTTPMiddleware):
         except ValueError:
             return False
 
-    async def dispatch(self, request: Request, call_next):
+    def authorize(self, request: Request) -> Response | None:
         if not self.local_url(request.headers.get("host", "")):
             return JSONResponse({"code": "INVALID_HOST", "message": "仅允许本机工作区地址。", "details": {}}, status_code=403)
         if not request.url.path.startswith("/api/"):
-            return await call_next(request)
+            return None
         origin = request.headers.get("origin")
         if origin is not None and not self.local_url(origin, True):
             return JSONResponse({"code": "INVALID_ORIGIN", "message": "不允许此网页访问本机工作区。", "details": {}}, status_code=403)
         if request.headers.get("sec-fetch-site") == "cross-site":
             return JSONResponse({"code": "CROSS_SITE_REQUEST", "message": "已阻止跨站访问。", "details": {}}, status_code=403)
         bootstrap = request.method == "GET" and request.url.path == "/api/v1/health"
-        if not bootstrap and not secrets.compare_digest(request.cookies.get("story_session", ""), self.token):
+        cookie = request.cookies.get("story_session", "")
+        if not bootstrap and (not cookie.isascii() or not secrets.compare_digest(cookie, self.token)):
             return JSONResponse({"code": "SESSION_REQUIRED", "message": "本地会话已更新，请刷新页面。", "details": {}}, status_code=401)
         if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
             if not origin or not self.local_url(origin, True):
                 return JSONResponse({"code": "ORIGIN_REQUIRED", "message": "写入操作需要本地页面来源。", "details": {}}, status_code=403)
+        return None
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        request = Request(scope, receive)
+        if denied := self.authorize(request):
+            await denied(scope, receive, send)
+            return
+        if not request.url.path.startswith("/api/"):
+            await self.app(scope, receive, send)
+            return
+
+        body_receive = receive
+        if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
             maximum = MAX_ARCHIVE if request.url.path == "/api/v1/workspace/restore" else 8 * 1024 * 1024
             try:
                 declared = int(request.headers.get("content-length", "0"))
             except ValueError:
                 declared = maximum + 1
-            if declared > maximum:
-                return JSONResponse({"code": "BODY_TOO_LARGE", "message": "请求内容超过限制。", "details": {}}, status_code=413)
-            body = await request.body()
-            if len(body) > maximum:
-                return JSONResponse({"code": "BODY_TOO_LARGE", "message": "请求内容超过限制。", "details": {}}, status_code=413)
+            too_large = JSONResponse({"code": "BODY_TOO_LARGE", "message": "请求内容超过限制。", "details": {}}, status_code=413)
+            if declared < 0 or declared > maximum:
+                await too_large(scope, receive, send)
+                return
+            buffered = bytearray()
+            size = 0
+            try:
+                async for chunk in request.stream():
+                    size += len(chunk)
+                    if size > maximum:
+                        await too_large(scope, receive, send)
+                        return
+                    buffered.extend(chunk)
+            except ClientDisconnect:
+                return  # The author disconnected before a complete write was received.
+            body = bytes(buffered)
+            replayed = False
+
+            async def body_receive() -> Message:
+                nonlocal replayed
+                if not replayed:
+                    replayed = True
+                    return {"type": "http.request", "body": body, "more_body": False}
+                return await receive()
+
+        bootstrap = request.method == "GET" and request.url.path == "/api/v1/health"
+
+        async def send_headers(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                headers["X-Content-Type-Options"] = "nosniff"
+                headers["Cache-Control"] = "no-store"
+                if bootstrap:
+                    headers.append("set-cookie", self.cookie_header)
+            await send(message)
+
         token = expected_workspace.set(None if bootstrap else request.headers.get("x-inkloom-workspace"))
         try:
-            response = await call_next(request)
+            await self.app(scope, body_receive, send_headers)
         finally:
             expected_workspace.reset(token)
-        if bootstrap:
-            response.set_cookie("story_session", self.token, httponly=True, samesite="strict", path="/api")
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["Cache-Control"] = "no-store"
-        return response
 
 
 def create_app(data_dir: Path | None = None, *, worker: bool = True, port: int = 8765) -> FastAPI:
@@ -97,6 +147,7 @@ def create_app(data_dir: Path | None = None, *, worker: bool = True, port: int =
         app.state.references = ChapterReferences(workspace)
         app.state.threads = ThreadTracking(workspace)
         app.state.outlines = ChapterOutlines(workspace)
+        app.state.discussions = Discussions(workspace)
         app.state.generation = Generation(workspace)
         task = asyncio.create_task(app.state.generation.run()) if worker else None
         app.state.worker_task = task
@@ -216,9 +267,26 @@ def create_app(data_dir: Path | None = None, *, worker: bool = True, port: int =
     def list_versions(novel_id: str, chapter_id: str, request: Request):
         return request.app.state.library.versions(novel_id, chapter_id)
 
+    @app.get(prefix + "/novels/{novel_id}/chapters/{chapter_id}/versions-page", response_model=dto.VersionHistoryPage)
+    def version_history(novel_id: str, chapter_id: str, request: Request,
+                        before: str | None = Query(default=None, min_length=1, max_length=160)):
+        return request.app.state.library.version_history(novel_id, chapter_id, before)
+
     @app.get(prefix + "/novels/{novel_id}/chapters/{chapter_id}/versions/{version_id}", response_model=dto.VersionOut)
     def get_version(novel_id: str, chapter_id: str, version_id: str, request: Request):
         return request.app.state.library.version(novel_id, chapter_id, version_id)
+
+    @app.get(prefix + "/novels/{novel_id}/chapters/{chapter_id}/canon", response_model=dto.CanonPreparation)
+    def prepare_canon(novel_id: str, chapter_id: str, request: Request):
+        return request.app.state.library.prepare_canon(novel_id, chapter_id)
+
+    @app.get(prefix + "/novels/{novel_id}/review-impact", response_model=dto.ReviewImpactPage)
+    def review_impact(novel_id: str, request: Request, after: int = Query(default=0, ge=0),
+                      fingerprint: str | None = Query(default=None, max_length=64),
+                      limit: int = Query(default=30, ge=1, le=50)):
+        from .review_impact import review_impact as read_impact
+        with request.app.state.workspace.session() as session:
+            return read_impact(session, novel_id, after, fingerprint, limit)
 
     @app.post(prefix + "/novels/{novel_id}/chapters/{chapter_id}/canon", response_model=dto.CanonOut)
     def confirm(novel_id: str, chapter_id: str, data: dto.CanonInput, request: Request):
@@ -294,9 +362,13 @@ def create_app(data_dir: Path | None = None, *, worker: bool = True, port: int =
     def job_history(request: Request, novel_id: str | None = None, chapter_id: str | None = None,
                     task: dto.TaskName | None = None, state: dto.JobStateName | None = None,
                     query: str = Query(default="", max_length=200), cursor: str | None = Query(default=None, max_length=1024),
-                    limit: int = Query(default=30, ge=1, le=100)):
+                    limit: int = Query(default=30, ge=1, le=100),
+                    tasks: Annotated[list[dto.TaskName] | None, Query(min_length=1, max_length=11)] = None,
+                    volume_plan_id: str | None = None, base_version_id: str | None = None,
+                    pending_only: bool = False):
         return request.app.state.generation.history(novel_id=novel_id, chapter_id=chapter_id,
-            task=task, state=state, query=query, cursor=cursor, limit=limit)
+            task=task, state=state, query=query, cursor=cursor, limit=limit, tasks=tasks,
+            volume_plan_id=volume_plan_id, base_version_id=base_version_id, pending_only=pending_only)
 
     @app.get(prefix + "/jobs/{job_id}", response_model=dto.JobDetail)
     def job(job_id: str, novel_id: str, request: Request):
@@ -388,6 +460,23 @@ def create_app(data_dir: Path | None = None, *, worker: bool = True, port: int =
     @app.post(prefix + "/import", response_model=dto.NovelOut)
     def import_manuscript(data: dto.ImportInput, request: Request):
         return request.app.state.library.import_manuscript(data)
+
+    @app.get(prefix + "/novels/{novel_id}/discussions", response_model=list[dto.ConversationOut])
+    def discussions(novel_id: str, request: Request):
+        return request.app.state.discussions.list(novel_id)
+
+    @app.post(prefix + "/novels/{novel_id}/discussions", response_model=dto.ConversationOut, status_code=201)
+    def create_discussion(novel_id: str, data: dto.ConversationInput, request: Request):
+        return request.app.state.discussions.create(novel_id, data)
+
+    @app.get(prefix + "/novels/{novel_id}/discussions/{conversation_id}", response_model=dto.DiscussionPage)
+    def discussion(novel_id: str, conversation_id: str, request: Request,
+                   before: str | None = Query(default=None, min_length=1, max_length=160)):
+        return request.app.state.discussions.get(novel_id, conversation_id, before)
+
+    @app.post(prefix + "/novels/{novel_id}/jobs/{job_id}/discussion-proposal", response_model=dto.OutlineState)
+    def adopt_discussion(novel_id: str, job_id: str, data: dto.OutlineApplyInput, request: Request):
+        return request.app.state.discussions.adopt(novel_id, job_id, data)
 
     @app.get(prefix + "/novels/{novel_id}/export-preview", response_model=dto.ExportPreviewOut)
     def export_preview(novel_id: str, request: Request, confirmed: bool = True,

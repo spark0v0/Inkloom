@@ -79,6 +79,28 @@ def collect(settings):
     return asyncio.run(run())
 
 
+@pytest.mark.parametrize('task,json_mode,expected', [
+    ('inspiration', True, True), ('discuss', True, True),
+    ('review', True, True), ('continue', True, False), ('inspiration', False, False),
+])
+def test_structured_tasks_share_json_wire_contract(monkeypatch, task, json_mode, expected):
+    payloads = []
+
+    def handle(request):
+        payloads.append(json.loads(request.content))
+        return httpx.Response(200, json={'choices': [{'message': {'content': '{}'}, 'finish_reason': 'stop'}]})
+    mock_http(monkeypatch, handle)
+    settings = {**config(), 'json_mode': json_mode}
+
+    async def run():
+        return [part async for part in providers.stream_completion(settings, 'test-only', [], task, {})]
+    asyncio.run(run())
+    assert len(payloads) == 1
+    assert ('response_format' in payloads[0]) == expected
+    if expected:
+        assert payloads[0]['response_format'] == {'type': 'json_object'}
+
+
 def test_non_streaming_stops_reading_when_size_limit_is_reached(monkeypatch):
     body = Chunks([b'x' * 600_000] * 12)
     mock_http(monkeypatch, lambda _: httpx.Response(200, stream=body))

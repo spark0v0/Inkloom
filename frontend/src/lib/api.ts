@@ -11,6 +11,9 @@ export type ReferenceSelection = Schema['ReferenceSelection']
 export type ReferenceState = Schema['ReferenceState']
 export type Version = Schema['VersionOut']
 export type VersionSummary = Schema['VersionSummary']
+export type Conversation = Schema['ConversationOut']
+export type DiscussionTurn = Schema['DiscussionTurn']
+export type DiscussionResult = Schema['DiscussionResult']
 export type Entity = Schema['EntityOut']
 export type EntityInput = Schema['EntityInput']
 export type Thread = Schema['ThreadOut']
@@ -18,6 +21,7 @@ export type ThreadProgressInput = Schema['ThreadProgressInput']
 export type Plan = Schema['PlanOut']
 export type PlanInput = Schema['PlanInput']
 export type Fact = Schema['FactOut']
+export type CanonPreparation = Schema['CanonPreparation']
 export type Evidence = Schema['Evidence']
 export type Source = Schema['Source']
 export type MemoryProposal = Schema['MemoryProposal']
@@ -108,7 +112,7 @@ export const api = {
   saveWritingStyle: (id: string, data: Schema['WritingStyleInput']) => request<Novel>(npath(id) + '/writing-style', { method: 'PUT', body: JSON.stringify(data) }),
   demo: () => request<Novel>('/demo', { method: 'POST' }),
   chapters: (id: string) => request<ChapterSummary[]>(npath(id) + '/chapters'),
-  chapter: (id: string, chapter: string) => request<Chapter>(cpath(id, chapter)),
+  chapter: (id: string, chapter: string, workspace?: string) => request<Chapter>(cpath(id, chapter), undefined, workspace),
   createChapter: (id: string, data: Schema['ChapterInput']) => request<Chapter>(npath(id) + '/chapters', { method: 'POST', body: JSON.stringify(data) }),
   editChapter: (id: string, chapter: string, data: Schema['ChapterUpdate']) => request<Chapter>(cpath(id, chapter), { method: 'PATCH', body: JSON.stringify(data) }),
   chapterOutline: (id: string, chapter: string) => request<OutlineState>(cpath(id, chapter) + '/outline'),
@@ -121,9 +125,12 @@ export const api = {
   saveReferences: (id: string, chapter: string, data: Schema['ReferenceUpdate']) => request<ReferenceState>(cpath(id, chapter) + '/references', { method: 'PUT', body: JSON.stringify(data) }),
   save: (id: string, chapter: string, data: Schema['SaveInput'], workspace?: string) => request<Version>(cpath(id, chapter) + '/versions', { method: 'POST', body: JSON.stringify(data) }, workspace),
   versions: (id: string, chapter: string) => request<VersionSummary[]>(cpath(id, chapter) + '/versions'),
-  version: (id: string, chapter: string, version: string) => request<Version>(cpath(id, chapter) + '/versions/' + encodeURIComponent(version)),
-  confirm: (id: string, chapter: string, data: Schema['CanonInput']) => request<Schema['CanonOut']>(cpath(id, chapter) + '/canon', { method: 'POST', body: JSON.stringify(data) }),
-  entities: (id: string) => request<Entity[]>(npath(id) + '/entities'),
+  versionHistory: (id: string, chapter: string, before?: string) => request<Schema['VersionHistoryPage']>(cpath(id, chapter) + '/versions-page' + (before ? '?before=' + encodeURIComponent(before) : '')),
+  version: (id: string, chapter: string, version: string, workspace?: string) => request<Version>(cpath(id, chapter) + '/versions/' + encodeURIComponent(version), undefined, workspace),
+  prepareCanon: (id: string, chapter: string, workspace?: string) => request<CanonPreparation>(cpath(id, chapter) + '/canon', undefined, workspace),
+  confirm: (id: string, chapter: string, data: Schema['CanonInput'], workspace?: string) => request<Schema['CanonOut']>(cpath(id, chapter) + '/canon', { method: 'POST', body: JSON.stringify(data) }, workspace),
+  entities: (id: string, workspace?: string) => request<Entity[]>(npath(id) + '/entities', undefined, workspace),
+  reviewImpact: (id: string, after: number, fingerprint?: string, workspace?: string) => request<Schema['ReviewImpactPage']>(npath(id) + '/review-impact?' + new URLSearchParams({ after: String(after), ...(fingerprint ? { fingerprint } : {}) }), undefined, workspace),
   saveEntity: (id: string, data: EntityInput, entity?: string, baseUpdatedAt?: string) => request<Entity>(npath(id) + '/entities' + (entity ? '/' + entity : ''), { method: entity ? 'PUT' : 'POST', body: JSON.stringify(entity ? { ...data, base_updated_at: baseUpdatedAt } : data) }),
   plans: (id: string) => request<Plan[]>(npath(id) + '/plans'),
   plan: (id: string, plan: string) => request<Plan>(npath(id) + '/plans/' + encodeURIComponent(plan)),
@@ -135,21 +142,28 @@ export const api = {
   addThreadProgress: (id: string, entity: string, data: ThreadProgressInput) => request<Thread>(npath(id) + `/threads/${entity}/progress`, { method: 'POST', body: JSON.stringify(data) }),
   changeThreadProgress: (id: string, entity: string, progress: string, data: Schema['ThreadProgressChange']) => request<Thread>(npath(id) + `/threads/${entity}/progress/${progress}`, { method: 'PATCH', body: JSON.stringify(data) }),
   search: (id: string, q: string) => request<Schema['SearchResult'][]>(npath(id) + '/search?q=' + encodeURIComponent(q)),
-  context: (id: string, data: ContextInput) => request<Context>(npath(id) + '/context', { method: 'POST', body: JSON.stringify(data) }),
-  createJob: (id: string, data: JobInput) => request<JobDetail>(npath(id) + '/jobs', { method: 'POST', body: JSON.stringify(data) }),
+  context: (id: string, data: ContextInput, workspace?: string) => request<Context>(npath(id) + '/context', { method: 'POST', body: JSON.stringify(data) }, workspace),
+  conversations: (id: string, workspace?: string) => request<Conversation[]>(npath(id) + '/discussions', undefined, workspace),
+  createConversation: (id: string, workspace?: string) => request<Conversation>(npath(id) + '/discussions', { method: 'POST', body: JSON.stringify({ title: '新的规划讨论' }) }, workspace),
+  discussion: (id: string, conversation: string, before?: string, workspace?: string) => request<Schema['DiscussionPage']>(npath(id) + '/discussions/' + encodeURIComponent(conversation) + (before ? '?before=' + encodeURIComponent(before) : ''), undefined, workspace),
+  applyDiscussion: (id: string, job: string, data: Schema['OutlineApplyInput'], workspace?: string) => request<OutlineState>(npath(id) + '/jobs/' + encodeURIComponent(job) + '/discussion-proposal', { method: 'POST', body: JSON.stringify(data) }, workspace),
+  createJob: (id: string, data: JobInput, workspace?: string) => request<JobDetail>(npath(id) + '/jobs', { method: 'POST', body: JSON.stringify(data) }, workspace),
   jobs: (id?: string, filters: { chapter_id?: string; task?: Task } = {}) => {
     const query = new URLSearchParams({ ...(id ? { novel_id: id } : {}), ...filters })
     return request<Job[]>('/jobs?' + query)
   },
-  jobHistory: (filters: JobHistoryFilters = {}) => {
+  jobHistory: (filters: JobHistoryFilters = {}, workspace?: string) => {
     const query = new URLSearchParams()
-    Object.entries(filters).forEach(([key, value]) => { if (value != null && value !== '') query.set(key, String(value)) })
-    return request<Schema['JobHistoryPage']>('/jobs/page?' + query)
+    Object.entries(filters).forEach(([key, value]) => { if (value != null && value !== '') {
+      if (Array.isArray(value)) value.forEach(item => query.append(key, String(item)))
+      else query.set(key, String(value))
+    } })
+    return request<Schema['JobHistoryPage']>('/jobs/page?' + query, undefined, workspace)
   },
   prepareReviewRewrite: (id: string, novel: string, data: Schema['ReviewRewriteInput']) => request<ReviewRewritePreparation>(`/jobs/${id}/prepare-rewrite?novel_id=${novel}`, { method: 'POST', body: JSON.stringify(data) }),
-  job: (id: string, novel: string, signal?: AbortSignal) => request<JobDetail>(jpath(id, novel), { signal }),
+  job: (id: string, novel: string, signal?: AbortSignal, workspace?: string) => request<JobDetail>(jpath(id, novel), { signal }, workspace),
   jobProgress: (id: string, novel: string, signal?: AbortSignal) => request<JobProgress>(`/jobs/${encodeURIComponent(id)}/progress?novel_id=${encodeURIComponent(novel)}`, { signal }),
-  control: (id: string, novel: string, action: string) => request<JobDetail>(`/jobs/${id}/${action}?novel_id=${novel}`, { method: 'POST' }),
+  control: (id: string, novel: string, action: string, workspace?: string) => request<JobDetail>(`/jobs/${id}/${action}?novel_id=${novel}`, { method: 'POST' }, workspace),
   adopt: (id: string, novel: string, base: string) => request<Version>(`/jobs/${id}/adopt?novel_id=${novel}`, { method: 'POST', body: JSON.stringify({ base_version_id: base }) }),
   applyPlan: (id: string, novel: string) => request<Schema['ProductionApplyOut']>(`/jobs/${id}/apply-plan?novel_id=${novel}`, { method: 'POST' }),
   decide: (id: string, novel: string, data: Schema['FindingDecision']) => request<JobDetail>(`/jobs/${id}/review-decision?novel_id=${novel}`, { method: 'POST', body: JSON.stringify(data) }),
@@ -166,7 +180,7 @@ export const api = {
 }
 
 export const taskNames: Record<Task, string> = {
-  continue: '正文生成', rewrite: '改写', plan: '场景规划', extract: '本章记忆', review: '审稿', handoff: '章节交接', blueprint: '全书方案', outline: '章节细纲', inspiration: '剧情灵感', outline_edit: '细纲修改',
+  continue: '正文生成', rewrite: '改写', plan: '场景规划', extract: '本章记忆', review: '审稿', handoff: '章节交接', blueprint: '全书方案', outline: '章节细纲', inspiration: '剧情灵感', outline_edit: '细纲修改', discuss: '规划讨论',
 }
 export const jobStateNames: Record<string, string> = {
   queued: '等待执行', running: '正在生成', pausing: '等待本次调用结束', paused: '已暂停', cancelling: '正在取消',

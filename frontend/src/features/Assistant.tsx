@@ -29,9 +29,10 @@ function roleFor(task: Task): keyof Roles {
 export function Assistant({ novel, chapter, providers, roles, flush, selection, quickRewrite, onQuickPrepared, onWritingStyle, onAdopt, onEvidence, onExtractReady, onClose, candidateHost, onCandidate, onShowCandidate, blockedChapter, onResolvePrevious }: AssistantProps) {
   const cache = useQueryClient()
   const [task, setTask] = useState<Task>('continue')
-  const [mode, setMode] = useState<'chapter' | 'continue' | 'rewrite'>('chapter')
+  const [mode, setMode] = useState<'chapter' | 'continue' | 'rewrite' | 'scene'>('chapter')
   const [tab, setTab] = useState<'assistant' | 'context'>('assistant')
   const [instruction, setInstruction] = useState('')
+  const [scene, setScene] = useState<NonNullable<ContextInput['scene']>>({ goal: '', conflict: '', turn: '', ending: '', viewpoint: '' })
   const [problem, setProblem] = useState('不知道接下来发生什么')
   const [selectedDirection, setDirection] = useState<{ reference: NonNullable<ContextInput['inspiration']>; title: string } | null>(null)
   const [preparedRevision, setPreparedRevision] = useState<ReviewRewritePreparation | null>(null)
@@ -43,6 +44,7 @@ export function Assistant({ novel, chapter, providers, roles, flush, selection, 
   const [providerId, setProviderId] = useState(roles.writer || 'demo')
   const providerChoices = useRef<Partial<Roles>>({})
   const [context, setContext] = useState<Context | null>(null)
+  useEffect(() => { setContext(null) }, [scene])
   const [excluded, setExcluded] = useState<string[]>([])
   const [jobId, setJobId] = useState<string | null>(null)
   const [error, setError] = useState('')
@@ -54,8 +56,8 @@ export function Assistant({ novel, chapter, providers, roles, flush, selection, 
   const pendingSubmission = useRef<JobInput | null>(null)
   const candidateRef = useRef<HTMLElement | null>(null)
   const provider = providers.find(p => p.id === providerId)
-  const jobs = useQuery({ queryKey: ['jobs', novel.id, chapter.id], queryFn: () => api.jobs(novel.id, { chapter_id: chapter.id }) })
-  const currentJobId = jobId || jobs.data?.find(j => j.chapter_id === chapter.id && !['blueprint', 'outline', 'outline_edit'].includes(j.task))?.id
+  const jobs = useQuery({ queryKey: ['jobs', novel.id, chapter.id, 'writing-summary'], queryFn: () => api.jobHistory({ novel_id: novel.id, chapter_id: chapter.id, tasks: ['continue', 'rewrite', 'plan', 'inspiration', 'review', 'extract', 'handoff'], limit: 1 }) })
+  const currentJobId = jobId || jobs.data?.items[0]?.id
   const job = useQuery({ queryKey: ['job', currentJobId], queryFn: () => api.job(currentJobId!, novel.id), enabled: !!currentJobId })
   const connection = useJobStream(job.data)
   const active = job.data && activeStates.has(job.data.state)
@@ -66,6 +68,10 @@ export function Assistant({ novel, chapter, providers, roles, flush, selection, 
   useEffect(() => {
     if (!jobId && job.data && restored.current !== job.data.id) {
       restored.current = job.data.id
+      if (job.data.task === 'continue' && job.data.context.scene) {
+        setMode('scene'); setTask('continue'); setScene(job.data.context.scene); setProviderId(job.data.provider_id)
+        setTarget(job.data.context.target_chars || 800)
+      }
       if (job.data.task === 'inspiration') {
         setTask('inspiration'); setProviderId(job.data.provider_id)
         providerChoices.current.planner = job.data.provider_id
@@ -86,6 +92,7 @@ export function Assistant({ novel, chapter, providers, roles, flush, selection, 
     setProviderId(providerChoices.current[role] || roles[role] || 'demo')
   }
   async function input(): Promise<ContextInput> {
+    if (task === 'continue' && mode === 'scene' && !scene.goal.trim()) throw new Error('请填写本场要发生的事情。')
     const version = await flush()
     if (preparedRevision && preparedRevision.base_version_id !== version.id) throw new Error('正文已更新，请重新审稿后准备改写。')
     if (preparedSelection && preparedSelection.base_version_id !== version.id) throw new Error('正文已更新，请重新选择文字后准备改写。')
@@ -95,6 +102,7 @@ export function Assistant({ novel, chapter, providers, roles, flush, selection, 
     const direction = wholeChapter ? `依据本章细纲创作完整一章，目标约 ${target} 字。包含完整场景推进和有意义的章末钩子；只输出正文，不重复章节标题。` : ''
     return { chapter_id: chapter.id, base_version_id: version.id, references_revision: chapter.references_revision, task: effectiveTask, instruction: [direction, task === 'inspiration' ? `当前卡点：${problem}` : '', instruction || (task === 'inspiration' ? '' : chapter.goal || '推进本章剧情，保持视角和人物一致。')].filter(Boolean).join('\n'),
       provider_id: providerId, target_chars: target, chapter_batch: 5, excluded_source_ids: excluded, selection: effectiveSelection,
+      scene: task === 'continue' && mode === 'scene' ? scene : null,
       inspiration: selectedDirection?.reference || null, review_reference: preparedRevision?.reference || null }
   }
   const preparing = useMutation({ mutationFn: async () => { const body = await input(); return api.context(novel.id, body) }, onSuccess: value => { setContext(value); setTab('context') } })
@@ -208,7 +216,17 @@ export function Assistant({ novel, chapter, providers, roles, flush, selection, 
   return <aside className="assistant-panel" aria-label="写作助手"><div className="assistant-heading"><strong>AI 写作</strong>{provider?.kind === 'demo' && <Badge tone="amber">演示</Badge>}<select disabled={submissionLocked} aria-label="写作模型" value={providerId} onChange={e => { providerChoices.current[roleFor(task)] = e.target.value; setProviderId(e.target.value); setContext(null) }}>{providers.map(p => <option value={p.id} key={p.id}>{p.name}</option>)}</select>{onClose && <button className="icon-button mobile-only" aria-label="关闭写作助手" onClick={onClose}><X size={18} /></button>}</div>
     <div className="assistant-tabs"><button disabled={submissionLocked} className={!['review', 'inspiration'].includes(task) ? 'active' : ''} onClick={() => { changeTask('continue'); setTab('assistant') }}>写作</button><button disabled={submissionLocked} className={task === 'inspiration' ? 'active' : ''} onClick={() => { changeTask('inspiration'); setTab('assistant') }}>找灵感</button><button disabled={submissionLocked} className={task === 'review' ? 'active' : ''} onClick={() => { changeTask('review'); setTab('assistant') }}>审稿</button></div>
     <div className="assistant-scroll">
-      {!['review', 'inspiration'].includes(task) && <div className="writing-mode-tabs"><button disabled={submissionLocked} className={mode === 'chapter' && task === 'continue' ? 'active' : ''} onClick={() => { setMode('chapter'); changeTask('continue') }}>写完整章</button><button disabled={submissionLocked} className={mode === 'continue' && task === 'continue' ? 'active' : ''} onClick={() => { setMode('continue'); changeTask('continue') }}>续写</button><button disabled={submissionLocked} className={task === 'rewrite' ? 'active' : ''} onClick={() => { setMode('rewrite'); changeTask('rewrite') }}>润色选段</button></div>}
+      {!['review', 'inspiration'].includes(task) && <div className="writing-mode-tabs"><button disabled={submissionLocked} className={mode === 'chapter' && task === 'continue' ? 'active' : ''} onClick={() => { setMode('chapter'); changeTask('continue') }}>写完整章</button><button disabled={submissionLocked} className={mode === 'continue' && task === 'continue' ? 'active' : ''} onClick={() => { setMode('continue'); changeTask('continue') }}>续写</button><button disabled={submissionLocked} className={mode === 'scene' && task === 'continue' ? 'active' : ''} onClick={() => { setMode('scene'); setTarget(800); changeTask('continue') }}>写一个场景</button><button disabled={submissionLocked} className={task === 'rewrite' ? 'active' : ''} onClick={() => { setMode('rewrite'); changeTask('rewrite') }}>润色选段</button></div>}
+      {task === 'continue' && mode === 'scene' && <section className="scene-composer form-stack" aria-label="本场景要求">
+        <p className="small muted">每次写一场；审阅采纳后接到当前正文末尾。</p>
+        <Field label="本场要发生什么"><textarea rows={2} maxLength={1200} value={scene.goal} onChange={e => { setScene({ ...scene, goal: e.target.value }); setContext(null) }} placeholder="例如：主角与守塔人交涉，争取进入灯塔" /></Field>
+        <Field label="阻碍或冲突"><textarea rows={2} maxLength={1200} value={scene.conflict || ''} onChange={e => { setScene({ ...scene, conflict: e.target.value }); setContext(null) }} placeholder="例如：对方要求交出唯一的钥匙" /></Field>
+        <details><summary>转折、收束与视角</summary><div className="form-stack">
+          <Field label="本场转折"><textarea rows={2} maxLength={1200} value={scene.turn || ''} onChange={e => setScene({ ...scene, turn: e.target.value })} /></Field>
+          <Field label="写到哪里停"><textarea rows={2} maxLength={1200} value={scene.ending || ''} onChange={e => setScene({ ...scene, ending: e.target.value })} /></Field>
+          <Field label="本场视角"><input maxLength={160} value={scene.viewpoint || ''} onChange={e => setScene({ ...scene, viewpoint: e.target.value })} placeholder="沿用本书视角，可留空" /></Field>
+        </div></details>
+      </section>}
       <div className="assistant-resources">
       <Button className="writing-style-trigger" variant="ghost" disabled={submissionLocked || !!active} onClick={onWritingStyle}><PenNib size={18} />写作风格<span>{hasStyle ? '本书已设置' : '未限定'}</span></Button>
       <Button className="chapter-references-trigger" variant="ghost" disabled={submissionLocked || !!active} onClick={() => setReferencesOpen(true)}><FileText size={17} />本章参考<span>{(chapter.references.entity_ids?.length || 0) + (chapter.references.chapters?.length || 0) ? `${(chapter.references.entity_ids?.length || 0) + (chapter.references.chapters?.length || 0)} 项必读` : chapter.references.notes?.trim() ? '含补充资料' : '自动召回'}</span></Button>
@@ -221,7 +239,7 @@ export function Assistant({ novel, chapter, providers, roles, flush, selection, 
         <div className="writing-options"><label hidden={task === 'inspiration'}><span className="sr-only">目标字数</span><select aria-label="目标字数" value={target} onChange={e => setTarget(Number(e.target.value))}>{Array.from(new Set([target, 100, 300, 500, 1000, 1500, 2000, 2500, 3000, 4000, 5000, 6000])).sort((a, b) => a - b).map(n => <option key={n} value={n}>{number(n)} 字</option>)}</select></label><details className="generation-limits"><summary><SlidersHorizontal size={17} />高级</summary><div className="form-stack"><Field label="其他任务"><select aria-label="更多写作任务" value={['plan', 'extract', 'handoff'].includes(task) ? task : ''} onChange={e => e.target.value && changeTask(e.target.value as Task)}><option value="">选择任务</option><option value="plan">场景规划</option><option value="extract">整理本章记忆</option><option value="handoff">章节交接</option></select></Field><Field label="最多调用次数"><select value={maxAttempts} onChange={e => setMaxAttempts(Number(e.target.value))}>{[1, 2, 3, 4, 5].map(n => <option value={n} key={n}>{n} 次</option>)}</select></Field><Field label={`费用上限（${provider?.currency || 'CNY'}）`}><input type="number" min="0.0001" max="10000" step="any" value={budget} onChange={e => setBudget(e.target.value)} placeholder="可选，需要配置价格" /></Field></div></details></div>
         {provider?.kind !== 'demo' && !provider?.has_key && <Notice>请先在模型设置中填写 API Key。</Notice>}
         {provider?.kind !== 'demo' && provider && ['continue', 'rewrite'].includes(task) && provider.max_output_tokens < target * 1.6 && <p className="model-disclosure">模型输出上限偏小，整章可能截断。可在模型设置中调大。</p>}
-        </fieldset><Button id={`generate-${chapter.id}`} variant="primary" className="full-width" disabled={!!active || generating.isPending || preparingRevision || (!!blockedChapter && ['continue', 'rewrite'].includes(task)) || !provider || (provider.kind !== 'demo' && !provider.has_key) || (task === 'rewrite' && !selection && !preparedRevision && !preparedSelection)} onClick={() => generating.mutate()}><Sparkle size={19} />{generating.isPending ? '正在提交…' : pendingSubmission.current ? '确认上次提交' : preparedRevision ? '按建议改写' : preparedSelection ? `生成${rewriteActions[preparedSelection.action].name}候选` : task === 'inspiration' ? '找三个走向' : selectedDirection ? '按此方向续写' : task === 'extract' ? '整理本章记忆' : task === 'review' ? '审阅本章' : task === 'plan' ? '生成场景计划' : task === 'handoff' ? '生成章节交接' : task === 'rewrite' ? '润色选段' : mode === 'chapter' ? (chapter.char_count ? '重写本章正文' : '生成本章正文') : '继续写作'}</Button>
+        </fieldset><Button id={`generate-${chapter.id}`} variant="primary" className="full-width" disabled={!!active || generating.isPending || preparingRevision || (!pendingSubmission.current && task === 'continue' && mode === 'scene' && !scene.goal.trim()) || (!!blockedChapter && ['continue', 'rewrite'].includes(task)) || !provider || (provider.kind !== 'demo' && !provider.has_key) || (task === 'rewrite' && !selection && !preparedRevision && !preparedSelection)} onClick={() => generating.mutate()}><Sparkle size={19} />{generating.isPending ? '正在提交…' : pendingSubmission.current ? '确认上次提交' : preparedRevision ? '按建议改写' : preparedSelection ? `生成${rewriteActions[preparedSelection.action].name}候选` : task === 'inspiration' ? '找三个走向' : selectedDirection ? '按此方向续写' : task === 'extract' ? '整理本章记忆' : task === 'review' ? '审阅本章' : task === 'plan' ? '生成场景计划' : task === 'handoff' ? '生成章节交接' : task === 'rewrite' ? '润色选段' : mode === 'chapter' ? (chapter.char_count ? '重写本章正文' : '生成本章正文') : mode === 'scene' ? '生成场景草稿' : '继续写作'}</Button>
       </div>
       {(error || generating.error || preparing.error) && <Notice>{error || errorText(generating.error ?? preparing.error)}{pendingSubmission.current && <span className="block small">上次提交尚未确认，暂时锁定写作要求。点击“确认上次提交”继续处理同一次请求。</span>}</Notice>}
       {inDocument ? <div className="candidate-summary"><Badge>{job.data?.candidate_status === 'adopted' ? '已采纳' : job.data ? jobStateNames[job.data.state] : ''}</Badge><Button onClick={onShowCandidate}>{job.data?.task === 'inspiration' ? '查看剧情灵感' : job.data?.task === 'review' ? '查看审稿意见' : '查看 AI 草稿'}<ArrowRight size={16} /></Button><p className="small muted">{job.data?.task === 'inspiration' ? (job.data.result?.kind === 'inspiration' ? '三个剧情方向' : active ? '正在寻找剧情方向' : '剧情方向未完成') : job.data?.task === 'review' ? (job.data.result?.kind === 'review' ? `${job.data.result.findings.length} 条审稿意见` : '正在整理审稿意见') : `${number(countChars(job.data?.output_text || ''))} 字`} · {job.data?.is_demo ? '演示样例' : job.data?.context.model}</p></div> : candidate}

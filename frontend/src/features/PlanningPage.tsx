@@ -12,19 +12,22 @@ import { ChapterOutlineEditor } from './ChapterOutlineEditor'
 import { ProviderDisclosure } from '../components/ProviderDisclosure'
 import { NovelBriefDialog } from './NovelBriefDialog'
 import { StoryMap } from './StoryMap'
+import { PlanningDiscussions } from './PlanningDiscussions'
+import { ReviewImpactDialog } from './ReviewImpactDialog'
 
 const labels = { book: '全书', volume: '分卷', chapter: '章节', scene: '场景' }
 
-export function PlanningPage({ novel, navigate, chapterId, workspaceId, registerGuard, onEvidence, view }: { novel: Novel; navigate: Navigate; chapterId?: string; view?: 'map'; workspaceId: string; registerGuard: (guard: (() => Promise<unknown>) | null) => void; onEvidence: (e: Evidence) => void }) {
+export function PlanningPage({ novel, navigate, chapterId, workspaceId, registerGuard, onEvidence, view, discussionId }: { novel: Novel; navigate: Navigate; chapterId?: string; view?: 'map' | 'discuss'; discussionId?: string; workspaceId: string; registerGuard: (guard: (() => Promise<unknown>) | null) => void; onEvidence: (e: Evidence) => void }) {
   const cache = useQueryClient()
   const plans = useQuery({ queryKey: ['plans', novel.id], queryFn: () => api.plans(novel.id), enabled: !chapterId })
   const chapters = useQuery({ queryKey: ['chapters', novel.id], queryFn: () => api.chapters(novel.id), enabled: !chapterId })
-  const jobs = useQuery({ queryKey: ['jobs', novel.id], queryFn: () => api.jobs(novel.id), refetchInterval: 3000, enabled: !chapterId })
+  const jobs = useQuery({ queryKey: ['jobs', novel.id, 'planning-pending'], queryFn: () => api.jobHistory({ novel_id: novel.id, tasks: ['blueprint', 'outline'], pending_only: true, limit: 1 }, workspaceId), refetchInterval: 3000, enabled: !chapterId })
   const [planningTab, setPlanningTab] = useState<'book' | 'volumes'>('volumes')
-  const tab = view === 'map' ? 'map' : planningTab
+  const tab = view || planningTab
   const [selected, setSelected] = useState<string | null>(null)
   const [editing, setEditing] = useState<Plan | 'new' | null>(null)
   const [brief, setBrief] = useState(false)
+  const [impactOpen, setImpactOpen] = useState(false)
   const [generation, setGeneration] = useState<'blueprint' | 'outline' | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -38,11 +41,11 @@ export function PlanningPage({ novel, navigate, chapterId, workspaceId, register
   const volumes = allPlans.filter(p => p.level === 'volume')
   const volume = volumes.find(p => p.id === selected) || volumes[0]
   const list = (chapters.data || []).filter(c => volume ? c.volume === volume.title : true)
-  const setupKind = generation || (tab !== 'map' && !book && !volumes.length ? 'blueprint' : null)
-  const resumable = jobs.data?.find(j => ['blueprint', 'outline'].includes(j.task) && (activeStates.has(j.state) || j.state === 'paused' || j.candidate_status === 'ready'))
-  function selectTab(value: 'book' | 'volumes' | 'map') {
-    if (value !== 'map') setPlanningTab(value)
-    if (view || value === 'map') void navigate({ page: 'plot', novelId: novel.id, view: value === 'map' ? 'map' : undefined }).catch(e => setError(errorText(e)))
+  const setupKind = generation || (!view && !book && !volumes.length ? 'blueprint' : null)
+  const resumable = jobs.data?.items[0]
+  function selectTab(value: 'book' | 'volumes' | 'map' | 'discuss') {
+    if (value === 'book' || value === 'volumes') setPlanningTab(value)
+    if (view || value === 'map' || value === 'discuss') void navigate({ page: 'plot', novelId: novel.id, view: value === 'map' || value === 'discuss' ? value : undefined }).catch(e => setError(errorText(e)))
   }
   async function refresh() {
     await Promise.all(['novel', 'chapters', 'plans', 'entities', 'jobs'].map(key => cache.invalidateQueries({ queryKey: [key, novel.id] })))
@@ -57,8 +60,11 @@ export function PlanningPage({ novel, navigate, chapterId, workspaceId, register
     if (!resumable) return
     try {
       const detail = await api.job(resumable.id, novel.id)
-      const planId = detail.context.plans.find(p => p.level === 'volume')?.id
-      if (typeof planId === 'string') setSelected(planId)
+      const planId = detail.context.volume_plan_id
+      if (detail.task === 'outline') {
+        if (!planId || !allPlans.some(p => p.id === planId && p.level === 'volume')) throw new Error('原分卷已变化，请读取最新规划后再继续。')
+        setSelected(planId)
+      }
       setResumeId(detail.id)
       setGeneration(detail.task as 'blueprint' | 'outline')
     } catch (e) { setError(errorText(e)) }
@@ -73,21 +79,23 @@ export function PlanningPage({ novel, navigate, chapterId, workspaceId, register
     if (setupKind === 'blueprint') setGeneration('outline')
     else { setAppliedChapters(ids); setGeneration(null) }
   }} />
-  if (chapterId) return <ChapterOutlineEditor key={chapterId} novel={novel} chapterId={chapterId} returnView={view} workspaceId={workspaceId} navigate={navigate} registerGuard={registerGuard} onEvidence={onEvidence} />
-  return <div className="page-scroll"><div className={`serial-studio ${tab === 'map' ? 'viewing-story-map' : ''}`}>
+  if (chapterId) return <ChapterOutlineEditor key={chapterId} novel={novel} chapterId={chapterId} returnView={view} returnDiscussionId={discussionId} workspaceId={workspaceId} navigate={navigate} registerGuard={registerGuard} onEvidence={onEvidence} />
+  return <div className="page-scroll"><div className={`serial-studio ${tab === 'map' ? 'viewing-story-map' : tab === 'discuss' ? 'viewing-planning-discussion' : ''}`}>
     <header className="book-heading"><div className="studio-book-cover" aria-hidden="true"><BookOpen size={28} weight="light" /><span>{novel.title}</span></div><div className="book-heading-main"><div className="book-category">{novel.genre || '题材待定'}<span>/</span>{novel.platform || '自由创作'}{novel.is_demo && <Badge tone="amber">示例</Badge>}</div><h1>{novel.title}</h1><p>{novel.premise || '写下一句故事想法，让 AI 帮你展开。'}</p><div className="book-targets"><span>计划 {number(novel.target_words / 10000)} 万字</span><span>每章 {number(novel.chapter_words)} 字</span><span>{novel.accepted_count} 章已定稿</span></div></div><Button onClick={() => setBrief(true)}><PencilSimple size={17} />编辑作品</Button></header>
     <nav className="creation-steps" aria-label="创作步骤">
       <button className={book ? 'done' : 'current'} aria-current={!book ? 'step' : undefined} onClick={() => { selectTab('book'); setGeneration(book ? null : 'blueprint') }}><span>{book ? <Check size={16} /> : '1'}</span>全书方案</button><i />
       <button className={book && !chapters.data?.some(c => c.goal) ? 'current' : ''} disabled={!book && !volumes.length} onClick={() => { selectTab('volumes'); setGeneration(null) }}><span>2</span>章节细纲</button><i />
       <button onClick={startWriting} disabled={!chapters.data?.length}><span>3</span>开始写作</button>
     </nav>
+    {novel.dirty_from_order != null && <Notice action={<Button onClick={() => setImpactOpen(true)}>查看复核清单</Button>}>第 {novel.dirty_from_order} 章起需要重新复核定稿。</Notice>}
     {resumable && !setupKind && <div className="production-resume"><Sparkle size={18} /><span>{resumable.task === 'blueprint' ? '全书方案' : '章节细纲'} · {jobStateNames[resumable.state]}</span><Button variant="ghost" onClick={() => void resume()}>查看进度<ArrowRight size={16} /></Button></div>}
     {error && <Notice>{error}</Notice>}
     {!setupKind && appliedChapters.length > 0 && <div className="setup-ready" role="status" ref={readyRef} tabIndex={-1}><CheckCircle size={22} /><span>已建立 {appliedChapters.length} 章细纲</span><Button variant="primary" onClick={startWriting}>开始写作<ArrowRight size={17} /></Button></div>}
-    {!setupKind && <div className="studio-tabs"><button className={tab === 'book' ? 'active' : ''} onClick={() => selectTab('book')}>全书设定</button><button className={tab === 'volumes' ? 'active' : ''} onClick={() => selectTab('volumes')}>分卷大纲<span>{volumes.length}</span></button><button className={tab === 'map' ? 'active' : ''} onClick={() => selectTab('map')}>故事脉络</button><Button variant="ghost" onClick={() => setEditing('new')}><Plus size={16} />手动添加</Button></div>}
-    {tab === 'map' && !setupKind ? <StoryMap novelId={novel.id} navigate={navigate} onEvidence={onEvidence} onPlan={() => selectTab('volumes')} /> : plans.isPending || chapters.isPending ? <Loading /> : plans.error || chapters.error ? <Notice>{errorText(plans.error || chapters.error)}</Notice> : setupKind ? <>{production}{!book && <div className="setup-alternative"><button className="text-link" onClick={() => setEditing('new')}>手动添加大纲</button><button className="text-link" onClick={() => { if (chapters.data?.length) startWriting(); else void addChapter() }}>直接开始写作<ArrowRight size={16} /></button></div>}</> : tab === 'book' ? <section className="book-blueprint">{blueprint ? <BlueprintView value={blueprint} /> : <><h2>{book?.title || '作品方向'}</h2><p className="preserve-lines">{book?.body || novel.premise}</p></>}<div className="button-row"><Button onClick={() => book && setEditing(book)}><PencilSimple size={16} />编辑大纲</Button><Button variant="primary" onClick={() => selectTab('volumes')}>规划分卷章节<ArrowRight size={16} /></Button></div></section> : <div className="volume-workspace"><aside className="volume-list"><div className="section-heading"><h2>分卷 <span>{volumes.length}</span></h2><button className="icon-button" aria-label="添加分卷" onClick={() => setEditing('new')}><Plus size={18} /></button></div>{volumes.map(v => <button key={v.id} className={`volume-option ${v.id === volume?.id ? 'active' : ''}`} onClick={() => setSelected(v.id)}><strong>{v.title}</strong><p>{v.body.split('\n')[0]}</p><small>{typeof v.structure?.planned_chapters === 'number' ? `计划 ${v.structure?.planned_chapters} 章` : `${chapters.data?.filter(c => c.volume === v.title).length || 0} 章`}</small></button>)}{!volumes.length && <p className="muted">先添加一个分卷。</p>}<Button variant="ghost" onClick={() => setEditing('new')}><Plus size={17} />添加分卷</Button></aside><section className="volume-chapters"><div className="volume-detail-heading"><div><h2>{volume?.title || '章节'}</h2><p>{volume?.body.split('\n')[0]}</p></div><div className="button-row">{volume && <button className="icon-button" aria-label="编辑分卷" onClick={() => setEditing(volume)}><PencilSimple size={18} /></button>}<Button variant="primary" disabled={!volume} onClick={() => setGeneration('outline')}><Sparkle size={18} />AI 规划后续章节</Button></div></div>{list.length ? <div className="chapter-table"><div className="chapter-table-head"><span>章节</span><span>本章剧情</span><span>状态</span><span /></div>{list.map(c => <ChapterRow key={c.id} chapter={c} onOpen={() => void navigate({ page: 'plot', novelId: novel.id, chapterId: c.id }).catch(e => setError(errorText(e)))} />)}</div> : <Empty icon={<FileText size={30} />} title="这一卷还没有章节" action={<Button onClick={() => setGeneration('outline')} disabled={!volume}>AI 拆分章节<ArrowRight size={17} /></Button>}>每次规划一批，边写边调整。</Empty>}<div className="volume-footer"><button className="text-link" onClick={() => void addChapter()} disabled={busy}><Plus size={18} />手动添加章节</button>{volume && <span className="muted small">{list.length} 章 · {list.filter(c => c.review_state === 'confirmed').length} 章定稿</span>}</div></section></div>}
-    {allPlans.some(p => p.level === 'scene' || (p.level === 'chapter' && !p.structure?.chapter_id)) && <details className="legacy-plans"><summary>其他规划</summary>{allPlans.filter(p => p.level === 'scene' || (p.level === 'chapter' && !p.structure?.chapter_id)).map(p => <button key={p.id} className="legacy-plan" onClick={() => setEditing(p)}><Badge>{labels[p.level]}</Badge>{p.title}<CaretRight size={16} /></button>)}</details>}
+    {!setupKind && <div className="studio-tabs"><button className={tab === 'book' ? 'active' : ''} onClick={() => selectTab('book')}>全书设定</button><button className={tab === 'volumes' ? 'active' : ''} onClick={() => selectTab('volumes')}>分卷大纲<span>{volumes.length}</span></button><button className={tab === 'map' ? 'active' : ''} onClick={() => selectTab('map')}>故事脉络</button><button className={tab === 'discuss' ? 'active' : ''} onClick={() => { setGeneration(null); selectTab('discuss') }}>规划讨论</button>{tab !== 'discuss' && <Button variant="ghost" onClick={() => setEditing('new')}><Plus size={16} />手动添加</Button>}</div>}
+    {tab === 'discuss' && !setupKind ? chapters.isPending ? <Loading /> : chapters.error ? <Notice>{errorText(chapters.error)}</Notice> : <PlanningDiscussions onEvidence={onEvidence} key={workspaceId + ':' + novel.id} novelId={novel.id} discussionId={discussionId} workspaceId={workspaceId} chapters={chapters.data || []} navigate={navigate} /> : tab === 'map' && !setupKind ? <StoryMap novelId={novel.id} navigate={navigate} onEvidence={onEvidence} onPlan={() => selectTab('volumes')} /> : plans.isPending || chapters.isPending ? <Loading /> : plans.error || chapters.error ? <Notice>{errorText(plans.error || chapters.error)}</Notice> : setupKind ? <>{production}{!book && <div className="setup-alternative"><button className="text-link" onClick={() => setEditing('new')}>手动添加大纲</button><button className="text-link" onClick={() => { if (chapters.data?.length) startWriting(); else void addChapter() }}>直接开始写作<ArrowRight size={16} /></button></div>}</> : tab === 'book' ? <section className="book-blueprint">{blueprint ? <BlueprintView value={blueprint} /> : <><h2>{book?.title || '作品方向'}</h2><p className="preserve-lines">{book?.body || novel.premise}</p></>}<div className="button-row"><Button onClick={() => book && setEditing(book)}><PencilSimple size={16} />编辑大纲</Button><Button variant="primary" onClick={() => selectTab('volumes')}>规划分卷章节<ArrowRight size={16} /></Button></div></section> : <div className="volume-workspace"><aside className="volume-list"><div className="section-heading"><h2>分卷 <span>{volumes.length}</span></h2><button className="icon-button" aria-label="添加分卷" onClick={() => setEditing('new')}><Plus size={18} /></button></div>{volumes.map(v => <button key={v.id} className={`volume-option ${v.id === volume?.id ? 'active' : ''}`} onClick={() => setSelected(v.id)}><strong>{v.title}</strong><p>{v.body.split('\n')[0]}</p><small>{typeof v.structure?.planned_chapters === 'number' ? `计划 ${v.structure?.planned_chapters} 章` : `${chapters.data?.filter(c => c.volume === v.title).length || 0} 章`}</small></button>)}{!volumes.length && <p className="muted">先添加一个分卷。</p>}<Button variant="ghost" onClick={() => setEditing('new')}><Plus size={17} />添加分卷</Button></aside><section className="volume-chapters"><div className="volume-detail-heading"><div><h2>{volume?.title || '章节'}</h2><p>{volume?.body.split('\n')[0]}</p></div><div className="button-row">{volume && <button className="icon-button" aria-label="编辑分卷" onClick={() => setEditing(volume)}><PencilSimple size={18} /></button>}<Button variant="primary" disabled={!volume} onClick={() => setGeneration('outline')}><Sparkle size={18} />AI 规划后续章节</Button></div></div>{list.length ? <div className="chapter-table"><div className="chapter-table-head"><span>章节</span><span>本章剧情</span><span>状态</span><span /></div>{list.map(c => <ChapterRow key={c.id} chapter={c} onOpen={() => void navigate({ page: 'plot', novelId: novel.id, chapterId: c.id }).catch(e => setError(errorText(e)))} />)}</div> : <Empty icon={<FileText size={30} />} title="这一卷还没有章节" action={<Button onClick={() => setGeneration('outline')} disabled={!volume}>AI 拆分章节<ArrowRight size={17} /></Button>}>每次规划一批，边写边调整。</Empty>}<div className="volume-footer"><button className="text-link" onClick={() => void addChapter()} disabled={busy}><Plus size={18} />手动添加章节</button>{volume && <span className="muted small">{list.length} 章 · {list.filter(c => c.review_state === 'confirmed').length} 章定稿</span>}</div></section></div>}
+    {tab !== 'discuss' && allPlans.some(p => p.level === 'scene' || (p.level === 'chapter' && !p.structure?.chapter_id)) && <details className="legacy-plans"><summary>其他规划</summary>{allPlans.filter(p => p.level === 'scene' || (p.level === 'chapter' && !p.structure?.chapter_id)).map(p => <button key={p.id} className="legacy-plan" onClick={() => setEditing(p)}><Badge>{labels[p.level]}</Badge>{p.title}<CaretRight size={16} /></button>)}</details>}
 
+    {impactOpen && <ReviewImpactDialog novelId={novel.id} workspaceId={workspaceId} navigate={navigate} onClose={() => setImpactOpen(false)} />}
     {editing && <PlanDialog novelId={novel.id} plan={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
     {brief && <NovelBriefDialog novel={novel} onClose={() => setBrief(false)} />}
   </div></div>
@@ -103,7 +111,7 @@ function ProductionPanel({ novel, kind, volume, resumeId, onSettings, onClose, o
   const cache = useQueryClient()
   const providers = useQuery({ queryKey: ['providers'], queryFn: api.providers })
   const roles = useQuery({ queryKey: ['roles'], queryFn: api.roles })
-  const jobs = useQuery({ queryKey: ['jobs', novel.id], queryFn: () => api.jobs(novel.id) })
+  const jobs = useQuery({ queryKey: ['jobs', novel.id, kind, kind === 'outline' ? volume?.id : null, 'production-summary'], queryFn: () => api.jobHistory({ novel_id: novel.id, task: kind, volume_plan_id: kind === 'outline' ? volume?.id : undefined, pending_only: true, limit: 1 }), enabled: kind === 'blueprint' || !!volume })
   const [chosen, setChosen] = useState('')
   const preferred = providers.data?.find(p => p.id === roles.data?.planner) || providers.data?.find(p => p.kind !== 'demo' && p.has_key)
   const providerId = chosen || preferred?.id || 'demo'
@@ -111,7 +119,7 @@ function ProductionPanel({ novel, kind, volume, resumeId, onSettings, onClose, o
   const [instruction, setInstruction] = useState('')
   const [batch, setBatch] = useState(5)
   const [jobId, setJobId] = useState<string | null>(null)
-  const existing = jobs.data?.find(j => j.task === kind && j.candidate_status !== 'adopted' && j.candidate_status !== 'rejected' && (kind === 'blueprint' || !j.result || (j.result.kind === 'outline' && j.result.volume_title === volume?.title)))
+  const existing = jobs.data?.items[0]
   const id = jobId || resumeId || existing?.id
   const job = useQuery({ queryKey: ['job', id], queryFn: () => api.job(id!, novel.id), enabled: !!id })
   useJobStream(job.data)
