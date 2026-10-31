@@ -4,7 +4,8 @@ param(
     [ValidateRange(1, 65535)][int]$Port = 8765,
     [string]$DataDirectory,
     [switch]$NoBrowser,
-    [switch]$Rebuild
+    [switch]$Rebuild,
+    [switch]$Stop
 )
 
 $ErrorActionPreference = 'Stop'
@@ -125,16 +126,38 @@ function Require-Command([string]$Name, [string]$Hint) {
 
 $lock = $null
 $server = $null
+$serverPort = $null
 $exitCode = 0
 Push-Location $projectRoot
 try {
+    if ($Stop) {
+        & (Join-Path $PSScriptRoot 'stop.ps1') -Port $Port
+        return
+    }
+
     $service = Find-InkloomService
     if ($service.Existing) {
         $url = "http://127.0.0.1:$($service.Port)"
-        Write-Host "Inkloom 已在运行：$url" -ForegroundColor Green
-        if ($Rebuild) { Write-Host '请先在原启动窗口按 Ctrl+C 停止，再运行 -Rebuild。' -ForegroundColor Yellow }
-        Open-Inkloom $url
-        return
+        Write-Host "Inkloom 当前已在运行：$url" -ForegroundColor Green
+        if ($Rebuild) {
+            Write-Host '检测到 -Rebuild 参数，正在停止旧服务以便重新构建...' -ForegroundColor Cyan
+            & (Join-Path $PSScriptRoot 'stop.ps1') -Port $service.Port
+        } else {
+            if (-not $NoBrowser -and [Environment]::UserInteractive -and -not [Console]::IsInputRedirected) {
+                Write-Host ""
+                Write-Host "【快捷选项】" -ForegroundColor Cyan
+                Write-Host "  [Enter] 直接打开浏览器访问"
+                Write-Host "  [Q]     关闭停止 Inkloom 服务"
+                Write-Host ""
+                $choice = Read-Host "请输入选项 (默认 Enter 打开)"
+                if ($choice -match '^[Qq]') {
+                    & (Join-Path $PSScriptRoot 'stop.ps1') -Port $service.Port
+                    return
+                }
+            }
+            Open-Inkloom $url
+            return
+        }
     }
 
     New-Item -ItemType Directory -Path $runtime -Force | Out-Null
@@ -144,7 +167,7 @@ try {
     $service = Find-InkloomService
     if ($service.Existing) {
         $url = "http://127.0.0.1:$($service.Port)"
-        Write-Host "Inkloom 已在运行：$url" -ForegroundColor Green
+        Write-Host "Inkloom 当前已在运行：$url" -ForegroundColor Green
         Open-Inkloom $url
         return
     }
@@ -224,10 +247,16 @@ try {
         if (Test-Path -LiteralPath $errLog) { Get-Content -LiteralPath $errLog -Tail 25 | Write-Host }
         throw "服务未能就绪。诊断日志：$errLog"
     }
-    @{ port = $serverPort } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $runtime "server-$serverPort.json") -Encoding utf8
+    @{
+        port = $serverPort
+        pid = $server.Id
+        workspace_id = $identity
+        started_at = (Get-Date).ToString("o")
+    } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $runtime "server-$serverPort.json") -Encoding utf8
     $lock.Dispose(); $lock = $null
     Write-Host "Inkloom 已启动：$url" -ForegroundColor Green
-    Write-Host '保留此窗口；按 Ctrl+C 停止本次启动的服务。'
+    Write-Host '保留此窗口；按 Ctrl+C 即可停止本次启动的服务。' -ForegroundColor Yellow
+    Write-Host '若已关闭此窗口，也可随时双击运行【关闭 Inkloom.cmd】。' -ForegroundColor Gray
     Write-Host "运行日志：$errLog"
     Open-Inkloom $url
     while (-not $server.WaitForExit(500)) { }
@@ -241,6 +270,10 @@ try {
 } finally {
     # Only this invocation's process tree is owned here. Reused services are untouched.
     if ($null -ne $server -and -not $server.HasExited) { $server.Kill($true); $server.WaitForExit() }
+    if ($null -ne $serverPort) {
+        $receipt = Join-Path $runtime "server-$serverPort.json"
+        if (Test-Path -LiteralPath $receipt) { Remove-Item -LiteralPath $receipt -Force -ErrorAction SilentlyContinue }
+    }
     if ($null -ne $lock) { $lock.Dispose() }
     Pop-Location
 }
