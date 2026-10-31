@@ -1,9 +1,10 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { MagnifyingGlass, User, GlobeHemisphereWest, GitBranch, Clock } from '@phosphor-icons/react'
+import { MagnifyingGlass, User, GlobeHemisphereWest, GitBranch, Clock, X } from '@phosphor-icons/react'
 import { api, errorText } from '../lib/api'
 import type { Chapter } from '../lib/api'
 import { Badge, Button, Empty, Loading, Modal, Notice } from '../components/ui'
+import { getRelationColor } from './RelationshipGraph'
 
 const kinds = { character: '人物', world: '世界设定', thread: '伏笔', timeline: '时间线' } as const
 const icons = { character: User, world: GlobeHemisphereWest, thread: GitBranch, timeline: Clock }
@@ -68,7 +69,7 @@ export function QuickEntitiesDialog({ novelId, chapter, onClose, onReferencesCha
     >
       <div className="quick-entities-modal form-stack">
         <div className="section-toolbar" style={{ gap: '8px', flexWrap: 'wrap' }}>
-          <label className="search-input" style={{ flex: 1, minWidth: '220px' }}>
+          <label className="search-input" style={{ flex: 1, minWidth: '220px', position: 'relative' }}>
             <MagnifyingGlass size={17} />
             <input
               aria-label="搜索设定"
@@ -76,6 +77,17 @@ export function QuickEntitiesDialog({ novelId, chapter, onClose, onReferencesCha
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
+            {search && (
+              <button
+                type="button"
+                className="icon-button"
+                style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', width: '24px', height: '24px' }}
+                onClick={() => setSearch('')}
+                title="清空搜索"
+              >
+                <X size={14} />
+              </button>
+            )}
           </label>
           <div className="filter-pills" role="group" aria-label="类型筛选" style={{ display: 'flex', gap: '4px' }}>
             <Button
@@ -127,9 +139,11 @@ export function QuickEntitiesDialog({ novelId, chapter, onClose, onReferencesCha
                   className="quick-entity-card"
                   style={{
                     border: '1px solid var(--line)',
+                    borderLeft: isPinned ? '3px solid var(--green)' : '1px solid var(--line)',
                     borderRadius: '8px',
                     padding: '12px 16px',
-                    background: isPinned ? 'var(--surface-hover, rgba(0, 128, 128, 0.05))' : 'var(--paper)'
+                    background: isPinned ? 'var(--surface-hover, rgba(0, 128, 128, 0.05))' : 'var(--paper)',
+                    transition: 'border 0.15s ease'
                   }}
                 >
                   <div
@@ -190,10 +204,22 @@ export function QuickEntitiesDialog({ novelId, chapter, onClose, onReferencesCha
                         <span className="small muted">羁绊:</span>
                         {itemRelations.slice(0, 3).map(r => {
                           const partner = r.source_id === item.id ? r.target_name : r.source_name
+                          const { color } = getRelationColor(r.relation_type)
                           return (
-                            <Badge key={r.id} tone="neutral">
+                            <span
+                              key={r.id}
+                              style={{
+                                fontSize: '11px',
+                                fontWeight: '600',
+                                color,
+                                border: `1px solid ${color}`,
+                                background: 'var(--paper)',
+                                borderRadius: '4px',
+                                padding: '1px 6px'
+                              }}
+                            >
                               {r.relation_type}: {partner}
-                            </Badge>
+                            </span>
                           )
                         })}
                         {itemRelations.length > 3 && <span className="small muted">等{itemRelations.length}条关系</span>}
