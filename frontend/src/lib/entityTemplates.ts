@@ -77,3 +77,23 @@ export const entityTemplates: EntityTemplate[] = [
 - 各方势力对此物的图谋与已知情报：`
   }
 ]
+
+/**
+ * Clean up selected manuscript text for quick entity creation:
+ * - Strips enclosing Chinese/English quotation marks: “ ” ‘ ’ " ' 「 」 『 』
+ * - Strips book title and emphasis brackets: 《 》 〈 〉 【 】 [ ] ( ) （ ）
+ * - Strips leading/trailing punctuation marks: ， 。 、 ； ： ！ ？ , . ; : ! ?
+ * - Trims whitespace
+ * - Clamps to 40 characters
+ * - Falls back to non-empty trimmed raw text if stripping empties the string
+ */
+export function cleanEntityName(raw: string): string {
+  if (!raw) return ''
+  const trimmed = raw.trim()
+  const stripped = trimmed
+    .replace(/^["'“”‘’《》〈〉【】\[\]()（）「」『』\s,，.。;；:：!！?？]+/, '')
+    .replace(/["'“”‘’《》〈〉【】\[\]()（）「」『』\s,，.。;；:：!！?？]+$/, '')
+    .trim()
+  return (stripped || trimmed).slice(0, 40)
+}
+

@@ -18,6 +18,7 @@ import { ChapterList } from './ChapterList'
 import { WritingStyleDialog } from './WritingStyleDialog'
 import { rewriteActions } from '../lib/writing'
 import type { RewriteAction, SelectionRewrite } from '../lib/writing'
+import { cleanEntityName } from '../lib/entityTemplates'
 
 type Props = { novel: Novel; chapter: Chapter; chapters: ChapterSummary[]; workspaceId: string; providers: Provider[]; roles: Roles; navigate: Navigate; onEvidence: (e: Evidence) => void; registerGuard: (guard: (() => Promise<unknown>) | null) => void }
 
@@ -283,7 +284,7 @@ function InlineQuickEntityModal({
 }) {
   const cache = useQueryClient()
   const [kind, setKind] = useState<'character' | 'world'>('character')
-  const [name, setName] = useState(initialName.trim().slice(0, 40))
+  const [name, setName] = useState(() => cleanEntityName(initialName))
   const [summary, setSummary] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')

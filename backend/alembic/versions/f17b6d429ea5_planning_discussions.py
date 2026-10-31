@@ -1,5 +1,6 @@
 """Planning conversations and bounded chapter history reads."""
 import sqlalchemy as sa
+
 from alembic import op
 
 revision = "f17b6d429ea5"

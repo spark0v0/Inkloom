@@ -1,5 +1,6 @@
 """Entity relationships table for character network and context grounding."""
 import sqlalchemy as sa
+
 from alembic import op
 
 revision = "1b8c6e431fa7"
