@@ -141,9 +141,6 @@ export function EditorPage({ novel, chapter, chapters, workspaceId, providers, r
     onResolvePrevious: () => {
       if (previous) void navigate({ page: 'write', novelId: novel.id, chapterId: previous.id }).catch(e => setError(errorText(e)))
     },
-    onInsertText: (text: string) => {
-      editor?.chain().focus().insertContent(text).run()
-    }
   }
   async function prepareSelection(action: RewriteAction) {
     if (!selection || preparingSelection || manuscript.composing.current) return

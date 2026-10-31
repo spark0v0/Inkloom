@@ -1,7 +1,7 @@
 /* Inkloom 0.2 — layout references: ui-serial-studio-v3 / ui-chapter-studio-v3. */
 :root {
-  --paper:#fff; --surface:#f7f8fb; --hover:#edf1fa; --line:#e5e8ef; --ink:#202631; --muted:#616b7b;
-  --accent:#246353; --green:var(--accent); --green-dark:#1b4e41; --green-soft:#eaf2ed; --sidebar:216px;
+  --paper:#fff; --surface:#f8fafc; --hover:#edf1fa; --line:#e2e8f0; --ink:#0f172a; --muted:#616b7b;
+  --accent:#0f766e; --green:var(--accent); --green-dark:#115e59; --green-soft:#f0fdfa; --sidebar:216px;
   font-family:'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif; color:var(--ink); background:var(--surface);
 }
 body { font-size:15px; }

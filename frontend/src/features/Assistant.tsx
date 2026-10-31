@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowRight, Check, FileText, Pause, Play, Stop, ArrowCounterClockwise, PenNib, Sparkle, SlidersHorizontal, User, X, Copy } from '@phosphor-icons/react'
+import { ArrowRight, Check, FileText, Pause, Play, Stop, ArrowCounterClockwise, PenNib, Sparkle, SlidersHorizontal, User, X } from '@phosphor-icons/react'
 import { activeStates, ApiError, api, countChars, dateLabel, downloadText, errorText, jobStateNames, number, uuid } from '../lib/api'
 import type { Chapter, Context, ContextInput, Evidence, JobInput, MemoryProposal, Novel, Provider, ReviewRewritePreparation, Roles, Selection, Task, Version } from '../lib/api'
 import { Badge, Button, Field, Modal, Notice } from '../components/ui'
@@ -11,9 +11,6 @@ import { ChapterReferencesDialog } from './ChapterReferencesDialog'
 import { QuickEntitiesDialog } from './QuickEntitiesDialog'
 import { rewriteActions, rewriteTarget } from '../lib/writing'
 import type { SelectionRewrite } from '../lib/writing'
-import { deriveBeatsFromOutline } from '../lib/sceneBeats'
-import { BRAINSTORM_PRESETS } from '../lib/brainstormPresets'
-import type { BrainstormCategory } from '../lib/brainstormPresets'
 
 export type AssistantProps = {
   novel: Novel; chapter: Chapter; providers: Provider[]; roles: Roles;
@@ -24,14 +21,13 @@ export type AssistantProps = {
   onClose?: () => void;
   candidateHost?: HTMLElement | null; onCandidate?: (id: string, show: boolean, label?: string) => void; onShowCandidate?: () => void;
   blockedChapter?: string; onResolvePrevious?: () => void;
-  onInsertText?: (text: string) => void;
 }
 
 function roleFor(task: Task): keyof Roles {
   return task === 'plan' || task === 'inspiration' ? 'planner' : task === 'review' ? 'reviewer' : task === 'extract' || task === 'handoff' ? 'extractor' : 'writer'
 }
 
-export function Assistant({ novel, chapter, providers, roles, flush, selection, quickRewrite, onQuickPrepared, onWritingStyle, onAdopt, onEvidence, onExtractReady, onClose, candidateHost, onCandidate, onShowCandidate, blockedChapter, onResolvePrevious, onInsertText }: AssistantProps) {
+export function Assistant({ novel, chapter, providers, roles, flush, selection, quickRewrite, onQuickPrepared, onWritingStyle, onAdopt, onEvidence, onExtractReady, onClose, candidateHost, onCandidate, onShowCandidate, blockedChapter, onResolvePrevious }: AssistantProps) {
   const cache = useQueryClient()
   const [task, setTask] = useState<Task>('continue')
   const [mode, setMode] = useState<'chapter' | 'continue' | 'rewrite' | 'scene'>('chapter')
@@ -40,31 +36,6 @@ export function Assistant({ novel, chapter, providers, roles, flush, selection, 
   const [scene, setScene] = useState<NonNullable<ContextInput['scene']>>({ goal: '', conflict: '', turn: '', ending: '', viewpoint: '' })
   const [problem, setProblem] = useState('不知道接下来发生什么')
   const [selectedDirection, setDirection] = useState<{ reference: NonNullable<ContextInput['inspiration']>; title: string } | null>(null)
-  const [inspirationTab, setInspirationTab] = useState<'directions' | 'brainstorm'>('directions')
-  const [brainstormCategory, setBrainstormCategory] = useState<BrainstormCategory | 'all'>('all')
-  const [selectedBrainstormId, setSelectedBrainstormId] = useState<string>('name_technique')
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
-  const [activeBrainstormItems, setActiveBrainstormItems] = useState<string[]>(
-    BRAINSTORM_PRESETS[0]?.demoItems || []
-  )
-
-  function selectBrainstormPreset(id: string) {
-    setSelectedBrainstormId(id)
-    const found = BRAINSTORM_PRESETS.find(p => p.id === id)
-    if (found) {
-      setActiveBrainstormItems(found.demoItems)
-      setInstruction(found.instruction)
-      setCopiedIndex(null)
-    }
-  }
-
-  function changeBrainstormCategory(cat: BrainstormCategory | 'all') {
-    setBrainstormCategory(cat)
-    const presets = cat === 'all' ? BRAINSTORM_PRESETS : BRAINSTORM_PRESETS.filter(p => p.category === cat)
-    if (presets.length > 0 && !presets.some(p => p.id === selectedBrainstormId)) {
-      selectBrainstormPreset(presets[0].id)
-    }
-  }
   const [preparedRevision, setPreparedRevision] = useState<ReviewRewritePreparation | null>(null)
   const [preparedSelection, setPreparedSelection] = useState<SelectionRewrite | null>(null)
   const preparedQuickId = useRef<string | null>(null)
@@ -81,25 +52,6 @@ export function Assistant({ novel, chapter, providers, roles, flush, selection, 
   const [showCompare, setShowCompare] = useState(false)
   const [referencesOpen, setReferencesOpen] = useState(false)
   const [entitiesOpen, setEntitiesOpen] = useState(false)
-  const [activeBeatIndex, setActiveBeatIndex] = useState<number>(0)
-  const [justAdoptedBeat, setJustAdoptedBeat] = useState<number | null>(null)
-  const outlineQuery = useQuery({ queryKey: ['chapter-outline', novel.id, chapter.id], queryFn: () => api.chapterOutline(novel.id, chapter.id) })
-  const { beats, isFromOutline } = deriveBeatsFromOutline(outlineQuery.data)
-
-  function applyBeat(index: number) {
-    const b = beats[index]
-    if (!b) return
-    setActiveBeatIndex(index)
-    setScene(current => ({
-      ...current,
-      goal: b.goal,
-      conflict: b.conflict ?? current.conflict,
-      turn: b.turn ?? current.turn,
-      ending: b.ending ?? current.ending
-    }))
-    setTarget(b.suggestedTarget || 800)
-    setContext(null)
-  }
   const [adopting, setAdopting] = useState(false)
   const [budget, setBudget] = useState('')
   const [maxAttempts, setMaxAttempts] = useState(3)
@@ -197,7 +149,6 @@ export function Assistant({ novel, chapter, providers, roles, flush, selection, 
       const version = await flush()
       const adopted = await api.adopt(job.data.id, novel.id, version.id)
       onAdopt(adopted, version); setShowCompare(false); setError('')
-      if (mode === 'scene') setJustAdoptedBeat(activeBeatIndex)
       await cache.invalidateQueries({ queryKey: ['job', job.data.id] }); await cache.invalidateQueries({ queryKey: ['chapters', novel.id] }); await cache.invalidateQueries({ queryKey: ['novel', novel.id] })
     } catch (e) { setError(errorText(e)) } finally { setAdopting(false) }
   }
@@ -264,58 +215,29 @@ export function Assistant({ novel, chapter, providers, roles, flush, selection, 
         {['continue', 'rewrite'].includes(job.data.task) && job.data.output_text && <p className="candidate-count">本次 {number(countChars(job.data.output_text))} 字<span>{job.data.context.target_chars == null ? '原任务目标未知' : `目标 ${number(job.data.context.target_chars)} 字`}</span></p>}
         <details className="call-details"><summary>引用资料与调用记录</summary><button className="text-link" onClick={() => { setContext(job.data!.context); setTab('context') }}>查看引用资料<ArrowRight size={15} /></button><p className="small muted">{dateLabel(job.data.created_at)} · 第 {job.data.attempt_count} 次调用 · {job.data.is_demo ? '本地演示，不计费' : job.data.cost == null ? '实际费用未知' : `${job.data.cost.toFixed(4)} ${job.data.context.currency}`}</p><button className="text-link" onClick={() => downloadText(job.data!.output_text, `${chapter.title}-候选.txt`)}>下载本次结果</button><AttemptHistory attempts={job.data.attempts} currency={job.data.context.currency} /></details>
       </> : <div className="candidate-placeholder"><PenNib size={24} weight="light" /><p>生成的正文会显示在这里</p></div>}</section>
-  const isBrainstorm = task === 'inspiration' && inspirationTab === 'brainstorm'
-  const displayedBrainstormPresets = brainstormCategory === 'all'
-    ? BRAINSTORM_PRESETS
-    : BRAINSTORM_PRESETS.filter(p => p.category === brainstormCategory)
-
   return <aside className="assistant-panel" aria-label="写作助手"><div className="assistant-heading"><strong>AI 写作</strong>{provider?.kind === 'demo' && <Badge tone="amber">演示</Badge>}<select disabled={submissionLocked} aria-label="写作模型" value={providerId} onChange={e => { providerChoices.current[roleFor(task)] = e.target.value; setProviderId(e.target.value); setContext(null) }}>{providers.map(p => <option value={p.id} key={p.id}>{p.name}</option>)}</select>{onClose && <button className="icon-button mobile-only" aria-label="关闭写作助手" onClick={onClose}><X size={18} /></button>}</div>
     <div className="assistant-tabs"><button disabled={submissionLocked} className={!['review', 'inspiration'].includes(task) ? 'active' : ''} onClick={() => { changeTask('continue'); setTab('assistant') }}>写作</button><button disabled={submissionLocked} className={task === 'inspiration' ? 'active' : ''} onClick={() => { changeTask('inspiration'); setTab('assistant') }}>找灵感</button><button disabled={submissionLocked} className={task === 'review' ? 'active' : ''} onClick={() => { changeTask('review'); setTab('assistant') }}>审稿</button></div>
     <div className="assistant-scroll">
       {!['review', 'inspiration'].includes(task) && <div className="writing-mode-tabs"><button disabled={submissionLocked} className={mode === 'chapter' && task === 'continue' ? 'active' : ''} onClick={() => { setMode('chapter'); changeTask('continue') }}>写完整章</button><button disabled={submissionLocked} className={mode === 'continue' && task === 'continue' && target !== 200 ? 'active' : ''} onClick={() => { setMode('continue'); changeTask('continue') }}>续写</button><button disabled={submissionLocked} className={target === 200 && task === 'continue' && mode === 'continue' ? 'active' : ''} onClick={() => { setMode('continue'); setTarget(200); setInstruction('顺着光标前的内容紧凑接写150~250字。注重当下动作与环境承接，快节奏推进，不要总括大意，不要跳过当前场景。'); changeTask('continue') }}>接写200字</button><button disabled={submissionLocked} className={mode === 'scene' && task === 'continue' ? 'active' : ''} onClick={() => { setMode('scene'); setTarget(800); changeTask('continue') }}>写一个场景</button><button disabled={submissionLocked} className={task === 'rewrite' ? 'active' : ''} onClick={() => { setMode('rewrite'); changeTask('rewrite') }}>润色选段</button></div>}
       {task === 'continue' && mode === 'scene' && <section className="scene-composer form-stack" aria-label="本场景要求">
-        <p className="small muted">每次写一场；审阅采纳后接到当前正文末尾。</p>
-        <div className="scene-beat-selector" style={{ marginBottom: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-            <span className="small muted">{isFromOutline ? '本章细纲节拍' : '经典四步节拍'}：</span>
-            {isFromOutline && <Badge tone="green">已绑定细纲</Badge>}
-          </div>
-          <div className="scene-beat-row" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-            {beats.map((b, i) => (
-              <Button
-                key={i}
-                type="button"
-                variant={activeBeatIndex === i ? 'primary' : 'ghost'}
-                onClick={() => applyBeat(i)}
-                style={{ padding: '3px 8px', fontSize: '12px' }}
-              >
-                {b.label}
-              </Button>
-            ))}
-          </div>
+        <p className="small muted">聚焦起草一个独立场景；审阅采纳后自动接到当前正文末尾。</p>
+        <Field label="本场核心事件（要发生什么）"><textarea rows={2} maxLength={1200} value={scene.goal} onChange={e => { setScene({ ...scene, goal: e.target.value }); setContext(null) }} placeholder="例如：主角潜入黑市药坊，与神秘掌柜就关键药材展开试探与交易" /></Field>
+        <Field label="阻碍或对立冲突（可选）"><textarea rows={2} maxLength={1200} value={scene.conflict || ''} onChange={e => { setScene({ ...scene, conflict: e.target.value }); setContext(null) }} placeholder="例如：对方发现主角隐瞒了身份，现场气氛瞬间剑拔弩张" /></Field>
+        <div className="form-row">
+          <Field label="场景篇幅">
+            <select value={target} onChange={e => setTarget(Number(e.target.value))}>
+              <option value={500}>紧凑短场景 (约 500 字)</option>
+              <option value={800}>标准场景 (约 800 字)</option>
+              <option value={1200}>重点长场景 (约 1200 字)</option>
+            </select>
+          </Field>
+          <Field label="叙事视角">
+            <input maxLength={160} value={scene.viewpoint || ''} onChange={e => setScene({ ...scene, viewpoint: e.target.value })} placeholder="默认沿用本书视角" />
+          </Field>
         </div>
-        {justAdoptedBeat !== null && activeBeatIndex < beats.length - 1 && (
-          <div className="next-beat-banner" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: 'var(--green-soft)', borderRadius: '6px' }}>
-            <span className="small" style={{ color: 'var(--green-dark)' }}>上一场已采纳！</span>
-            <Button
-              type="button"
-              variant="primary"
-              style={{ fontSize: '12px', padding: '3px 8px' }}
-              onClick={() => {
-                applyBeat(activeBeatIndex + 1)
-                setJustAdoptedBeat(null)
-              }}
-            >
-              进入 {beats[activeBeatIndex + 1].label} <ArrowRight size={14} />
-            </Button>
-          </div>
-        )}
-        <Field label="本场要发生什么"><textarea rows={2} maxLength={1200} value={scene.goal} onChange={e => { setScene({ ...scene, goal: e.target.value }); setContext(null) }} placeholder="例如：主角与守塔人交涉，争取进入灯塔" /></Field>
-        <Field label="阻碍或冲突"><textarea rows={2} maxLength={1200} value={scene.conflict || ''} onChange={e => { setScene({ ...scene, conflict: e.target.value }); setContext(null) }} placeholder="例如：对方要求交出唯一的钥匙" /></Field>
-        <details><summary>转折、收束与视角</summary><div className="form-stack">
-          <Field label="本场转折"><textarea rows={2} maxLength={1200} value={scene.turn || ''} onChange={e => setScene({ ...scene, turn: e.target.value })} /></Field>
-          <Field label="写到哪里停"><textarea rows={2} maxLength={1200} value={scene.ending || ''} onChange={e => setScene({ ...scene, ending: e.target.value })} /></Field>
-          <Field label="本场视角"><input maxLength={160} value={scene.viewpoint || ''} onChange={e => setScene({ ...scene, viewpoint: e.target.value })} placeholder="沿用本书视角，可留空" /></Field>
+        <details><summary>转折与收尾节点（可选）</summary><div className="form-stack">
+          <Field label="本场转折"><textarea rows={2} maxLength={1200} value={scene.turn || ''} onChange={e => setScene({ ...scene, turn: e.target.value })} placeholder="例如：掌柜突然态度反转，透露惊人消息" /></Field>
+          <Field label="写到哪里停"><textarea rows={2} maxLength={1200} value={scene.ending || ''} onChange={e => setScene({ ...scene, ending: e.target.value })} placeholder="例如：主角拿到药材后从后门离开" /></Field>
         </div></details>
       </section>}
       <div className="assistant-resources">
@@ -327,162 +249,57 @@ export function Assistant({ novel, chapter, providers, roles, flush, selection, 
       <div className="assistant-form"><fieldset className="assistant-inputs" disabled={submissionLocked}>
         {blockedChapter && <Notice tone="neutral" action={<Button onClick={onResolvePrevious}>查看前章</Button>}>提示：前章《{blockedChapter}》尚未定稿。定稿后可沉淀正史事实，你仍可继续撰写本章草稿。</Notice>}
         {task === 'inspiration' && (
-          <div className="inspiration-workspace form-stack" style={{ gap: '10px' }}>
-            <div className="sub-mode-pills" style={{ display: 'flex', gap: '6px', marginBottom: '2px' }}>
-              <Button
-                type="button"
-                variant={inspirationTab === 'directions' ? 'primary' : 'ghost'}
-                onClick={() => setInspirationTab('directions')}
-                style={{ fontSize: '12px', padding: '3px 8px' }}
-              >
-                走向推演
-              </Button>
-              <Button
-                type="button"
-                variant={inspirationTab === 'brainstorm' ? 'primary' : 'ghost'}
-                onClick={() => setInspirationTab('brainstorm')}
-                style={{ fontSize: '12px', padding: '3px 8px' }}
-              >
-                起名与卡文脑暴
-              </Button>
-            </div>
-
-            {inspirationTab === 'directions' ? (
-              <Field label="卡在哪里？">
-                <select value={problem} onChange={e => { setProblem(e.target.value); setContext(null) }}>
-                  {['不知道接下来发生什么', '知道要发生什么，但过渡生硬', '这段太平，缺少冲突', '人物没有理由行动', '剧情重复，想换一种走法'].map(value => <option key={value}>{value}</option>)}
-                </select>
-              </Field>
-            ) : (
-              <div className="brainstorm-panel form-stack" style={{ gap: '8px' }}>
-                <div className="brainstorm-category-pills" style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '2px' }}>
-                  {[
-                    { id: 'all' as const, label: '全部' },
-                    { id: 'names' as const, label: '起名废' },
-                    { id: 'complications' as const, label: '冲突反转' },
-                    { id: 'cliffhangers' as const, label: '断章留钩' },
-                    { id: 'dialogues' as const, label: '爽点对白' },
-                  ].map(cat => (
-                    <Button
-                      key={cat.id}
-                      type="button"
-                      variant={brainstormCategory === cat.id ? 'primary' : 'ghost'}
-                      onClick={() => changeBrainstormCategory(cat.id)}
-                      style={{ fontSize: '11px', padding: '1px 6px', height: '22px' }}
-                    >
-                      {cat.label}
-                    </Button>
-                  ))}
-                </div>
-                <div className="preset-chip-row" style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                  {displayedBrainstormPresets.map(preset => (
-                    <Button
-                      key={preset.id}
-                      type="button"
-                      variant={selectedBrainstormId === preset.id ? 'primary' : 'ghost'}
-                      onClick={() => selectBrainstormPreset(preset.id)}
-                      style={{ fontSize: '11px', padding: '2px 6px' }}
-                    >
-                      {preset.label}
-                    </Button>
-                  ))}
-                </div>
-                <p className="small muted" style={{ margin: '2px 0 4px', fontSize: '11px' }}>
-                  💡 {BRAINSTORM_PRESETS.find(p => p.id === selectedBrainstormId)?.description}
-                </p>
-
-                <div className="brainstorm-results-list form-stack" style={{ gap: '6px', maxHeight: '240px', overflowY: 'auto' }}>
-                  {activeBrainstormItems.map((item, idx) => (
-                    <div
-                      key={idx}
-                      style={{
-                        border: '1px solid var(--line)',
-                        borderRadius: '6px',
-                        padding: '6px 8px',
-                        background: 'var(--surface)'
-                      }}
-                    >
-                      <p style={{ margin: '0 0 4px', fontSize: '12px', lineHeight: '1.4', whiteSpace: 'pre-wrap' }}>
-                        {item}
-                      </p>
-                      <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          style={{ fontSize: '11px', padding: '1px 6px' }}
-                          onClick={() => {
-                            void navigator.clipboard.writeText(item)
-                            setCopiedIndex(idx)
-                            setTimeout(() => setCopiedIndex(null), 2000)
-                          }}
-                        >
-                          <Copy size={12} style={{ marginRight: '2px' }} />
-                          {copiedIndex === idx ? '已复制' : '复制'}
-                        </Button>
-                        {onInsertText && (
-                          <Button
-                            type="button"
-                            variant="primary"
-                            style={{ fontSize: '11px', padding: '1px 6px' }}
-                            onClick={() => onInsertText(item)}
-                          >
-                            <ArrowRight size={12} style={{ marginRight: '2px' }} />
-                            插入正文
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <p className="small muted" style={{ fontSize: '11px', margin: '4px 0 0' }}>
-                  💡 点击“插入正文”可将词条或情节钩子直接插入编辑器光标处，或点击“复制”自由使用。
-                </p>
-              </div>
-            )}
+          <div className="inspiration-workspace form-stack">
+            <Field label="你想打破什么卡文困境？">
+              <select value={problem} onChange={e => { setProblem(e.target.value); setContext(null) }}>
+                <option value="不知道接下来发生什么">推进后续：不知道接下来发生什么，推演3个合理走向</option>
+                <option value="这段太平，缺少冲突">制造波澜：当前剧情太平淡，需要引入意外冲突与危机</option>
+                <option value="人物没有理由行动">强化动机：人物行动牵强，需要补充角色的紧迫动机</option>
+                <option value="剧情重复，想换一种走法">打破套路：避免老套套路，换一种出人意料的逆转走法</option>
+                <option value="知道要发生什么，但过渡生硬">过渡生硬：衔接不顺畅，推演更自然的场景过渡</option>
+              </select>
+            </Field>
+            <p className="small muted">
+              💡 模型将基于当前正文与本章细纲，推演 3 个具有张力的不同走向供你挑选。
+            </p>
           </div>
         )}
-        {selectedDirection && <div className="selected-direction" role="status"><strong>已选：{selectedDirection.title}</strong><p className="small">点击下方按钮生成候选正文。</p><Button variant="ghost" onClick={() => setDirection(null)}>移除方向</Button></div>}
-        {!isBrainstorm && (
-          <Field label={task === 'review' ? '审稿重点' : task === 'inspiration' ? '补充想法（可选）' : '补充要求'}>
-            <textarea
-              aria-label="本次写作要求"
-              rows={3}
-              value={instruction}
-              onChange={e => setInstruction(e.target.value)}
-              placeholder={task === 'inspiration' ? '可留空，让 AI 根据本章给出三个不同走法' : task === 'review' ? '例如：检查人物动机、前后矛盾、重复和节奏' : '例如：加快节奏，让章末留下悬念'}
-              maxLength={12000}
-            />
-          </Field>
-        )}
+        {selectedDirection && <div className="selected-direction" role="status"><strong>已选：{selectedDirection.title}</strong><p className="small">已锁定此剧情方向，点击下方按钮将基于该方向续写正文。</p><Button variant="ghost" onClick={() => setDirection(null)}>清除选定方向</Button></div>}
+        <Field label={task === 'review' ? '审稿重点（可选）' : task === 'inspiration' ? '补充想法或细节（可选）' : '补充要求（可选）'}>
+          <textarea
+            aria-label="本次写作要求"
+            rows={3}
+            value={instruction}
+            onChange={e => setInstruction(e.target.value)}
+            placeholder={task === 'inspiration' ? '例如：希望能体现主角性格的果决；或者让反派露出破绽...' : task === 'review' ? '例如：重点检查人物性格一致性、逻辑漏洞与前后矛盾' : '例如：加快打斗节奏，突出紧迫感，在章末留悬念'}
+            maxLength={12000}
+          />
+        </Field>
         {preparedRevision && <section className="prepared-revision" aria-label="准备改写的段落"><div className="section-heading"><strong role="status">已准备段落改写</strong><Button variant="ghost" onClick={() => changeTask('review')}>取消修稿</Button></div><blockquote tabIndex={0}>{preparedRevision.selection.text}</blockquote><p className="small">{preparedRevision.finding.suggestion}</p></section>}
         {preparedSelection && <section className="prepared-selection" aria-label="准备改写的选段"><div className="section-heading"><strong role="status">已准备{rewriteActions[preparedSelection.action].name}</strong><Button variant="ghost" onClick={() => { changeTask('continue'); setMode('continue') }}>取消选段操作</Button></div><blockquote tabIndex={0}>{preparedSelection.selection.text}</blockquote><p className="small muted">检查原文和要求，点击生成后才调用模型。</p></section>}
         {task === 'rewrite' && !preparedRevision && !preparedSelection && <p className="selection-hint">{selection ? `已选 ${number(Array.from(selection.text).length)} 字符` : '先在正文中选择需要润色的文字。'}</p>}
-        {!isBrainstorm && (
-          <div className="writing-options">
-            <label hidden={task === 'inspiration'}><span className="sr-only">目标字数</span><select aria-label="目标字数" value={target} onChange={e => setTarget(Number(e.target.value))}>{Array.from(new Set([target, 100, 200, 300, 500, 1000, 1500, 2000, 2500, 3000, 4000, 5000, 6000])).sort((a, b) => a - b).map(n => <option key={n} value={n}>{number(n)} 字</option>)}</select></label>
-            <details className="generation-limits"><summary><SlidersHorizontal size={17} />高级</summary><div className="form-stack"><Field label="其他任务"><select aria-label="更多写作任务" value={['plan', 'extract', 'handoff'].includes(task) ? task : ''} onChange={e => e.target.value && changeTask(e.target.value as Task)}><option value="">选择任务</option><option value="plan">场景规划</option><option value="extract">整理本章记忆</option><option value="handoff">章节交接</option></select></Field><Field label="最多调用次数"><select value={maxAttempts} onChange={e => setMaxAttempts(Number(e.target.value))}>{[1, 2, 3, 4, 5].map(n => <option value={n} key={n}>{n} 次</option>)}</select></Field><Field label={`费用上限（${provider?.currency || 'CNY'}）`}><input type="number" min="0.0001" max="10000" step="any" value={budget} onChange={e => setBudget(e.target.value)} placeholder="可选，需要配置价格" /></Field></div></details>
-          </div>
-        )}
+        <div className="writing-options">
+          <label hidden={task === 'inspiration'}><span className="sr-only">目标字数</span><select aria-label="目标字数" value={target} onChange={e => setTarget(Number(e.target.value))}>{Array.from(new Set([target, 100, 200, 300, 500, 800, 1000, 1200, 1500, 2000, 2500, 3000, 4000, 5000, 6000])).sort((a, b) => a - b).map(n => <option key={n} value={n}>{number(n)} 字</option>)}</select></label>
+          <details className="generation-limits"><summary><SlidersHorizontal size={17} />高级</summary><div className="form-stack"><Field label="其他任务"><select aria-label="更多写作任务" value={['plan', 'extract', 'handoff'].includes(task) ? task : ''} onChange={e => e.target.value && changeTask(e.target.value as Task)}><option value="">选择任务</option><option value="plan">场景规划</option><option value="extract">整理本章记忆</option><option value="handoff">章节交接</option></select></Field><Field label="最多调用次数"><select value={maxAttempts} onChange={e => setMaxAttempts(Number(e.target.value))}>{[1, 2, 3, 4, 5].map(n => <option value={n} key={n}>{n} 次</option>)}</select></Field><Field label={`费用上限（${provider?.currency || 'CNY'}）`}><input type="number" min="0.0001" max="10000" step="any" value={budget} onChange={e => setBudget(e.target.value)} placeholder="可选，需要配置价格" /></Field></div></details>
+        </div>
         {provider?.kind !== 'demo' && !provider?.has_key && <Notice>请先在模型设置中填写 API Key。</Notice>}
         {provider?.kind !== 'demo' && provider && ['continue', 'rewrite'].includes(task) && provider.max_output_tokens < target * 1.6 && <p className="model-disclosure">模型输出上限偏小，整章可能截断。可在模型设置中调大。</p>}
         </fieldset>
-        {!isBrainstorm && (
-          <Button
-            id={`generate-${chapter.id}`}
-            variant="primary"
-            className="full-width"
-            disabled={!!active || generating.isPending || preparingRevision || (!pendingSubmission.current && task === 'continue' && mode === 'scene' && !scene.goal.trim()) || !provider || (provider.kind !== 'demo' && !provider.has_key) || (task === 'rewrite' && !selection && !preparedRevision && !preparedSelection)}
-            onClick={() => generating.mutate()}
-          >
-            <Sparkle size={19} />
-            {generating.isPending ? '正在提交…' : pendingSubmission.current ? '确认上次提交' : preparedRevision ? '按建议改写' : preparedSelection ? `生成${rewriteActions[preparedSelection.action].name}候选` : task === 'inspiration' ? '找三个走向' : selectedDirection ? '按此方向续写' : task === 'extract' ? '整理本章记忆' : task === 'review' ? '审阅本章' : task === 'plan' ? '生成场景计划' : task === 'handoff' ? '生成章节交接' : task === 'rewrite' ? '润色选段' : mode === 'chapter' ? (chapter.char_count ? '重写本章正文' : '生成本章正文') : mode === 'scene' ? '生成场景草稿' : '继续写作'}
-          </Button>
-        )}
+        <Button
+          id={`generate-${chapter.id}`}
+          variant="primary"
+          className="full-width"
+          disabled={!!active || generating.isPending || preparingRevision || (!pendingSubmission.current && task === 'continue' && mode === 'scene' && !scene.goal.trim()) || !provider || (provider.kind !== 'demo' && !provider.has_key) || (task === 'rewrite' && !selection && !preparedRevision && !preparedSelection)}
+          onClick={() => generating.mutate()}
+        >
+          <Sparkle size={19} />
+          {generating.isPending ? '正在提交…' : pendingSubmission.current ? '确认上次提交' : preparedRevision ? '按建议改写' : preparedSelection ? `生成${rewriteActions[preparedSelection.action].name}候选` : task === 'inspiration' ? '寻找 3 个破局走向' : selectedDirection ? '按此方向续写' : task === 'extract' ? '整理本章记忆' : task === 'review' ? '审阅本章' : task === 'plan' ? '生成场景计划' : task === 'handoff' ? '生成章节交接' : task === 'rewrite' ? '润色选段' : mode === 'chapter' ? (chapter.char_count ? '重写本章正文' : '生成本章正文') : mode === 'scene' ? '生成场景草稿' : '继续写作'}
+        </Button>
       </div>
       {(error || generating.error || preparing.error) && <Notice>{error || errorText(generating.error ?? preparing.error)}{pendingSubmission.current && <span className="block small">上次提交尚未确认，暂时锁定写作要求。点击“确认上次提交”继续处理同一次请求。</span>}</Notice>}
       {inDocument ? <div className="candidate-summary"><Badge>{job.data?.candidate_status === 'adopted' ? '已采纳' : job.data ? jobStateNames[job.data.state] : ''}</Badge><Button onClick={onShowCandidate}>{job.data?.task === 'inspiration' ? '查看剧情灵感' : job.data?.task === 'review' ? '查看审稿意见' : '查看 AI 草稿'}<ArrowRight size={16} /></Button><p className="small muted">{job.data?.task === 'inspiration' ? (job.data.result?.kind === 'inspiration' ? '三个剧情方向' : active ? '正在寻找剧情方向' : '剧情方向未完成') : job.data?.task === 'review' ? (job.data.result?.kind === 'review' ? `${job.data.result.findings.length} 条审稿意见` : '正在整理审稿意见') : `${number(countChars(job.data?.output_text || ''))} 字`} · {job.data?.is_demo ? '演示样例' : job.data?.context.model}</p></div> : candidate}
       {inDocument && createPortal(candidate, candidateHost!)}
-      {!isBrainstorm && <button className="text-link context-trigger" onClick={() => preparing.mutate()} disabled={preparing.isPending}>查看将引用的资料<ArrowRight size={15} /></button>}
+      <button className="text-link context-trigger" onClick={() => preparing.mutate()} disabled={preparing.isPending}>查看将引用的资料<ArrowRight size={15} /></button>
     </div><footer className="assistant-footer">{provider?.kind === 'demo' ? '演示模式 · 固定样例' : `发送至 ${provider?.name || '所选模型服务'}`}</footer>
     {referencesOpen && <ChapterReferencesDialog novelId={novel.id} chapter={chapter} onClose={() => setReferencesOpen(false)} onSaved={() => { setReferencesOpen(false); setContext(null); setExcluded([]); setDirection(null); setPreparedRevision(null); setError('') }} />}
     {entitiesOpen && <QuickEntitiesDialog novelId={novel.id} chapter={chapter} onClose={() => setEntitiesOpen(false)} onReferencesChanged={() => { void cache.invalidateQueries({ queryKey: ['chapters', novel.id] }); setContext(null) }} />}
