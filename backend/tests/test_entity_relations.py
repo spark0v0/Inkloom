@@ -122,3 +122,54 @@ def test_relation_context_injection(library, generation):
         user_msg = ctx["messages"][1]["content"]
         assert "退婚宿敌" in user_msg
         assert "三年之约" in user_msg
+
+
+def test_one_hop_relation_partner_auto_included(library, generation):
+    novel = library.create_novel(dto.NovelInput(title="一跳关系测试"))
+    c1 = library.put_entity(
+        novel.id,
+        dto.EntityInput(kind="character", name="陆离", summary="隐匿修士"),
+    )
+    c2 = library.put_entity(
+        novel.id,
+        dto.EntityInput(kind="character", name="灵珑仙子", summary="护道师尊"),
+    )
+    library.create_relation(
+        novel.id,
+        dto.RelationInput(
+            source_id=c1.id,
+            target_id=c2.id,
+            relation_type="师徒",
+            description="传授上清引雷诀，赐下护身玉佩",
+            bidirectional=True,
+        ),
+    )
+
+    # Goal ONLY mentions 陆离, not 灵珑仙子
+    chapter = library.create_chapter(
+        novel.id,
+        dto.ChapterInput(title="第2章 密室打坐", goal="陆离在密室中引雷入体"),
+    )
+
+    with library.ws.session() as s:
+        ctx = build_context(
+            s,
+            novel.id,
+            dto.ContextInput(
+                chapter_id=chapter.id,
+                base_version_id=chapter.working_version_id,
+                task="continue",
+                target_chars=800,
+                provider_id="demo",
+            ),
+        )
+        # Even though 灵珑仙子 wasn't mentioned in goal, she is auto-pulled via 1-hop relation
+        assert len(ctx["preview"]["character_relations"]) == 1
+        rel = ctx["preview"]["character_relations"][0]
+        assert rel["relation_type"] == "师徒"
+        assert rel["source_name"] == "陆离"
+        assert rel["target_name"] == "灵珑仙子"
+        entity_names = {e["name"] for e in ctx["preview"]["entities"]}
+        assert "陆离" in entity_names
+        assert "灵珑仙子" in entity_names
+

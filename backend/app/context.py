@@ -154,6 +154,19 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
     # the context budget rejects an oversized request instead of silently dropping them.
     required_ids = {e.id for e in matched} | {e.id for e in all_entities if e.kind == "world"} | {
         e.id for e in pinned_entities}
+    matched_char_ids = {e.id for e in matched if e.kind == "character"}
+    if matched_char_ids:
+        rel_partners = session.scalars(
+            select(EntityRelation).where(
+                EntityRelation.novel_id == novel_id,
+                (EntityRelation.source_id.in_(matched_char_ids)) | (EntityRelation.target_id.in_(matched_char_ids)),
+            )
+        ).all()
+        all_ids = {e.id for e in all_entities}
+        for r in rel_partners[:12]:
+            partner_id = r.target_id if r.source_id in matched_char_ids else r.source_id
+            if partner_id in all_ids:
+                required_ids.add(partner_id)
     from .threads import thread_context
     thread_guidance, thread_sources = thread_context(session, novel_id, narrative_position, required_ids)
     if any(source["source_id"] in request.excluded_source_ids for source in thread_sources):
