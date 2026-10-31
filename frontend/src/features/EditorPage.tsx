@@ -209,39 +209,42 @@ export function EditorPage({ novel, chapter, chapters, workspaceId, providers, r
       {!compact && <nav className="document-tabs" aria-label="稿件视图"><button aria-pressed={!candidateView} onClick={() => setCandidateView(false)}>正文</button><button aria-pressed={candidateView} disabled={!hasCandidate || !assistantOpen} onClick={() => setCandidateView(true)}>{candidateLabel}</button><span>{chapter.title}</span></nav>}
       <div className="editor-toolbar"><div className="button-row"><button className="icon-button mobile-directory-toggle" aria-label="打开章节目录" onClick={() => setDirectoryOpen(true)}><List size={20} /></button><span className="editor-volume">{chapter.volume}</span><span className="toolbar-divider" /><button className={`icon-button ${editor?.isActive('bold') ? 'selected' : ''}`} aria-label="加粗" aria-pressed={editor?.isActive('bold')} onMouseDown={e => e.preventDefault()} onClick={() => editor?.chain().focus().toggleBold().run()}><TextB size={18} /></button><button className="icon-button" aria-label="斜体" onMouseDown={e => e.preventDefault()} onClick={() => editor?.chain().focus().toggleItalic().run()}><TextItalic size={18} /></button><button className="icon-button" aria-label="撤销" onClick={() => editor?.chain().focus().undo().run()}><ArrowCounterClockwise size={17} /></button><button className="icon-button" aria-label="重做" onClick={() => editor?.chain().focus().redo().run()}><ArrowClockwise size={17} /></button></div><div className="button-row"><button className="icon-button pane-toggle desktop-directory-toggle" aria-label={directoryVisible ? '收起章节目录' : '展开章节目录'} aria-expanded={directoryVisible} title={directoryVisible ? '收起章节目录' : '展开章节目录'} onClick={() => setDirectoryVisible(!directoryVisible)}><List size={18} /><span className="toolbar-label">目录</span></button><label className="reading-font"><span className="sr-only">正文字体</span><select aria-label="正文字体" value={fontFamily} onChange={e => setFontFamily(e.target.value === 'serif' ? 'serif' : 'sans')}><option value="sans">黑体</option><option value="serif">宋体</option></select></label><label className="font-size-label"><span className="sr-only">正文字号</span><select aria-label="正文字号" value={fontSize} onChange={e => setFontSize(Number(e.target.value))}><option value={16}>16</option><option value={18}>18</option><option value={20}>20</option><option value={22}>22</option></select></label><button className="icon-button focus-toggle" aria-label={focused ? '退出专注写作' : '专注写作'} onClick={() => setFocused(!focused)}><Article size={19} /></button><button className="icon-button pane-toggle desktop-assistant-toggle" aria-expanded={assistantOpen} title={assistantOpen ? '收起写作助手' : '展开写作助手'} aria-label={assistantOpen ? '收起写作助手' : '展开写作助手'} onClick={() => { setAssistantOpen(!assistantOpen); setCandidateView(false) }}><SidebarSimple size={19} /><span className="toolbar-label">助手</span></button><button className="icon-button mobile-assistant-toggle" aria-label="打开写作助手" onClick={() => setMobileAssistant(true)}><Sparkle size={20} /></button></div></div>
       {!candidateView && selection && (
-        <div className="selection-actions" role="group" aria-label="选段快捷操作" style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontWeight: 600, color: 'var(--ink)', marginRight: '4px' }}>已选 {Array.from(selection.text).length} 字</span>
-          {Object.entries(rewriteActions).map(([action, value]) => (
-            <Button
-              key={action}
-              disabled={preparingSelection}
-              onMouseDown={e => e.preventDefault()}
-              onClick={() => void prepareSelection(action as RewriteAction)}
-              aria-label={`准备${value.name}选段`}
-              style={{ fontSize: '12px', padding: '3px 8px' }}
-            >
-              {value.name}
-            </Button>
-          ))}
+        <div className="selection-actions" role="group" aria-label="选段快捷操作">
+          <span className="selection-count">已选 {Array.from(selection.text).length} 字</span>
+          <div className="selection-btn-group">
+            {Object.entries(rewriteActions).map(([action, value]) => (
+              <Button
+                key={action}
+                disabled={preparingSelection}
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => void prepareSelection(action as RewriteAction)}
+                aria-label={`准备${value.name}选段`}
+                className="selection-action-btn"
+              >
+                {value.name}
+              </Button>
+            ))}
+          </div>
           <Button
             variant="ghost"
             disabled={preparingSelection}
             onMouseDown={e => e.preventDefault()}
             onClick={() => setQuickEntityText(selection.text)}
             title="将选中的词条快速存入设定库"
-            style={{ fontSize: '12px', padding: '3px 8px' }}
+            className="selection-entity-btn"
           >
             + 记为设定
           </Button>
-          <Button
-            variant="ghost"
+          <button
+            type="button"
+            className="icon-button selection-close-btn"
             disabled={preparingSelection}
             aria-label="收起选段快捷操作"
             onMouseDown={e => e.preventDefault()}
             onClick={() => setSelection(null)}
           >
-            <X size={16} />
-          </Button>
+            <X size={15} />
+          </button>
         </div>
       )}
       <div className="candidate-host" ref={setCandidateHost} hidden={!candidateView} />
