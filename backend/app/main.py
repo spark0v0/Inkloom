@@ -317,8 +317,9 @@ def create_app(data_dir: Path | None = None, *, worker: bool = True, port: int =
         return request.app.state.library.update_relation(novel_id, relation_id, data)
 
     @app.delete(prefix + "/novels/{novel_id}/relations/{relation_id}")
-    def remove_relation(novel_id: str, relation_id: str, request: Request):
-        request.app.state.library.delete_relation(novel_id, relation_id)
+    def remove_relation(novel_id: str, relation_id: str, request: Request,
+                        base_updated_at: Annotated[str, Query(min_length=1, max_length=64)]):
+        request.app.state.library.delete_relation(novel_id, relation_id, base_updated_at)
         return {"ok": True}
 
     @app.get(prefix + "/novels/{novel_id}/threads", response_model=list[dto.ThreadOut])

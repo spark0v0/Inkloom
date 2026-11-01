@@ -14,7 +14,7 @@ from app.chapter_outlines import ChapterOutlines
 from app.context import validate_result
 from app.discussion_sources import validate_snapshot
 from app.discussions import Discussions
-from app.domain import DomainError, uid
+from app.domain import DomainError, digest, uid
 from app.models import Job, Provider
 from app.providers import StreamPart, demo_text
 from app.workspace_io import activate_restore, backup, restore
@@ -52,6 +52,7 @@ def test_explicit_manuscript_and_cards_have_verified_sources_and_stale_protectio
         tampered = json.loads(json.dumps(snapshot))
         tampered['input']['sources'][0]['text'] = '伪造的原文'
         tampered['preview']['sources'][0]['text'] = '伪造的原文'
+        tampered['messages'][1]['content'] = json.dumps(tampered['input'], ensure_ascii=False)
         with pytest.raises(DomainError, match='不可变正文'):
             validate_snapshot(connection, novel.id, data.discussion, tampered)
     restored = restore(workspace, archive)
@@ -101,6 +102,63 @@ def test_a_selected_manuscript_change_after_preview_rejects_sending(library, gen
     with pytest.raises(DomainError) as error:
         generation.create(novel.id, data)
     assert error.value.code == 'DISCUSSION_CONTEXT_CHANGED'
+
+
+def test_pre_manuscript_discussion_receipt_replays_but_new_scope_cannot_reuse_it(library, generation, workspace):
+    novel, chapter, _, conversation = setup(library, workspace)
+    data = request(chapter, conversation)
+    job = generation.create(novel.id, data)
+    legacy = data.model_dump()
+    legacy.pop("scene")
+    legacy["discussion"].pop("manuscripts")
+    legacy["discussion"].pop("entity_ids")
+    with workspace.session(write=True) as session:
+        session.get(Job, job.id).request_hash = digest(legacy)
+    assert generation.create(novel.id, data).id == job.id
+    entity = library.put_entity(novel.id, dto.EntityInput(kind="character", name="守塔人"))
+    data.discussion.entity_ids = [entity.id]
+    with pytest.raises(DomainError) as error:
+        generation.create(novel.id, data)
+    assert error.value.code == "IDEMPOTENCY_CONFLICT"
+
+
+@pytest.mark.parametrize("tamper", ["evidence", "message", "legacy-scope"])
+def test_restore_rejects_tampered_manuscript_discussion(library, generation, workspace, tmp_path, tamper):
+    novel, chapter, _, conversation = setup(library, workspace)
+    version = library.save(novel.id, chapter.id, dto.SaveInput(base_version_id=chapter.working_version_id,
+        operation_id=uid("save"), text="守塔人将钥匙留在门边。"))
+    chapter = library.chapter(novel.id, chapter.id)
+    data = request(chapter, conversation)
+    data.discussion.manuscripts = [dto.ChapterReferenceVersion(chapter_id=chapter.id, version_id=version.id)]
+    job = execute(generation, novel, data)
+    original_id = workspace.db.workspace_id
+    with zipfile.ZipFile(io.BytesIO(backup(workspace))) as archive:
+        manifest = json.loads(archive.read("manifest.json"))
+        path = tmp_path / "tampered-material.db"
+        path.write_bytes(archive.read("workspace.db"))
+    with sqlite3.connect(path) as connection:
+        raw_context, raw_result = connection.execute("SELECT context,result FROM jobs WHERE id=?", (job.id,)).fetchone()
+        context, result = json.loads(raw_context), json.loads(raw_result)
+        assert result["evidence"]
+        if tamper == "evidence":
+            result["evidence"][0]["novel_id"] = "foreign-book"
+        elif tamper == "message":
+            context["messages"][1]["content"] = json.dumps({"message": "预览没有列出的资料"})
+        else:
+            context["prompt_version"] = "discuss-v1"
+            context["preview"]["discussion"]["manuscripts"] = []
+        connection.execute("UPDATE jobs SET context=?,result=? WHERE id=?",
+            (json.dumps(context), json.dumps(result), job.id))
+        connection.commit()
+        raw = connection.serialize()
+    manifest["files"]["workspace.db"] = {"bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w") as archive:
+        archive.writestr("manifest.json", json.dumps(manifest))
+        archive.writestr("workspace.db", raw)
+    with pytest.raises(DomainError):
+        restore(workspace, output.getvalue())
+    assert workspace.db.workspace_id == original_id
 
 
 @pytest.fixture(autouse=True)

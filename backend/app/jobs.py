@@ -30,6 +30,7 @@ from .providers import (
     completion_cost,
     model_catalog,
     normalize_endpoint,
+    requires_api_key,
     stream_completion,
 )
 from .storage import Workspace
@@ -76,8 +77,9 @@ class Generation:
 
     def _provider_out(self, provider: Provider) -> dto.ProviderOut:
         values = {key: getattr(provider, key) for key in dto.ProviderOut.model_fields
-                  if key not in {"has_key", "secret_persistent"}}
+                  if key not in {"has_key", "secret_persistent", "requires_key"}}
         return dto.ProviderOut(**values,
+            requires_key=provider.kind != "demo" and requires_api_key(provider.base_url),
             has_key=self.ws.db.secrets.has(provider.id, provider.key_env),
             secret_persistent=self.ws.db.secrets.persistent)
 
@@ -93,6 +95,12 @@ class Generation:
             provider = s.get(Provider, provider_id) if provider_id else None
             if provider_id and (provider is None or provider.kind == "demo"):
                 raise DomainError("PROVIDER_NOT_EDITABLE", "此模型连接不能修改。", 404)
+            if provider is not None and provider.base_url != base_url:
+                if ((provider.key_env and data.key_env == provider.key_env)
+                        or (self.ws.db.secrets.has(provider.id) and not data.clear_key
+                            and not (data.api_key and data.api_key.get_secret_value()))):
+                    raise DomainError("PROVIDER_CREDENTIAL_SCOPE",
+                        "服务地址已更换。请清除旧密钥并为新服务重新配置凭证，或另建连接。", 409)
             values = data.model_dump(exclude={"api_key", "clear_key"})
             values["base_url"] = base_url
             if provider is None:
@@ -119,7 +127,7 @@ class Generation:
                     message="演示模型在本机运行，不调用外部服务。")
             key = self.ws.db.secrets.get(provider.id, provider.key_env)
             url, model = provider.base_url, provider.model
-        if not key:
+        if not key and requires_api_key(url):
             raise DomainError("PROVIDER_KEY_MISSING", "请先配置密钥。")
         try:
             models = await model_catalog(url, key)
@@ -173,7 +181,8 @@ class Generation:
                 raise DomainError("JOB_ACTIVE", "本书已有生成任务，请等待完成或取消后再试。", 409)
             context = build_context(s, novel_id, request)
             config = context["provider"]
-            if config["kind"] != "demo" and not self.ws.db.secrets.has(config["id"], config["key_env"]):
+            if (config["kind"] != "demo" and requires_api_key(config["base_url"])
+                    and not self.ws.db.secrets.has(config["id"], config["key_env"])):
                 raise DomainError("PROVIDER_KEY_MISSING", "请先配置模型密钥，或明确选择演示模型。")
             estimate = context["preview"]["estimated_max_cost"]
             if request.max_cost is not None and estimate is None:
@@ -433,6 +442,9 @@ class Generation:
                 if job is None:
                     return
                 context = job.context
+                provider = s.get(Provider, job.provider_id)
+                if provider is None or provider.revision != context["provider"]["revision"]:
+                    raise ProviderFailure("PROVIDER_CHANGED", "模型连接在派发前已改变，未发送请求。请重新准备任务。")
                 key = self.ws.db.secrets.get(job.provider_id, context["provider"]["key_env"])
                 job.checkpoint = "dispatched"
                 s.get(Attempt, attempt_id).call_state = "dispatch_started"

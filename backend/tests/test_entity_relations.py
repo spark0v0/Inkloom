@@ -62,12 +62,12 @@ def test_relation_crud(library):
     updated = library.update_relation(
         novel.id,
         rel.id,
-        dto.RelationUpdate(description="青梅竹马，因九品玄丹之争暗生嫌隙"),
+        dto.RelationUpdate(base_updated_at=rel.updated_at, description="青梅竹马，因九品玄丹之争暗生嫌隙"),
     )
     assert updated.description == "青梅竹马，因九品玄丹之争暗生嫌隙"
 
     # Delete relation
-    library.delete_relation(novel.id, rel.id)
+    library.delete_relation(novel.id, rel.id, updated.updated_at)
     assert len(library.relations(novel.id)) == 0
 
 
@@ -172,4 +172,40 @@ def test_one_hop_relation_partner_auto_included(library, generation):
         entity_names = {e["name"] for e in ctx["preview"]["entities"]}
         assert "陆离" in entity_names
         assert "灵珑仙子" in entity_names
+
+
+def test_relation_edits_and_deletes_require_the_displayed_revision(client):
+    novel = client.post("/api/v1/novels", json={"title": "关系并发"}).json()
+    path = f"/api/v1/novels/{novel['id']}"
+    people = [client.post(path + "/entities", json={"kind": "character", "name": name}).json()
+        for name in ("林舟", "守塔人")]
+    relation = client.post(path + "/relations", json={"source_id": people[0]["id"],
+        "target_id": people[1]["id"], "relation_type": "师徒", "bidirectional": False}).json()
+    route = path + f"/relations/{relation['id']}"
+    assert client.put(route, json={"description": "没有基线"}).status_code == 422
+    first = client.put(route, json={"base_updated_at": relation["updated_at"], "description": "一窗的新描述"})
+    assert first.status_code == 200
+    stale = client.put(route, json={"base_updated_at": relation["updated_at"], "relation_type": "敌对"})
+    assert stale.status_code == 409 and stale.json()["code"] == "RELATION_CONFLICT"
+    assert client.delete(route).status_code == 422
+    assert client.delete(route, params={"base_updated_at": relation["updated_at"]}).status_code == 409
+    incoming = client.get(path + "/relations", params={"entity_id": people[1]["id"]}).json()
+    assert len(incoming) == 1 and incoming[0]["bidirectional"] is False
+    assert incoming[0]["description"] == "一窗的新描述"
+    assert client.delete(route, params={"base_updated_at": first.json()["updated_at"]}).status_code == 200
+
+
+def test_relation_duplicate_rename_and_blank_type_are_domain_errors(client):
+    novel = client.post("/api/v1/novels", json={"title": "关系约束"}).json()
+    path = f"/api/v1/novels/{novel['id']}"
+    people = [client.post(path + "/entities", json={"kind": "character", "name": name}).json()
+        for name in ("林舟", "守塔人")]
+    pair = {"source_id": people[0]["id"], "target_id": people[1]["id"]}
+    blank = client.post(path + "/relations", json={**pair, "relation_type": "   "})
+    assert blank.status_code == 400
+    for label in ("师徒", "旧识"):
+        relation = client.post(path + "/relations", json={**pair, "relation_type": label}).json()
+    response = client.put(path + f"/relations/{relation['id']}", json={
+        "base_updated_at": relation["updated_at"], "relation_type": "师徒"})
+    assert response.status_code == 409 and response.json()["code"] == "RELATION_EXISTS"
 

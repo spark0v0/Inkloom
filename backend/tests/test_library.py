@@ -230,10 +230,12 @@ def test_ten_chapter_demo_loop_then_rebuild_dirty_suffix(library, generation):
     library.save(novel.id, third.id, dto.SaveInput(base_version_id=third.version.id,
         operation_id=uid("save"), text="第3日的潮汐记录被作者重新核对。"))
     assert library.novel(novel.id).dirty_from_order == 3
-    with pytest.raises(DomainError) as error:
-        generation.preview(novel.id, dto.ContextInput(chapter_id=chapters[9].id,
-            base_version_id=chapters[9].version.id, task="continue"))
-    assert error.value.code == "CANON_DIRTY"
+    preview = generation.preview(novel.id, dto.ContextInput(chapter_id=chapters[9].id,
+        base_version_id=chapters[9].version.id, task="continue"))
+    assert any("待复核" in notice for notice in preview.notices)
+    assert all(source.chapter_position < 3 or source.chapter_id == chapters[9].id
+               for source in preview.sources)
+    assert all(fact.chapter_id in {item.id for item in chapters[:2]} for fact in preview.facts)
     for chapter in chapters[2:]:
         current = library.chapter(novel.id, chapter.id)
         library.confirm(novel.id, chapter.id, dto.CanonInput(version_id=current.version.id,

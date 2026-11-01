@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { CheckCircle, Plus, Sparkle, X } from '@phosphor-icons/react'
-import { activeStates, ApiError, api, dateLabel, errorText, number, uuid } from '../lib/api'
+import { canUseProvider, activeStates, ApiError, api, dateLabel, errorText, number, uuid } from '../lib/api'
 import type { CanonPreparation, Chapter, Evidence, JobInput, MemoryProposal, Novel, Provider, Roles, Version } from '../lib/api'
 import { Badge, Button, Field, Loading, Modal, Notice } from '../components/ui'
 import { SourceButton } from './JobPresentation'
@@ -110,7 +110,7 @@ export function CanonDialog({ novel, chapter, version, workspaceId, proposed: in
       <legend className="sr-only">本章记忆与原文依据</legend>
       <section className="finalize-memory">
         <div className="section-heading"><div><h3>本章记忆</h3><p className="muted small">{basis?.confirmed ? '已载入作者确认的记忆，修改后可重新定稿。' : '整理人物变化与伏笔，供后文引用。'}</p></div><Badge tone={provider?.kind === 'demo' ? 'amber' : 'neutral'}>{provider?.kind === 'demo' ? '演示样例' : provider?.model}</Badge></div>
-        <div className="finalize-model-row"><label><span className="sr-only">记忆整理模型</span><select aria-label="记忆整理模型" disabled={busy || active || !!pending.current} value={providerId} onChange={e => setProviderId(e.target.value)}>{providers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label><Button onClick={() => void summarize()} disabled={busy || active || !provider || (provider.kind !== 'demo' && !provider.has_key)}><Sparkle size={17} />{active ? '正在整理…' : pending.current ? '确认上次提交' : 'AI 整理本章记忆'}</Button></div>
+        <div className="finalize-model-row"><label><span className="sr-only">记忆整理模型</span><select aria-label="记忆整理模型" disabled={busy || active || !!pending.current} value={providerId} onChange={e => setProviderId(e.target.value)}>{providers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label><Button onClick={() => void summarize()} disabled={busy || active || !canUseProvider(provider)}><Sparkle size={17} />{active ? '正在整理…' : pending.current ? '确认上次提交' : 'AI 整理本章记忆'}</Button></div>
         {pending.current && <Notice>上次提交尚未确认，将使用原模型确认同一次请求。</Notice>}
         {job.data?.error_message && <Notice>{job.data.error_message}</Notice>}
         {!proposed.length && !active && basis && <p className="small muted">也可以直接定稿，仅将正文用于后续创作。</p>}

@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { MagnifyingGlass, User, GlobeHemisphereWest, GitBranch, Clock, X } from '@phosphor-icons/react'
-import { api, errorText } from '../lib/api'
+import { ApiError, api, errorText } from '../lib/api'
 import type { Chapter } from '../lib/api'
 import { Badge, Button, Empty, Loading, Modal, Notice } from '../components/ui'
 import { getRelationColor } from './RelationshipGraph'
@@ -27,6 +27,8 @@ export function QuickEntitiesDialog({ novelId, chapter, onClose, onReferencesCha
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [savingId, setSavingId] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [conflicted, setConflicted] = useState(false)
+  const pending = useRef(false)
 
   const activeRefSelection = currentRefs.data?.selection || chapter.references
   const activeEntityIds = activeRefSelection.entity_ids || []
@@ -42,26 +44,41 @@ export function QuickEntitiesDialog({ novelId, chapter, onClose, onReferencesCha
   })
 
   async function togglePin(entityId: string) {
+    if (pending.current || !currentRefs.data || currentRefs.error || conflicted) return
+    pending.current = true
     setSavingId(entityId)
     setError('')
     try {
       const isPinned = activeEntityIds.includes(entityId)
       const nextIds = isPinned ? activeEntityIds.filter(id => id !== entityId) : [...activeEntityIds, entityId]
       const nextSelection = { ...activeRefSelection, entity_ids: nextIds }
-      await api.saveReferences(novelId, chapter.id, { selection: nextSelection, base_revision: revision })
+      const saved = await api.saveReferences(novelId, chapter.id, { selection: nextSelection, base_revision: revision })
+      cache.setQueryData(['references', novelId, chapter.id], saved)
       await cache.invalidateQueries({ queryKey: ['references', novelId, chapter.id] })
       await cache.invalidateQueries({ queryKey: ['chapters', novelId] })
       onReferencesChanged?.()
     } catch (e) {
       setError(errorText(e))
+      setConflicted(e instanceof ApiError && e.code === 'REFERENCE_CONFLICT')
     } finally {
+      pending.current = false
       setSavingId(null)
     }
+  }
+
+  async function reloadReferences() {
+    if (pending.current) return
+    pending.current = true
+    try {
+      const result = await currentRefs.refetch()
+      if (result.isSuccess) { setError(''); setConflicted(false) }
+    } finally { pending.current = false }
   }
 
   return (
     <Modal
       open
+      dismissible={!savingId}
       onOpenChange={v => !v && onClose()}
       title="速查故事设定与主角状态"
       description="在写作中快速调阅人物、外挂与世界设定；可直接将核心设定设为本章必读。"
@@ -83,6 +100,7 @@ export function QuickEntitiesDialog({ novelId, chapter, onClose, onReferencesCha
                 className="icon-button"
                 style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', width: '24px', height: '24px' }}
                 onClick={() => setSearch('')}
+                aria-label="清空搜索"
                 title="清空搜索"
               >
                 <X size={14} />
@@ -113,7 +131,8 @@ export function QuickEntitiesDialog({ novelId, chapter, onClose, onReferencesCha
           </div>
         </div>
 
-        {error && <Notice>{error}</Notice>}
+        {error && <Notice action={conflicted && <Button disabled={!!savingId || currentRefs.isFetching} onClick={() => void reloadReferences()}>重新读取本章必读</Button>}>{error}</Notice>}
+        {currentRefs.error && <Notice action={<Button disabled={currentRefs.isFetching} onClick={() => void reloadReferences()}>重试读取本章必读</Button>}>{errorText(currentRefs.error)}</Notice>}
 
         {entities.isPending ? (
           <Loading />
@@ -172,9 +191,9 @@ export function QuickEntitiesDialog({ novelId, chapter, onClose, onReferencesCha
                       <Button
                         type="button"
                         variant={isPinned ? 'ghost' : 'primary'}
-                        disabled={isBusy}
+                        disabled={!!savingId || currentRefs.isPending || currentRefs.isFetching || !!currentRefs.error || conflicted || (!isPinned && item.status !== 'author')}
                         onClick={() => void togglePin(item.id)}
-                        title={isPinned ? '从本章必读中移除' : '将此设定固定至本章写作提示词上下文'}
+                        title={isPinned ? '从本章必读中移除' : item.status !== 'author' ? '请先在人物与设定中确认此档案' : '将此设定固定至本章写作提示词上下文'}
                       >
                         {isBusy ? '保存中…' : isPinned ? '已加入本章必读' : '+ 设为本章必读'}
                       </Button>
@@ -197,7 +216,7 @@ export function QuickEntitiesDialog({ novelId, chapter, onClose, onReferencesCha
                   )}
 
                   {(() => {
-                    const itemRelations = (relations.data || []).filter(r => r.source_id === item.id || (r.target_id === item.id && r.bidirectional))
+                    const itemRelations = (relations.data || []).filter(r => r.source_id === item.id || r.target_id === item.id)
                     if (itemRelations.length === 0) return null
                     return (
                       <div className="quick-entity-relations" style={{ marginTop: '6px', display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -218,7 +237,7 @@ export function QuickEntitiesDialog({ novelId, chapter, onClose, onReferencesCha
                                 padding: '1px 6px'
                               }}
                             >
-                              {r.relation_type}: {partner}
+                              {r.bidirectional ? `${r.relation_type}：${partner}` : `${r.relation_type}：${r.source_name} → ${r.target_name}`}
                             </span>
                           )
                         })}
@@ -250,7 +269,7 @@ export function QuickEntitiesDialog({ novelId, chapter, onClose, onReferencesCha
         )}
 
         <div className="modal-actions" style={{ marginTop: '12px' }}>
-          <Button type="button" onClick={onClose}>
+          <Button type="button" disabled={!!savingId} onClick={onClose}>
             关闭
           </Button>
         </div>

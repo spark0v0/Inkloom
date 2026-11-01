@@ -319,7 +319,7 @@ class Library:
                 query = query.where(
                     or_(
                         EntityRelation.source_id == entity_id,
-                        and_(EntityRelation.target_id == entity_id, EntityRelation.bidirectional.is_(True)),
+                        EntityRelation.target_id == entity_id,
                     )
                 )
             rows = s.scalars(query.order_by(EntityRelation.updated_at.desc())).all()
@@ -351,6 +351,8 @@ class Library:
             if not source or source.novel_id != novel_id or not target or target.novel_id != novel_id:
                 raise DomainError("ENTITY_NOT_FOUND", "所选人物/实体不存在或不属于本书。", 404)
             rel_type = data.relation_type.strip()
+            if not rel_type:
+                raise DomainError("INVALID_RELATION", "请填写关系类型。")
             existing = s.scalar(
                 select(EntityRelation).where(
                     EntityRelation.novel_id == novel_id,
@@ -396,8 +398,17 @@ class Library:
             rel = s.get(EntityRelation, relation_id)
             if rel is None or rel.novel_id != novel_id:
                 raise DomainError("RELATION_NOT_FOUND", "关系记录不存在。", 404)
+            if rel.updated_at != data.base_updated_at:
+                raise DomainError("RELATION_CONFLICT", "关系已在其他窗口更新。你的输入已保留，请读取最新关系后比较。", 409)
             if data.relation_type is not None:
-                rel.relation_type = data.relation_type.strip()
+                rel_type = data.relation_type.strip()
+                if not rel_type:
+                    raise DomainError("INVALID_RELATION", "请填写关系类型。")
+                if s.scalar(select(EntityRelation.id).where(EntityRelation.novel_id == novel_id,
+                        EntityRelation.source_id == rel.source_id, EntityRelation.target_id == rel.target_id,
+                        EntityRelation.relation_type == rel_type, EntityRelation.id != rel.id)):
+                    raise DomainError("RELATION_EXISTS", "该关系记录已存在，请保留现有记录或选择其他类型。", 409)
+                rel.relation_type = rel_type
             if data.description is not None:
                 rel.description = data.description.strip()
             if data.bidirectional is not None:
@@ -421,12 +432,14 @@ class Library:
                 updated_at=rel.updated_at,
             )
 
-    def delete_relation(self, novel_id: str, relation_id: str) -> None:
+    def delete_relation(self, novel_id: str, relation_id: str, base_updated_at: str) -> None:
         with self.ws.session(write=True) as s:
             novel = require_novel(s, novel_id)
             rel = s.get(EntityRelation, relation_id)
             if rel is None or rel.novel_id != novel_id:
                 raise DomainError("RELATION_NOT_FOUND", "关系记录不存在。", 404)
+            if rel.updated_at != base_updated_at:
+                raise DomainError("RELATION_CONFLICT", "关系已在其他窗口更新，请刷新关系后再决定是否删除。", 409)
             s.delete(rel)
             novel.settings_revision += 1
             novel.updated_at = now()

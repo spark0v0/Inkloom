@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, ArrowRight, ClockCounterClockwise, Plus, Sparkle, X } from '@phosphor-icons/react'
-import { activeStates, ApiError, api, dateLabel, downloadText, errorText, jobStateNames, uuid } from '../lib/api'
+import { canUseProvider, activeStates, ApiError, api, dateLabel, downloadText, errorText, jobStateNames, uuid } from '../lib/api'
 import type { Context, ContextInput, Evidence, JobInput, Novel, OutlineDocument, OutlineField, OutlineHistoryItem, OutlineRevision, OutlineState } from '../lib/api'
 import type { Navigate } from '../lib/route'
 import { outlineDrafts } from '../lib/drafts'
@@ -219,7 +219,7 @@ export function ChapterOutlineEditor({ novel, chapterId, workspaceId, navigate, 
           <Field label="修改要求"><textarea rows={4} maxLength={12000} value={instruction} onChange={e => setInstruction(e.target.value)} placeholder="希望保留什么，又想调整哪里？" /></Field><ProviderDisclosure provider={provider} />
         </fieldset>
         {dirty && <p className="outline-inline-hint">先保存细纲，再让 AI 基于保存的内容提出修改。</p>}
-        <Button variant="primary" className="full-width" disabled={busy || active || dirty || (!!pending && pending.kind !== 'generate') || !provider || (provider.kind !== 'demo' && !provider.has_key)} onClick={() => void generate()}><Sparkle size={18} />{pending?.kind === 'generate' ? '确认上次提交' : '生成修改建议'}</Button>
+        <Button variant="primary" className="full-width" disabled={busy || active || dirty || (!!pending && pending.kind !== 'generate') || !canUseProvider(provider)} onClick={() => void generate()}><Sparkle size={18} />{pending?.kind === 'generate' ? '确认上次提交' : '生成修改建议'}</Button>
         <details className="outline-context"><summary>本次参考与费用</summary><Button disabled={locked || active || dirty} onClick={() => void preview()}>查看本次参考（不生成）</Button>{context && <ContextDetails context={context} onEvidence={onEvidence} />}</details>
         {job.data && <div className="outline-candidate"><div className="section-heading"><strong>修改建议结果</strong><Badge>{job.data.is_demo ? '演示 · ' : ''}{jobStateNames[job.data.state]}</Badge></div>
           {active && <><p role="status">{connection || '正在生成建议…'}</p><Button disabled={locked} onClick={() => void control('cancel')}>停止生成</Button></>}

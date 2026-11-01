@@ -109,14 +109,9 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
     revision = review_guidance(session, novel_id, request)
     from .chapter_outlines import edit_guidance
     outline_edit = edit_guidance(session, novel_id, request)
-    if request.task == "continue":
-        if novel.dirty_from_order is not None and chapter.position > novel.dirty_from_order:
-            raise DomainError("CANON_DIRTY", f"第 {novel.dirty_from_order} 章起的正史待复核。"
-                              "手工写作不受影响，请先确认前文再自动续写。", 409)
-        previous = session.scalars(select(Chapter).where(Chapter.novel_id == novel_id,
-                    Chapter.position < chapter.position)).all()
-        if any(c.review_state != "confirmed" for c in previous):
-            raise DomainError("CANON_GAP", "自动续写需要先确认前面的章节，仍可自由手写或改写选段。", 409)
+    unconfirmed_prior = session.scalar(select(Chapter.position).where(
+        Chapter.novel_id == novel_id, Chapter.position < narrative_position,
+        Chapter.review_state != "confirmed").order_by(Chapter.position).limit(1))
     if request.task == "rewrite":
         selection = request.selection
         if selection is None or version.text[selection.start_codepoint:selection.end_codepoint] != selection.text:
@@ -155,25 +150,28 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
     required_ids = {e.id for e in matched} | {e.id for e in all_entities if e.kind == "world"} | {
         e.id for e in pinned_entities}
     matched_char_ids = {e.id for e in matched if e.kind == "character"}
+    related_ids = set()
     if matched_char_ids:
         rel_partners = session.scalars(
             select(EntityRelation).where(
                 EntityRelation.novel_id == novel_id,
                 (EntityRelation.source_id.in_(matched_char_ids)) | (EntityRelation.target_id.in_(matched_char_ids)),
-            )
+            ).order_by(EntityRelation.updated_at.desc(), EntityRelation.id).limit(12)
         ).all()
         all_ids = {e.id for e in all_entities}
-        for r in rel_partners[:12]:
+        for r in rel_partners:
             partner_id = r.target_id if r.source_id in matched_char_ids else r.source_id
             if partner_id in all_ids:
-                required_ids.add(partner_id)
+                related_ids.add(partner_id)
     from .threads import thread_context
     thread_guidance, thread_sources = thread_context(session, novel_id, narrative_position, required_ids)
     if any(source["source_id"] in request.excluded_source_ids for source in thread_sources):
         raise DomainError("PROTECTED_CONTEXT", "本次伏笔跟进的原文依据不能排除，请先调整伏笔安排或暂缓跟进。")
     required_ids.update(item.entity_id for item in thread_guidance)
     required = [e for e in all_entities if e.id in required_ids]
-    entities = required + [e for e in all_entities if e.id not in required_ids][:max(0, 60 - len(required))]
+    optional_entities = [e for e in all_entities if e.id in related_ids - required_ids]
+    optional_entities += [e for e in all_entities if e.id not in required_ids | related_ids]
+    entities = required + optional_entities[:max(0, 60 - len(required))]
     terms, terms_omitted = retrieval_terms(query_text, [term for e in matched for term in entity_terms(e.name, e.aliases)])
     terms = weight_terms(session, novel_id, narrative_position, terms)
     ranked_ids = retrieve_source_ids(session, novel_id, narrative_position, terms, request.excluded_source_ids)
@@ -272,6 +270,9 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
     initial_source_ids = {source["source_id"] for source in reading_sources()}
     initial_fact_count = len(facts)
     notices = ["Token 为保守估算，未使用此模型的专用 tokenizer。"]
+    if unconfirmed_prior is not None:
+        notices.append(f"前文存在未定稿或待复核章节（最早第 {unconfirmed_prior} 章）。"
+                       "可以继续起草；这些章节的正文与记忆未自动纳入，定稿时仍需按顺序复核。")
     if terms_omitted:
         notices.append("本章检索词较多，已优先检索人物及别名；部分检索词未纳入。")
     if not facts:
@@ -324,6 +325,10 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
             )
             for r in rel_rows
         ]
+    def sync_relations():
+        included = {e.id for e in entities}
+        character_relations[:] = [r for r in character_relations
+            if r.source_id in included and r.target_id in included]
         if character_relations:
             input_body["character_relations"] = [
                 {
@@ -335,6 +340,10 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
                 }
                 for r in character_relations
             ]
+        else:
+            input_body.pop("character_relations", None)
+
+    sync_relations()
     if production is not None:
         input_body["production"] = production
     if direction is not None:
@@ -367,7 +376,7 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
         input_body["output_schema"] = RESULT_SCHEMAS[request.task].model_json_schema()
     if outline_edit:
         input_body["outline_edit"] = outline_edit
-    base_prompt = (PROJECT_DIR / "prompts/base-v1.md").read_text(encoding="utf-8")
+    base_prompt = (PROJECT_DIR / "prompts/base-v2.md").read_text(encoding="utf-8")
     if request.scene is not None:
         input_body["scene_intent_not_facts"] = request.scene.model_dump()
     template = "scene-v1" if request.scene is not None else f"{request.task}-v1"
@@ -387,6 +396,7 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
     while len(entities) > len(required) and estimate() > available:
         entities.pop()
         input_body["author_settings"].pop()
+        sync_relations()
     trimmable_recent = sorted((source for source in prior_sources
         if source["source_id"] not in protected_ids | continuity_ids),
         key=lambda source: (source["source_id"] in relevant_ids, source["chapter_position"]))

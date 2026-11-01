@@ -16,7 +16,7 @@ export function Modal({ open, onOpenChange, title, description, children, wide =
   const returnFocus = useRef<HTMLElement | null>(null)
   if (open && !previous.current) returnFocus.current = document.activeElement as HTMLElement | null
   previous.current = open
-  return <Dialog.Root open={open} onOpenChange={onOpenChange}>
+  return <Dialog.Root open={open} onOpenChange={value => { if (value || dismissible) onOpenChange(value) }}>
     <Dialog.Portal><Dialog.Overlay className="modal-overlay" />
       <Dialog.Content className={`modal ${wide ? 'modal-wide' : ''} ${className}`} onCloseAutoFocus={event => { if (returnFocus.current?.isConnected) { event.preventDefault(); returnFocus.current.focus({ preventScroll: true }) } }} onEscapeKeyDown={event => { if (!dismissible) event.preventDefault() }}>
         <div className="modal-heading"><div><Dialog.Title>{title}</Dialog.Title>

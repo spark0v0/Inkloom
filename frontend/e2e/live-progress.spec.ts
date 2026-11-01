@@ -5,6 +5,8 @@ for (const disconnected of [false, true]) {
     await page.goto('/')
     await expect(page.getByRole('button', { name: '新建小说', exact: true })).toBeVisible()
     const ids = await page.evaluate(async () => {
+      const health = await (await fetch('/api/v1/health')).json()
+      if (!health.workspace_name.startsWith('e2e-')) throw new Error('Refusing author workspace')
       const post = async (path: string, body: object) => {
         const response = await fetch('/api/v1' + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
         if (!response.ok) throw new Error('Fixture failed: ' + response.status)
@@ -20,7 +22,8 @@ for (const disconnected of [false, true]) {
     const created: string[] = []
     page.on('request', request => {
       const path = new URL(request.url()).pathname
-      if (request.method() === 'GET' && /^\/api\/v1\/jobs\/[^/]+$/.test(path)) full.push(path)
+      // /jobs/page contains summaries; only an individual job is a full detail read.
+      if (request.method() === 'GET' && path !== '/api/v1/jobs/page' && /^\/api\/v1\/jobs\/[^/]+$/.test(path)) full.push(path)
       if (request.method() === 'GET' && path.endsWith('/progress')) light.push(path)
       if (request.method() === 'POST' && path === `/api/v1/novels/${ids.novel}/jobs`) created.push(path)
     })

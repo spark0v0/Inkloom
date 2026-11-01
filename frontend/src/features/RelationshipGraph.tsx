@@ -17,19 +17,19 @@ import {
   GraduationCap,
   Users
 } from '@phosphor-icons/react'
-import { api, errorText } from '../lib/api'
+import { api, ApiError, errorText } from '../lib/api'
 import type { Entity, Relation, RelationInput } from '../lib/api'
 import { Badge, Button, Empty, Field, Loading, Modal, Notice } from '../components/ui'
 
 export const PRESET_RELATIONS = [
-  { label: '道侣 / 情缘', category: '情感', color: '#ec4899', bg: 'rgba(236, 72, 153, 0.12)' },
+  { label: '道侣 / 情缘', category: '情感', color: '#be185d', bg: 'rgba(236, 72, 153, 0.12)' },
   { label: '生死大敌 / 仇怨', category: '对立', color: '#e11d48', bg: 'rgba(225, 29, 72, 0.12)' },
   { label: '师徒 / 护道者', category: '传授', color: '#0f766e', bg: 'rgba(15, 118, 110, 0.12)' },
   { label: '同门师兄弟', category: '门派', color: '#2563eb', bg: 'rgba(37, 99, 235, 0.12)' },
-  { label: '盟友 / 合作者', category: '互利', color: '#0d9488', bg: 'rgba(13, 148, 136, 0.12)' },
-  { label: '主仆 / 契约灵兽', category: '从属', color: '#64748b', bg: 'rgba(100, 116, 139, 0.12)' },
-  { label: '同族 / 血亲', category: '血脉', color: '#d97706', bg: 'rgba(217, 119, 6, 0.12)' },
-  { label: '知己 / 结义', category: '情义', color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.12)' }
+  { label: '盟友 / 合作者', category: '互利', color: '#0f766e', bg: 'rgba(13, 148, 136, 0.12)' },
+  { label: '主仆 / 契约灵兽', category: '从属', color: '#475569', bg: 'rgba(100, 116, 139, 0.12)' },
+  { label: '同族 / 血亲', category: '血脉', color: '#92400e', bg: 'rgba(217, 119, 6, 0.12)' },
+  { label: '知己 / 结义', category: '情义', color: '#6d28d9', bg: 'rgba(139, 92, 246, 0.12)' }
 ]
 
 export function getRelationColor(type: string): { color: string; bg: string } {
@@ -39,7 +39,7 @@ export function getRelationColor(type: string): { color: string; bg: string } {
     return { color: '#e11d48', bg: 'rgba(225, 29, 72, 0.12)' }
   }
   if (type.includes('情') || type.includes('侣') || type.includes('妻') || type.includes('夫') || type.includes('红颜') || type.includes('恋')) {
-    return { color: '#ec4899', bg: 'rgba(236, 72, 153, 0.12)' }
+    return { color: '#be185d', bg: 'rgba(236, 72, 153, 0.12)' }
   }
   if (type.includes('师') || type.includes('徒') || type.includes('长辈') || type.includes('尊')) {
     return { color: '#0f766e', bg: 'rgba(15, 118, 110, 0.12)' }
@@ -48,12 +48,12 @@ export function getRelationColor(type: string): { color: string; bg: string } {
     return { color: '#2563eb', bg: 'rgba(37, 99, 235, 0.12)' }
   }
   if (type.includes('主') || type.includes('仆') || type.includes('兽') || type.includes('奴')) {
-    return { color: '#64748b', bg: 'rgba(100, 116, 139, 0.12)' }
+    return { color: '#475569', bg: 'rgba(100, 116, 139, 0.12)' }
   }
   if (type.includes('族') || type.includes('血') || type.includes('亲') || type.includes('子') || type.includes('父') || type.includes('母')) {
-    return { color: '#d97706', bg: 'rgba(217, 119, 6, 0.12)' }
+    return { color: '#92400e', bg: 'rgba(217, 119, 6, 0.12)' }
   }
-  return { color: '#0d9488', bg: 'rgba(13, 148, 136, 0.12)' }
+  return { color: '#0f766e', bg: 'rgba(13, 148, 136, 0.12)' }
 }
 
 type Props = {
@@ -114,10 +114,10 @@ export function RelationshipGraph({ novelId, onSelectEntity }: Props) {
   // Selected character's direct relations
   const selectedCharacterRelations = useMemo(() => {
     if (!selectedEntityId) return []
-    return allRelations.filter(
-      r => r.source_id === selectedEntityId || (r.target_id === selectedEntityId && r.bidirectional)
+    return visibleRelations.filter(
+      r => r.source_id === selectedEntityId || r.target_id === selectedEntityId
     )
-  }, [selectedEntityId, allRelations])
+  }, [selectedEntityId, visibleRelations])
 
   // Adaptive Node layout calculation
   // For small sets (<= 8), use single ring.
@@ -172,13 +172,14 @@ export function RelationshipGraph({ novelId, onSelectEntity }: Props) {
     return map
   }, [characters])
 
-  async function handleDeleteRelation(relId: string) {
+  async function handleDeleteRelation(relation: Relation) {
     if (!confirm('确定要删除这条人物关系吗？')) return
     try {
-      await api.deleteRelation(novelId, relId)
+      await api.deleteRelation(novelId, relation.id, relation.updated_at)
       await cache.invalidateQueries({ queryKey: ['relations', novelId] })
     } catch (e) {
       setError(errorText(e))
+      if (e instanceof ApiError && e.code === 'RELATION_CONFLICT') void relationsQuery.refetch()
     }
   }
 
@@ -206,10 +207,12 @@ export function RelationshipGraph({ novelId, onSelectEntity }: Props) {
           </label>
         </div>
 
+        <label className="graph-character-picker">查看人物关系<select aria-label="查看人物关系" value={selectedEntityId || ''} onChange={event => setSelectedEntityId(event.target.value || null)}><option value="">全书人物</option>{characters.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
         <div className="filter-pills" role="group" aria-label="关系筛选" style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
           <Button
             type="button"
             variant={filterType === 'all' ? 'primary' : 'ghost'}
+            aria-pressed={filterType === 'all'}
             onClick={() => setFilterType('all')}
             style={{ fontSize: '12px', padding: '4px 9px' }}
           >
@@ -227,6 +230,7 @@ export function RelationshipGraph({ novelId, onSelectEntity }: Props) {
               key={item.key}
               type="button"
               variant={filterType === item.key ? 'primary' : 'ghost'}
+              aria-pressed={filterType === item.key}
               onClick={() => setFilterType(item.key)}
               style={{ fontSize: '12px', padding: '4px 9px' }}
             >
@@ -249,9 +253,12 @@ export function RelationshipGraph({ novelId, onSelectEntity }: Props) {
       </div>
 
       {error && <Notice>{error}</Notice>}
+      {!selectedEntityId && <p className="graph-mobile-hint small muted">选择人物，查看和编辑相关关系。</p>}
 
       {entitiesQuery.isPending || relationsQuery.isPending ? (
         <Loading />
+      ) : entitiesQuery.error || relationsQuery.error ? (
+        <Notice action={<Button onClick={() => { void entitiesQuery.refetch(); void relationsQuery.refetch() }}>重试读取</Button>}>{errorText(entitiesQuery.error || relationsQuery.error)}</Notice>
       ) : characters.length < 2 ? (
         <Empty
           icon={<User size={32} weight="light" />}
@@ -430,6 +437,10 @@ export function RelationshipGraph({ novelId, onSelectEntity }: Props) {
 
                     {/* Interactive Relation Badge Pill */}
                     <g
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`编辑关系：${rel.source_name}到${rel.target_name}，${rel.relation_type}`}
+                      onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); handleEditRelation(rel) } }}
                       transform={`translate(${midX}, ${midY})`}
                       style={{ cursor: 'pointer' }}
                       onClick={e => {
@@ -480,6 +491,11 @@ export function RelationshipGraph({ novelId, onSelectEntity }: Props) {
                 return (
                   <g
                     key={char.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`查看人物关系：${char.name}`}
+                    aria-pressed={isSelected}
+                    onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedEntityId(current => current === char.id ? null : char.id) } }}
                     transform={`translate(${pos.x}, ${pos.y})`}
                     style={{ cursor: 'pointer', transition: 'all 0.2s ease' }}
                     opacity={isConnected ? 1 : 0.2}
@@ -717,8 +733,8 @@ export function RelationshipGraph({ novelId, onSelectEntity }: Props) {
                                 <ArrowsLeftRight size={13} className="muted" />
                               </span>
                             ) : (
-                              <span title="单向态度">
-                                <ArrowRight size={13} className="muted" />
+                              <span title={`${rel.source_name} → ${rel.target_name}（单向）`}>
+                                <ArrowRight size={13} className="muted" style={{ transform: isSource ? undefined : 'rotate(180deg)' }} />
                               </span>
                             )}
                           </div>
@@ -737,7 +753,7 @@ export function RelationshipGraph({ novelId, onSelectEntity }: Props) {
                               type="button"
                               className="icon-button"
                               title="删除关系"
-                              onClick={() => void handleDeleteRelation(rel.id)}
+                              onClick={() => void handleDeleteRelation(rel)}
                               style={{ color: 'var(--muted)', background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px' }}
                             >
                               <Trash size={14} />
@@ -816,8 +832,25 @@ function RelationDialog({
   const [bidirectional, setBidirectional] = useState(relation ? relation.bidirectional : true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [baseline, setBaseline] = useState(relation)
+  const [conflicted, setConflicted] = useState(false)
+  const [latest, setLatest] = useState<Relation | null>(null)
+
+  async function readLatest() {
+    if (!baseline || busy) return
+    setBusy(true)
+    try {
+      const value = (await api.relations(novelId)).find(item => item.id === baseline.id)
+      if (!value) throw new Error('这条关系已被删除。你的输入仍保留，可复制后关闭。')
+      if (relationType === baseline.relation_type) setRelationType(value.relation_type)
+      if (description === baseline.description) setDescription(value.description)
+      if (bidirectional === baseline.bidirectional) setBidirectional(value.bidirectional)
+      setBaseline(value); setLatest(value); setConflicted(false); setError('')
+    } catch (e) { setError(errorText(e)) } finally { setBusy(false) }
+  }
 
   async function handleSave() {
+    if (busy) return
     if (!sourceId || !targetId || sourceId === targetId) {
       setError('请选择两位不同的角色。')
       return
@@ -832,6 +865,7 @@ function RelationDialog({
     try {
       if (relation) {
         await api.editRelation(novelId, relation.id, {
+          base_updated_at: baseline!.updated_at,
           relation_type: relationType.trim(),
           description: description.trim(),
           bidirectional
@@ -849,6 +883,7 @@ function RelationDialog({
       onSaved()
     } catch (e) {
       setError(errorText(e))
+      setConflicted(e instanceof ApiError && e.code === 'RELATION_CONFLICT')
     } finally {
       setBusy(false)
     }
@@ -859,9 +894,10 @@ function RelationDialog({
   return (
     <Modal
       open
+      dismissible={!busy}
       onOpenChange={v => !v && onClose()}
       title={relation ? '编辑人物关系' : '建立新的人物关系'}
-      description="在两位角色之间建立羁绊约束。当两人同场登场时，系统将自动将该关系作为防OOC基线注入模型提示词。"
+      description="记录两人的关系与方向，供后续写作参考。设定不等于正文中已经发生的事实。"
     >
       <form
         onSubmit={e => {
@@ -870,6 +906,7 @@ function RelationDialog({
         }}
         className="form-stack"
       >
+        <fieldset disabled={busy} className="relation-fields form-stack">
         <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <Field label="人物 A">
             <select
@@ -920,16 +957,16 @@ function RelationDialog({
           <span className="small muted">常用网文羁绊预设：</span>
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
             {[
-              { text: '道侣', icon: Heart, color: '#ec4899' },
-              { text: '情缘 / 伴侣', icon: Heart, color: '#ec4899' },
+              { text: '道侣', icon: Heart, color: '#be185d' },
+              { text: '情缘 / 伴侣', icon: Heart, color: '#be185d' },
               { text: '生死大敌', icon: Sword, color: '#e11d48' },
               { text: '宿敌 / 对立', icon: Sword, color: '#e11d48' },
               { text: '师尊 / 徒弟', icon: GraduationCap, color: '#0f766e' },
               { text: '护道者', icon: GraduationCap, color: '#0f766e' },
               { text: '同门师兄弟', icon: Users, color: '#2563eb' },
-              { text: '生死同盟', icon: Users, color: '#0d9488' },
-              { text: '主仆 / 灵兽', icon: Users, color: '#64748b' },
-              { text: '血亲同族', icon: Users, color: '#d97706' }
+              { text: '生死同盟', icon: Users, color: '#0f766e' },
+              { text: '主仆 / 灵兽', icon: Users, color: '#475569' },
+              { text: '血亲同族', icon: Users, color: '#92400e' }
             ].map(item => {
               const Icon = item.icon
               return (
@@ -972,11 +1009,14 @@ function RelationDialog({
           />
           <span>双向关系（双方互认相同关系定位；如为单向暗恋或暗中仇视可取消勾选）</span>
         </label>
+        </fieldset>
 
         {error && <Notice>{error}</Notice>}
+        {conflicted && <Button disabled={busy} onClick={() => void readLatest()}>读取最新关系并保留本页修改</Button>}
+        {latest && <details><summary>查看当前已保存关系</summary><p>{latest.relation_type} · {latest.bidirectional ? '双向' : '单向'}</p><p>{latest.description || '未填写关系详情'}</p></details>}
 
         <div className="modal-actions" style={{ marginTop: '12px' }}>
-          <Button type="button" onClick={onClose}>
+          <Button type="button" disabled={busy} onClick={onClose}>
             取消
           </Button>
           <Button type="submit" variant="primary" disabled={busy || !sourceId || !targetId || sourceId === targetId}>

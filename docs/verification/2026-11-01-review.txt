@@ -1,0 +1,92 @@
+Inkloom 0.2.0 本地测试版：2026-11-01 复查验证记录
+
+这是本轮执行结果摘要，不是原始终端逐字日志。仅使用独立临时 SQLite、
+.tmp/e2e-* 工作区、固定演示响应与 HTTP Mock；未调用真实收费模型。
+未读取作者工作区来生成样例，未推送、发布或执行破坏性迁移。
+
+一、静态、契约与后端
+
+ruff check backend/app backend/tests
+结果：All checks passed!
+
+后端完整 pytest（backend/tests，--tb=short，独立 --basetemp）
+结果：251 passed, 1 warning in 125.87s
+覆盖：正文/细纲版本和采纳、工作区边界、任务并发/取消、Provider、资料预算、
+正文与档案讨论、场景写作、复核清单、备份恢复及迁移兼容。
+
+随后增强“领取到派发之间更换连接”回归的模拟凭证输入，仅重跑该项：
+backend/.venv/Scripts/python.exe -X utf8 -m pytest
+  backend/tests/test_writing_flow_review.py::test_provider_change_between_claim_and_dispatch_does_not_send_a_new_key_to_old_endpoint
+  -q --tb=short --basetemp .tmp/review-keydispatch-final
+结果：1 passed, 1 warning in 0.35s；stream_completion 调用次数为 0。
+
+警告：StarletteDeprecationWarning: Using `httpx` with `starlette.testclient`
+is deprecated; install `httpx2` instead.
+本轮没有为消除提示盲目更换依赖。
+
+二、前端
+
+npm --prefix frontend test
+结果：50 tests passed，15 files passed。
+npm --prefix frontend run check:api
+结果：退出码 0，生成声明与后端 OpenAPI 一致。
+npm --prefix frontend run build
+结果：TypeScript/Vite 构建通过；场景字段锁定的最后一次修改后重新构建通过。
+
+三、Chrome 浏览器（1440×900 与 390×844）
+
+最初相关测试暴露过旧标题/summary 定位、短选段 HTTP 422、浅色文字对比度问题；
+这些失败用于定位，不能算作通过。
+
+npm --prefix frontend run test:e2e --
+  writing-flow-review.spec.ts planning-discussions.spec.ts authoring-assistance.spec.ts
+  --max-failures=3
+最终该组结果：14 项通过。
+范围：正文/档案显式选择、资料预览、引用回看、刷新恢复、旧提案失效、场景追加、
+复核清单按需读取与顺序跳转、关系冲突和方向、免密钥配置、篇幅模式切换。
+
+writing-assistance.spec.ts
+最终相关结果：6 项通过。
+范围：文风修订与冲突、选段准备不调用模型、短选段/emoji 改写及版本基线。
+
+补充主流程首轮：
+npm --prefix frontend run test:e2e -- workshop.spec.ts finalization.spec.ts export.spec.ts
+  --grep 'AI 建书|手写保存|卡剧情找灵感|写作提交回执|离线保存|备份下载|继续写作进入|定稿回执|并发修改定稿|定稿记忆读取|按章范围预览|导出前保存|首个模型连接|模型目录读取|编辑器与助手'
+  --max-failures=3
+结果：18 passed，3 failed，9 did not run；达到失败上限后停止，框架另有早停错误提示。
+三项失败均等待旧名称“找三个走向”，实际按钮已被改为“寻找 3 个破局走向”；
+未进入生成。恢复简洁文案，重新构建，再只测失败/未运行范围及受影响交互。
+
+桌面补充：
+npm --prefix frontend run test:e2e -- workshop.spec.ts writing-flow-review.spec.ts inspiration-return.spec.ts
+  --project=desktop --grep '卡剧情找灵感|改稿后旧灵感|写作提交回执|关系编辑|续写不满意'
+  --max-failures=2
+结果：5 passed (49.4s)
+
+手机补充：
+npm --prefix frontend run test:e2e -- workshop.spec.ts writing-flow-review.spec.ts inspiration-return.spec.ts
+  --project=mobile --grep '卡剧情找灵感|改稿后旧灵感|写作提交回执|关系编辑|续写不满意|手写保存|离线保存|备份下载|编辑器与助手|AI 建书|首个模型连接|模型目录读取|继续写作进入'
+  --max-failures=2
+结果：13 passed (1.6m)
+
+最后发现并修复场景参数未随回执锁定的问题，只补测该行为：
+npm --prefix frontend run test:e2e -- authoring-assistance.spec.ts
+  --grep '场景提交回执' --max-failures=2
+结果：2 passed (10.6s)，含截图回到表单顶部后的最终复测。
+已入队后模拟响应丢失，核对场景全部输入禁用，重试请求逐字段相同，
+采纳追加正文且旧版本保留。没有真实模型服务参与。
+
+浏览器分组存在交集，不将各组相加作为独立测试总数，没有运行完整 Playwright 集合。
+相关讨论、复核、关系、编辑器/助手区域的 axe 自动检查通过，包含键盘关系选择与
+手机无横向溢出断言；并查看运行截图。不能推断全站 WCAG 或全部设备验收。
+浏览器运行出现 Node NO_COLOR/FORCE_COLOR 提示，不影响测试断言。
+
+四、文档与交付边界
+
+git diff --check：通过；既有 LF/CRLF 转换提示不作为代码错误。
+检查 8 份入口/报告/决策中的 75 个本地链接及截图路径，缺失 0 项。
+没有新增迁移，没有清理作者数据或丢弃交接修改。
+
+未进行：真实模型文学效果、供应商实际用量与费用、连续十章人工试写、百万字负载、
+完整 Windows 中文输入法人工测试、跨浏览器及全站人工可访问性验收。
+工程与模拟检查不证明完全生产可用。

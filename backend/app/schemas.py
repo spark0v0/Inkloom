@@ -305,6 +305,7 @@ class RelationOut(RelationInput):
 
 
 class RelationUpdate(Schema):
+    base_updated_at: str = Field(min_length=1, max_length=64)
     relation_type: str | None = Field(default=None, min_length=1, max_length=80)
     description: str | None = Field(default=None, max_length=2000)
     bidirectional: bool | None = None
@@ -731,7 +732,7 @@ class ContextInput(Schema):
     provider_id: str = "demo"
     excluded_source_ids: list[str] = Field(default_factory=list, max_length=500)
     selection: Selection | None = None
-    target_chars: int = Field(default=500, ge=100, le=6000)
+    target_chars: int = Field(default=500, ge=50, le=6000)
     volume_plan_id: str | None = None
     chapter_batch: int = Field(default=5, ge=3, le=20)
     inspiration: InspirationReference | None = None
@@ -942,6 +943,7 @@ class ProviderOut(Schema):
     price_date: str | None
     key_env: str
     has_key: bool
+    requires_key: bool
     secret_persistent: bool
 
 

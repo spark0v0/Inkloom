@@ -44,6 +44,9 @@ export type ContextInput = Schema['ContextInput']
 export type Context = Schema['ContextOut']
 export type Provider = Schema['ProviderOut']
 export type ProviderInput = Schema['ProviderInput']
+export function canUseProvider(provider?: Pick<Provider, 'kind' | 'has_key' | 'requires_key'>) {
+  return !!provider && (provider.kind === 'demo' || provider.requires_key === false || provider.has_key)
+}
 export type Roles = Schema['RoleConfig']
 export type Selection = Schema['Selection']
 export type Health = Schema['HealthOut']
@@ -138,7 +141,7 @@ export const api = {
   relations: (id: string, entityId?: string) => request<Relation[]>(npath(id) + '/relations' + (entityId ? '?entity_id=' + encodeURIComponent(entityId) : '')),
   createRelation: (id: string, data: RelationInput) => request<Relation>(npath(id) + '/relations', { method: 'POST', body: JSON.stringify(data) }),
   editRelation: (id: string, relationId: string, data: RelationUpdate) => request<Relation>(npath(id) + '/relations/' + encodeURIComponent(relationId), { method: 'PUT', body: JSON.stringify(data) }),
-  deleteRelation: (id: string, relationId: string) => request<{ ok: boolean }>(npath(id) + '/relations/' + encodeURIComponent(relationId), { method: 'DELETE' }),
+  deleteRelation: (id: string, relationId: string, baseUpdatedAt: string) => request<{ ok: boolean }>(npath(id) + '/relations/' + encodeURIComponent(relationId) + '?base_updated_at=' + encodeURIComponent(baseUpdatedAt), { method: 'DELETE' }),
   plans: (id: string) => request<Plan[]>(npath(id) + '/plans'),
   plan: (id: string, plan: string) => request<Plan>(npath(id) + '/plans/' + encodeURIComponent(plan)),
   savePlan: (id: string, data: PlanInput) => request<Plan>(npath(id) + '/plans', { method: 'POST', body: JSON.stringify(data) }),

@@ -5,6 +5,8 @@ async function fixture(page: Page) {
   await page.goto('/')
   await expect(page.getByRole('button', { name: '新建小说', exact: true })).toBeVisible()
   return page.evaluate(async () => {
+    const health = await (await fetch('/api/v1/health')).json()
+    if (!health.workspace_name.startsWith('e2e-')) throw new Error('Refusing author workspace')
     async function post(path: string, body: object) {
       const r = await fetch('/api/v1' + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       if (!r.ok) throw new Error('Fixture failed: ' + r.status)
@@ -89,30 +91,37 @@ test('跨标签页恢复后重新读取当前工作区，原草稿副本保留',
   const other = await page.context().newPage()
   await other.goto('/')
   await expect(other.getByRole('button', { name: '新建小说', exact: true })).toBeVisible()
-  await other.evaluate(async backup => {
-    const r = await fetch('/api/v1/workspace/restore', { method: 'POST', headers: { 'Content-Type': 'application/zip' }, body: new Uint8Array(backup) })
-    if (!r.ok) throw new Error('Restore failed')
-    const restored = await r.json()
-    const activation = await fetch('/api/v1/workspace/activate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ restore_id: restored.restore_id }) })
-    if (!activation.ok) throw new Error('Activation failed')
-  }, before.backup)
-  await expect(editor).toHaveText('作者原稿。', { timeout: 22000 })
-  await expect(page.locator('.save-status')).toHaveText('已保存')
-  const result = await page.evaluate(async ({ ids, before }) => {
-    const chapter = await (await fetch(`/api/v1/novels/${ids.novel}/chapters/${ids.chapter}`)).json()
-    const recovery = await new Promise<{ text: string } | undefined>((resolve, reject) => {
-      const open = indexedDB.open('story-workshop-recovery', 1)
-      open.onsuccess = () => {
-        const prefix = `${before.workspace}:${ids.novel}:${ids.chapter}:`
-        const query = open.result.transaction('drafts').objectStore('drafts').getAll()
-        query.onsuccess = () => { resolve(query.result.find(value => value.key.startsWith(prefix))); open.result.close() }
-        query.onerror = () => reject(query.error)
-      }
-    })
-    return { text: chapter.version.text, recovery: recovery?.text }
-  }, { ids, before })
-  expect(result).toEqual({ text: '作者原稿。', recovery: '原工作区未确认保存的草稿。' })
-  await other.close()
+  try {
+    await other.evaluate(async backup => {
+      const r = await fetch('/api/v1/workspace/restore', { method: 'POST', headers: { 'Content-Type': 'application/zip' }, body: new Uint8Array(backup) })
+      if (!r.ok) throw new Error('Restore failed')
+      const restored = await r.json()
+      const activation = await fetch('/api/v1/workspace/activate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ restore_id: restored.restore_id }) })
+      if (!activation.ok) throw new Error('Activation failed')
+    }, before.backup)
+    await expect(editor).toHaveText('作者原稿。', { timeout: 22000 })
+    await expect(page.locator('.save-status')).toHaveText('已保存')
+    const result = await page.evaluate(async ({ ids, before }) => {
+      const chapter = await (await fetch(`/api/v1/novels/${ids.novel}/chapters/${ids.chapter}`)).json()
+      const recovery = await new Promise<{ text: string } | undefined>((resolve, reject) => {
+        const open = indexedDB.open('story-workshop-recovery', 1)
+        open.onsuccess = () => {
+          const prefix = `${before.workspace}:${ids.novel}:${ids.chapter}:`
+          const query = open.result.transaction('drafts').objectStore('drafts').getAll()
+          query.onsuccess = () => { resolve(query.result.find(value => value.key.startsWith(prefix))); open.result.close() }
+          query.onerror = () => reject(query.error)
+        }
+      })
+      return { text: chapter.version.text, recovery: recovery?.text }
+    }, { ids, before })
+    expect(result).toEqual({ text: '作者原稿。', recovery: '原工作区未确认保存的草稿。' })
+  } finally {
+    await other.close()
+    // Activation affects the server, not just this tab; always return to the disposable original.
+    const response = await page.request.post('/api/v1/workspace/use-original', { headers: { Origin: new URL(page.url()).origin } })
+    expect(response.ok()).toBeTruthy()
+    expect((await (await page.request.get('/api/v1/health')).json()).workspace_id).toBe(before.workspace)
+  }
 })
 
 test('档案双窗口冲突保留表单，读取最新值后明确保存', async ({ page }) => {
@@ -126,8 +135,8 @@ test('档案双窗口冲突保留表单，读取最新值后明确保存', async
   const other = await page.context().newPage()
   await other.goto(`/#/bible/${ids.novel}`)
   await other.getByRole('button').filter({ has: other.getByRole('heading', { name: '林舟', exact: true }) }).click()
-  const first = page.getByRole('dialog', { name: '林舟', exact: true })
-  const second = other.getByRole('dialog', { name: '林舟', exact: true })
+  const first = page.getByRole('dialog', { name: '编辑人物', exact: true })
+  const second = other.getByRole('dialog', { name: '编辑人物', exact: true })
   await second.getByLabel('一句话简述', { exact: true }).fill('B 的新简介')
   await first.getByLabel('详细档案', { exact: true }).fill('A 的新档案')
   await first.getByRole('button', { name: '保存档案', exact: true }).click()
@@ -138,7 +147,7 @@ test('档案双窗口冲突保留表单，读取最新值后明确保存', async
   await second.getByRole('button', { name: '读取最新档案', exact: true }).click()
   await second.getByText('查看当前已保存档案', { exact: true }).click()
   await expect(second).toContainText('A 的新档案')
-  await second.getByLabel('详细档案', { exact: true }).fill('A 的新档案')
+  await expect(second.getByLabel('详细档案', { exact: true })).toHaveValue('A 的新档案')
   await second.getByRole('button', { name: '保存档案', exact: true }).click()
   await expect(second).not.toBeVisible()
   const saved = await other.evaluate(async ids => (await (await fetch(`/api/v1/novels/${ids.novel}/entities`)).json())[0], ids)

@@ -78,7 +78,7 @@ def build_discussion_context(session, novel_id, request):
         "output_schema": dto.DiscussionResult.model_json_schema()}
     if any(len(p.body) > 3000 for p in plans):
         notices.append("全书/分卷资料仅取各项前 3000 字符；所选细纲保持完整。")
-    system = (PROJECT_DIR / "prompts/base-v1.md").read_text(encoding="utf-8") + "\n" + (PROJECT_DIR / "prompts/discuss-v2.md").read_text(encoding="utf-8")
+    system = (PROJECT_DIR / "prompts/base-v2.md").read_text(encoding="utf-8") + "\n" + (PROJECT_DIR / "prompts/discuss-v2.md").read_text(encoding="utf-8")
 
     def messages():
         return [{"role": "system", "content": system},
@@ -266,7 +266,10 @@ def validate_restored_discussions(connection):
         result = json.loads(raw_result) if raw_result else None
         if result:
             result = dto.DiscussionResult.model_validate(result).model_dump()
+            original_evidence = result["evidence"]
             validate_discussion_result(result, context)
+            if original_evidence != result["evidence"]:
+                raise DomainError("INVALID_DATABASE", "讨论回复的原文引用身份或范围无效。")
         if number in conversation["turns"]:
             raise DomainError("INVALID_DATABASE", "讨论消息顺序重复。")
         conversation["turns"][number] = (jid, reference.chapter_ids, reference.last_job_id)

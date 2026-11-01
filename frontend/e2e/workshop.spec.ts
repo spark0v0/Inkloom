@@ -380,8 +380,13 @@ test('备份下载、校验与新工作区恢复', async ({ page }) => {
   await page.getByRole('button', { name: '校验并预览备份' }).click()
   const dialog = page.getByRole('dialog', { name: '备份已通过校验' })
   await expect(dialog).toBeVisible()
-  await dialog.getByRole('button', { name: '切换到恢复的工作区' }).click()
   try {
+    // Activation changes the hash before a full reload; the heading alone can
+    // belong to the old document whose execution context is about to disappear.
+    await Promise.all([
+      page.waitForEvent('load'),
+      dialog.getByRole('button', { name: '切换到恢复的工作区' }).click(),
+    ])
     await expect(page.getByRole('heading', { name: '我的作品', exact: true })).toBeVisible()
     const restored = await page.evaluate(async () => (await (await fetch('/api/v1/health')).json()).workspace_id)
     expect(restored).not.toBe(original)
@@ -591,8 +596,8 @@ test('继续写作进入未完成章，前章未定稿有直接处理入口', as
   })).json()), novelId)
   await page.goto(`/#/write/${novelId}/${next.id}`)
   const panel = await assistant(page)
-  await expect(panel.getByRole('button', { name: '生成本章正文', exact: true })).toBeDisabled()
-  await panel.getByRole('button', { name: '去处理前章' }).click()
+  await expect(panel.getByRole('button', { name: '生成本章正文', exact: true })).toBeEnabled()
+  await panel.getByRole('button', { name: '查看前章' }).click()
   await expect(page).toHaveURL(new RegExp(firstId + '$'))
   await page.getByRole('button', { name: '本章定稿', exact: true }).click()
   await page.getByRole('button', { name: '仅定稿', exact: true }).click()

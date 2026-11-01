@@ -39,7 +39,7 @@ test('规划讨论恢复历史、重放未确认发送、采纳细纲并拦截�
   await composer.dispatchEvent('compositionend')
   await region.getByRole('button', { name: '查看本次资料', exact: true }).click()
   const contextModal = page.getByRole('dialog', { name: '本次资料与费用估算', exact: true })
-  await expect(contextModal).toContainText('没有读取正文')
+  await expect(contextModal).toContainText('没有选择正文')
   await contextModal.getByRole('button', { name: '关闭对话框', exact: true }).click()
   const payloads: { idempotency_key: string }[] = []
   let loseAck = true
@@ -111,7 +111,7 @@ test('规划讨论恢复历史、重放未确认发送、采纳细纲并拦截�
   await modal.getByRole('button', { name: '关闭', exact: true }).click()
   const discussionHash = new URL(page.url()).hash
   expect(discussionHash).toContain('&discussion=')
-  await region.locator('.discussion-references > summary').click()
+  await region.locator('.discussion-references > summary').filter({ hasText: '参考细纲' }).click()
   await region.getByRole('button', { name: '编辑', exact: true }).first().click()
   await expect(page.getByRole('heading', { name: '第1章 雨夜来信', exact: true })).toBeVisible()
   await page.getByRole('button', { name: '返回规划讨论', exact: true }).click()

@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import {
   ArrowRight,
   BookOpen,
@@ -18,6 +18,7 @@ import { SourceButton } from './JobPresentation'
 import { ThreadPanel } from './ThreadPanel'
 import { RelationshipGraph } from './RelationshipGraph'
 import { entityTemplates } from '../lib/entityTemplates'
+import { entityDraftOf, parseAliases, rebaseEntityDraft } from '../lib/entityDrafts'
 
 const kinds = {
   character: '人物',
@@ -331,14 +332,7 @@ function EntityDialog({
   })
   const [form, setForm] = useState<EntityInput>(
     entity
-      ? {
-          kind: entity.kind,
-          name: entity.name,
-          summary: entity.summary,
-          body: entity.body,
-          aliases: entity.aliases,
-          status: entity.status,
-        }
+      ? entityDraftOf(entity)
       : {
           kind: initialKind,
           name: '',
@@ -349,48 +343,57 @@ function EntityDialog({
         }
   )
   const [aliases, setAliases] = useState(entity?.aliases?.join('、') || '')
-  const [baseline, setBaseline] = useState(entity?.updated_at)
+  const [baseline, setBaseline] = useState(entity)
   const [latest, setLatest] = useState<Entity | null>(null)
   const [conflicted, setConflicted] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const pending = useRef(false)
+  const composing = useRef(false)
 
   async function save() {
+    if (pending.current || composing.current || conflicted) return
+    pending.current = true
     setBusy(true)
+    setError('')
     try {
       await api.saveEntity(
         novelId,
         {
           ...form,
-          aliases: aliases
-            .split(/[、,，\n]/)
-            .map((s) => s.trim())
-            .filter(Boolean),
+          aliases: parseAliases(aliases),
         },
         entity?.id,
-        baseline
+        baseline?.updated_at
       )
       onSaved()
     } catch (e) {
       setError(errorText(e))
       setConflicted(e instanceof ApiError && e.code === 'ENTITY_CONFLICT')
     } finally {
+      pending.current = false
       setBusy(false)
     }
   }
 
   async function readLatest() {
+    if (pending.current || composing.current) return
+    pending.current = true
     setBusy(true)
     try {
       const value = (await api.entities(novelId)).find((item) => item.id === entity?.id)
       if (!value) throw new Error('档案已不存在，请另建档案保存当前输入。')
+      const rebased = rebaseEntityDraft({ ...form, aliases: parseAliases(aliases) }, baseline ?? form, value)
+      setForm(rebased)
+      setAliases(rebased.aliases?.join('、') ?? '')
       setLatest(value)
-      setBaseline(value.updated_at)
+      setBaseline(value)
       setConflicted(false)
       setError('')
     } catch (e) {
       setError(errorText(e))
     } finally {
+      pending.current = false
       setBusy(false)
     }
   }
@@ -398,6 +401,7 @@ function EntityDialog({
   return (
     <Modal
       open
+      dismissible={!busy}
       onOpenChange={(value) => !value && onClose()}
       title={entity ? `编辑${kinds[entity.kind]}` : '新建设定'}
       description="记录人物、世界规则与伏笔，供后续创作参考。"
@@ -405,13 +409,16 @@ function EntityDialog({
       className="edit-form-modal"
     >
       <form
+        onCompositionStart={() => { composing.current = true }}
+        onCompositionEnd={() => { composing.current = false }}
         onSubmit={(e) => {
           e.preventDefault()
           void save()
         }}
         className="bounded-edit-form"
       >
-        <div className="edit-form-fields form-stack">
+        <fieldset disabled={busy} className="edit-form-fields form-stack metadata-fields">
+          <legend className="sr-only">档案内容</legend>
           <div className="form-row">
             <Field label="类型">
               <select
@@ -550,7 +557,7 @@ function EntityDialog({
 
           {latest && (
             <Notice tone="neutral">
-              你的输入仍保留，请比较后再保存。
+              你的修改仍保留，未修改的字段已采用最新内容。请比较后再保存。
               <details>
                 <summary>查看当前已保存档案</summary>
                 <strong>
@@ -563,7 +570,7 @@ function EntityDialog({
               </details>
             </Notice>
           )}
-        </div>
+        </fieldset>
 
         {error && (
           <Notice>
@@ -577,11 +584,11 @@ function EntityDialog({
         )}
 
         <div className="modal-actions">
-          <Button onClick={onClose}>取消</Button>
+          <Button disabled={busy} onClick={onClose}>取消</Button>
           <Button
             type="submit"
             variant="primary"
-            disabled={busy || !form.name.trim()}
+            disabled={busy || conflicted || !form.name.trim()}
           >
             {busy ? '正在保存…' : '保存档案'}
           </Button>

@@ -1,5 +1,7 @@
 # 技术方案与关键契约
 
+2026-11-01：讨论恢复校验实际消息、不可变原文及引用身份；连接在领取和派发前核验修订，更换端点不沿用旧凭证。自动关系邻居与关系边一起让出预算；人物关系编辑/删除检查 `base_updated_at`。`ProviderOut.requires_key` 是计算字段，无数据库迁移，当前 head 为 `1b8c6e431fa7`。见 [决策 0026](decisions/0026-writing-flow-review.md)。
+
 2026-10-31 连续创作流程复查：`job_history.py` 在分页前过滤任务集合、分卷、正文版本和待处理状态，页面仅取摘要，再加载选中详情；章纲详情显式带生成时分卷 ID，旧快照从原生产输入读取。`Library.prepare_canon` 提供只读定稿准备；同一正文和记忆不增加修订，修改已确认记忆检查修订基线。`ChapterFinalizeDialog` 管理冻结提交、未确认重放、冲突比较和回执后的状态复读。无新迁移，见 [决策 0022](decisions/0022-workflow-resumption-finalization.md) 与 [流程复查](REVIEW-WORKFLOW-2026-10-31.md)。
 
 2026-10-31 新增有范围的持续规划讨论：`discussions.py` 管理会话、参考快照、预算和字段采纳，消息沿用 `jobs`，前端复用轻量进度。迁移 `f17b6d429ea5` 增加会话、任务轮次及版本历史索引；恢复保持旧版细纲结构验证，并校验会话的同书范围与消息链。结构化任务共用结果注册表，正文历史采用元数据投影与游标分页。见 [决策 0021](decisions/0021-planning-discussions.md) 与 [实现记录](IMPLEMENTATION-PLANNING-DISCUSSIONS.md)。

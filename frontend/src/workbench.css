@@ -94,7 +94,7 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.15);
 }
 input::placeholder, textarea::placeholder {
-  color: var(--muted-light);
+  color: var(--muted);
 }
 
 /* Buttons */
@@ -158,6 +158,24 @@ input::placeholder, textarea::placeholder {
 }
 
 /* Badges */
+.relation-fields, .scene-composer { border: 0; padding: 0; margin: 0; min-width: 0; }
+.graph-character-picker { min-width: 150px; font-size: 12px; color: var(--muted); }
+.graph-character-picker select { margin-top: 4px; }
+.graph-workspace-layout > * { min-width: 0; }
+.graph-mobile-hint { display: none; }
+@media (max-width: 1000px) {
+  .graph-workspace-layout { grid-template-columns: minmax(0, 1fr) !important; }
+  .relationship-graph-container .icon-button { min-width: 44px; min-height: 44px; }
+}
+@media (max-width: 600px) {
+  .graph-workspace-layout .graph-canvas-wrapper { display: none; }
+  .graph-mobile-hint { display: block; }
+  .relationship-graph-container .section-toolbar { align-items: stretch; padding: 0; }
+  .relationship-graph-container .section-toolbar > div { flex-direction: row; }
+  .relationship-graph-container .graph-character-picker { width: 100%; min-width: 0; }
+  .relationship-graph-container .filter-pills { width: 100%; }
+}
+
 .badge {
   font-size: 11.5px;
   font-weight: 500;
@@ -167,7 +185,7 @@ input::placeholder, textarea::placeholder {
 }
 .badge-neutral {
   background: var(--hover);
-  color: var(--muted);
+  color: var(--ink-secondary);
 }
 .badge-green {
   background: var(--green-soft);

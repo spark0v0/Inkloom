@@ -2503,6 +2503,8 @@ export interface components {
             key_env: string;
             /** Has Key */
             has_key: boolean;
+            /** Requires Key */
+            requires_key: boolean;
             /** Secret Persistent */
             secret_persistent: boolean;
         };
@@ -2584,6 +2586,8 @@ export interface components {
         };
         /** RelationUpdate */
         RelationUpdate: {
+            /** Base Updated At */
+            base_updated_at: string;
             /** Relation Type */
             relation_type?: string | null;
             /** Description */
@@ -4095,7 +4099,9 @@ export interface operations {
     };
     remove_relation_api_v1_novels__novel_id__relations__relation_id__delete: {
         parameters: {
-            query?: never;
+            query: {
+                base_updated_at: string;
+            };
             header?: never;
             path: {
                 novel_id: string;

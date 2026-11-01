@@ -1,0 +1,73 @@
+Inkloom 前端工程复查（2026-11-01 开始，2026-11-02 收尾）
+
+环境：Windows / PowerShell 7，前端现有锁定依赖，后端既有 .venv。
+所有浏览器测试使用 e2e-* 临时工作区；不访问作者正文，不调用真实收费模型。
+
+1. 修复前复现
+npm --prefix frontend run test:e2e -- frontend-engineering.spec.ts --project=desktop --max-failures=4
+档案未改字段仍为旧值、保存时遮罩关闭弹窗、预览时源文仍可改，均按预期失败。
+默认连接用例首轮因测试夹具直接创建连接而缓存未刷新，停在选择选项；修正为重新加载后，
+仅复测此项，确认其失败于保存期间其他角色下拉框仍启用。
+首次失败清理曾出现 route is already handled；改为释放回执后等待路由处理完成。
+
+2. 修复后核心检查
+npm --prefix frontend test
+53 passed / 16 files，最后一次 5.84 秒。
+
+npm --prefix frontend run check:api
+OpenAPI 与前端生成类型一致，退出码 0。
+
+npm --prefix frontend run build
+tsc -b && vite build 通过，Vite 8.3.4；浏览器测试使用生产构建。
+最后的快速设定与关闭入口修复后重新构建通过，后续手机补验与最终 10 项使用该构建。
+
+npm --prefix frontend run test:e2e -- frontend-engineering.spec.ts --max-failures=4
+8 passed (18.4s)，桌面/手机均覆盖档案冲突、连接等待、默认角色串行、预览与导入冻结。
+追加的新建输入法/重复提交、文件读取失败用例在随后完整回归中执行。
+
+backend/.venv/Scripts/ruff.exe check backend/app backend/tests
+All checks passed!
+
+在 backend 目录：
+./.venv/Scripts/python.exe -X utf8 -m pytest tests -q --tb=short --basetemp ../.tmp/frontend-review-backend
+251 passed, 1 warning in 132.26s (0:02:12)。
+警告为 StarletteDeprecationWarning（fastapi.testclient 依赖 httpx）。
+
+3. 完整浏览器回归与有针对性的补验
+npm --prefix frontend run test:e2e -- --max-failures=6
+首轮 156 项集合：59 passed (5.8m)，6 failed，91 did not run。
+失败原因逐项定位：
+- 作品页没有优先显示当前默认写作连接，现已修正。
+- 两项进度测试把 /jobs/page 摘要查询统计成完整详情；从 trace 确认实际只读一次完整详情，
+  修正端点统计，仍要求完整详情读取不超过 2 次且只创建一个任务。
+- 档案双窗口用例仍使用旧弹窗名称；更新选择器，并将手工补填远端正文改为断言自动合并。
+- 跨标签页恢复测试遗漏回到原测试工作区，污染后续故事脉络和备份身份检查。
+  补齐 finally 清理和原工作区身份断言，没有放宽作者工作区保护。
+
+只选择首轮未通过、未执行、新增以及清理变更影响的桌面用例，共 21 项。
+日志确认前 10 项逐条通过后，测试进程中断，没有完整汇总；据此只恢复未完成范围。
+剩余 11 项：11 passed (59.5s)，包括完整演示开书、细纲、生成、定稿、下一章与导出。
+前 10 项含一次与首轮重叠的恢复用例，不直接相加作为独立用例总数。
+
+速查必读新增用例在修复前构建上先复现：读取失败未显示错误且仍能操作。
+修复后桌面用例已核对读取失败禁止写入、显式重读、回执期间锁定其他项、连续保存保留两项。
+
+手机集合原为 79 项，日志确认前 51 项逐条通过后会话中断，未产生完整汇总。
+仅恢复剩余范围：
+npm --prefix frontend run test:e2e -- workshop.spec.ts writing-assistance.spec.ts writing-flow-review.spec.ts --project=mobile --max-failures=3
+27 passed (2.8m)，1 failed。
+失败为备份切换后 page.evaluate 遇到 Execution context was destroyed：页面先更新 hash
+再整页重载，标题可在旧文档短暂出现。测试改为点击前等待 load，保留身份、正文与清理断言。
+
+最后补验快速设定的输入法组合/重复提交、速查关闭按钮、默认连接、模型目录和备份恢复。
+npm --prefix frontend run test:e2e -- frontend-engineering.spec.ts quick-references-boundaries.spec.ts workshop.spec.ts --grep '快速记录设定忽略|速查必读|默认连接切换|模型目录读取|备份下载、校验与新工作区恢复' --max-failures=3
+10 passed (37.7s)，桌面与手机各 5 项，退出码 0。
+测试分阶段、有重叠，并有中断后续跑；没有将这些结果描述成一次完整集合全部通过。
+首轮和续跑中发现的失败均已定位并通过对应补验。
+
+人工浏览：独立浏览器只访问 127.0.0.1:9876，经 health 确认 e2e-*；
+查看 390×844 手机导入窗口，字段与底部操作可见，横向溢出为 false。
+未进行真实模型、完整输入法、跨浏览器或百万字负载验证。
+
+文档检查：本轮修改文档中的 150 个本地链接全部存在；检查器解码 URL 中的 %20 后核对文件。
+本次修改未新增迁移或依赖。生成的临时测试工作区不进入版本控制。

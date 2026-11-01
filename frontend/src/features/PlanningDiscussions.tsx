@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowRight, ChatsCircle, Check, PaperPlaneTilt, Plus, Stop } from '@phosphor-icons/react'
-import { activeStates, api, ApiError, dateLabel, errorText, jobStateNames, uuid } from '../lib/api'
+import { canUseProvider, activeStates, api, ApiError, dateLabel, errorText, jobStateNames, uuid } from '../lib/api'
 import type { ChapterSummary, Context, ContextInput, Conversation, DiscussionTurn, Evidence, JobInput, OutlineField } from '../lib/api'
 import type { Navigate } from '../lib/route'
 import { discussionDrafts } from '../lib/drafts'
@@ -206,7 +206,7 @@ function DiscussionThread({ conversation, chapters, workspaceId, navigate, onEvi
           <span>{item.name}<small>{item.summary || '作者设定'}</small></span>
         </label>)}</div>}
       </fieldset>
-      <p className="small muted">未勾选的正文与档案不会作为本轮参考发送。当前稿和待复核稿会明确标注。</p>
+      <p className="small muted">本轮直接参考仅限所选项；最近讨论仍可能包含先前引文。当前稿和待复核稿会明确标注。</p>
     </details>
     {job.error && <Notice action={<Button onClick={() => void job.refetch()}>重试读取</Button>}>{errorText(job.error)}</Notice>}
     </div>
@@ -223,7 +223,7 @@ function DiscussionThread({ conversation, chapters, workspaceId, navigate, onEvi
       {pending && <Notice>发送结果尚未确认。请先刷新讨论核对，或重试原请求。</Notice>}
       {error && !pending && <Notice>{error}</Notice>}
       {!recovery && <><Field label="讨论内容"><textarea rows={3} maxLength={4000} value={instruction} disabled={locked} placeholder="说说你卡住的地方，或让 AI 针对细纲提出修改建议…" onChange={e => setInstruction(e.target.value)} onCompositionStart={() => { composing.current = true }} onCompositionEnd={() => { composing.current = false }} onKeyDown={e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !e.nativeEvent.isComposing && !locked) { e.preventDefault(); void send() } }} /></Field>
-      <div className="discussion-send-row"><label>讨论模型<select aria-label="讨论模型" value={providerId} onChange={e => setProviderChoice(e.target.value)} disabled={locked}>{providers.data?.map(item => <option value={item.id} key={item.id}>{item.name} · {item.model}</option>)}</select></label>{!pending && !active && <Button variant="ghost" disabled={locked || !instruction.trim() || !chapterIds.length} onClick={() => void seeContext()}>查看本次资料</Button>}{active ? <Button disabled={busy} onClick={() => void cancel()}><Stop size={16} />停止回复</Button> : <Button variant="primary" disabled={busy || !!recovery || !recoveryReady || !materialsReady || !current || (!pending && (!instruction.trim() || !chapterIds.length || !provider || (provider.kind !== 'demo' && !provider.has_key)))} onClick={() => void send()}><PaperPlaneTilt size={17} />{busy ? '准备发送…' : pending ? '重试原请求' : '发送'}</Button>}</div>
+      <div className="discussion-send-row"><label>讨论模型<select aria-label="讨论模型" value={providerId} onChange={e => setProviderChoice(e.target.value)} disabled={locked}>{providers.data?.map(item => <option value={item.id} key={item.id}>{item.name} · {item.model}</option>)}</select></label>{!pending && !active && <Button variant="ghost" disabled={locked || !instruction.trim() || !chapterIds.length} onClick={() => void seeContext()}>查看本次资料</Button>}{active ? <Button disabled={busy} onClick={() => void cancel()}><Stop size={16} />停止回复</Button> : <Button variant="primary" disabled={busy || !!recovery || !recoveryReady || !materialsReady || !current || (!pending && (!instruction.trim() || !chapterIds.length || !canUseProvider(provider)))} onClick={() => void send()}><PaperPlaneTilt size={17} />{busy ? '准备发送…' : pending ? '重试原请求' : '发送'}</Button>}</div>
       <ProviderDisclosure provider={provider} /></> }
       {providers.error && <Notice>{errorText(providers.error)}</Notice>}
       {preview && contextOpen && <Modal open title="本次资料与费用估算" wide onOpenChange={setContextOpen} className="discussion-context"><div className="discussion-context-outlines">{preview.discussion_outlines?.map(item => <details key={item.chapter_id}><summary>{item.document.title}</summary><pre>{outlineText(item.document)}</pre></details>)}</div><ContextDetails context={preview} onEvidence={onEvidence} /></Modal>}

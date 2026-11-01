@@ -39,7 +39,16 @@ def validate_snapshot(connection, novel_id, reference, context):
     """Historical snapshots may be stale; ownership and immutable text must still match."""
     payload, preview = context["input"], context["preview"]
     modern = context.get("prompt_version") == "discuss-v2"
-    if not modern and not reference.manuscripts and not reference.entity_ids:
+    messages = context["messages"]
+    if (context.get("prompt_version") not in {"discuss-v1", "discuss-v2"}
+            or len(messages) != 2 or messages[0]["role"] != "system" or messages[1]["role"] != "user"
+            or json.loads(messages[1]["content"]) != payload):
+        raise DomainError("INVALID_DATABASE", "讨论实际消息与资料快照不一致。")
+    if not modern:
+        if (reference.manuscripts or reference.entity_ids
+                or any(payload.get(key) for key in ("manuscripts", "sources", "entities"))
+                or any(preview.get(key) for key in ("discussion_manuscripts", "sources", "entities"))):
+            raise DomainError("INVALID_DATABASE", "旧版讨论不允许携带正文或档案来源。")
         return
     if len({item.chapter_id for item in reference.manuscripts}) != len(reference.manuscripts):
         raise DomainError("INVALID_DATABASE", "讨论正文重复。")

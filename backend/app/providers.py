@@ -110,7 +110,7 @@ async def model_catalog(base_url: str, key: str) -> list[str]:
     try:
         async with httpx.AsyncClient(timeout=12, follow_redirects=False, trust_env=False) as client:
             async with client.stream("GET", base_url.rstrip("/") + "/models",
-                                     headers={"Authorization": "Bearer " + key}) as response:
+                                     headers={"Authorization": "Bearer " + key} if key else {}) as response:
                 if response.status_code != 200:
                     raise ProviderFailure("PROVIDER_CHECK_FAILED",
                         f"模型目录返回 HTTP {response.status_code}。请检查服务地址与权限。")
@@ -125,6 +125,11 @@ async def model_catalog(base_url: str, key: str) -> list[str]:
         raise ProviderFailure("PROVIDER_CHECK_FAILED", exc.message) from exc
     except (httpx.HTTPError, ValueError, RecursionError) as exc:
         raise ProviderFailure("PROVIDER_CHECK_FAILED", "无法读取模型目录，请检查服务与本机网络。") from exc
+
+
+def requires_api_key(url: str) -> bool:
+    """Only explicitly configured loopback servers may run without credentials."""
+    return urlsplit(url).hostname not in {"localhost", "127.0.0.1", "::1"}
 
 
 def normalize_endpoint(url: str) -> str:
@@ -297,7 +302,7 @@ async def stream_completion(config: dict[str, Any], key: str, messages: list[dic
 
 
 async def _compatible_completion(config: dict[str, Any], key: str, messages: list[dict[str, str]], task: str):
-    if not key:
+    if not key and requires_api_key(config["base_url"]):
         raise ProviderFailure("PROVIDER_KEY_MISSING", "模型密钥未配置，请在模型设置中添加。")
     payload: dict[str, Any] = {"model": config["model"], "messages": messages,
         "stream": config["stream"], config["token_parameter"]: config["max_output_tokens"]}
@@ -306,7 +311,9 @@ async def _compatible_completion(config: dict[str, Any], key: str, messages: lis
     if config["json_mode"] and task in RESULT_SCHEMAS:
         payload["response_format"] = {"type": "json_object"}
     endpoint = config["base_url"].rstrip("/") + "/chat/completions"
-    headers = {"Authorization": "Bearer " + key, "Content-Type": "application/json"}
+    headers = {"Content-Type": "application/json"}
+    if key:
+        headers["Authorization"] = "Bearer " + key
     timeout = httpx.Timeout(connect=12, read=45, write=30, pool=12)
     try:
         async with httpx.AsyncClient(timeout=timeout, follow_redirects=False, trust_env=False) as client:

@@ -288,9 +288,12 @@ function InlineQuickEntityModal({
   const [summary, setSummary] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const pending = useRef(false)
+  const composing = useRef(false)
 
   async function handleSave() {
-    if (!name.trim()) return
+    if (!name.trim() || pending.current || composing.current) return
+    pending.current = true
     setBusy(true)
     setError('')
     try {
@@ -307,6 +310,7 @@ function InlineQuickEntityModal({
     } catch (e) {
       setError(errorText(e))
     } finally {
+      pending.current = false
       setBusy(false)
     }
   }
@@ -314,40 +318,46 @@ function InlineQuickEntityModal({
   return (
     <Modal
       open
+      dismissible={!busy}
       onOpenChange={v => !v && onClose()}
       title="快速记录设定词条"
       description="无需离开写作页面，直接将词条添加进小说世界观与人物库。"
     >
       <form
+        onCompositionStart={() => { composing.current = true }}
+        onCompositionEnd={() => { composing.current = false }}
         onSubmit={e => {
           e.preventDefault()
           void handleSave()
         }}
         className="form-stack"
       >
-        <div className="form-row">
-          <Field label="设定类型">
-            <select value={kind} onChange={e => setKind(e.target.value as 'character' | 'world')}>
-              <option value="character">人物 / 配角</option>
-              <option value="world">世界设定 / 功法 / 宗门</option>
-            </select>
+        <fieldset disabled={busy} className="form-stack metadata-fields">
+          <legend className="sr-only">快速设定内容</legend>
+          <div className="form-row">
+            <Field label="设定类型">
+              <select value={kind} onChange={e => setKind(e.target.value as 'character' | 'world')}>
+                <option value="character">人物 / 配角</option>
+                <option value="world">世界设定 / 功法 / 宗门</option>
+              </select>
+            </Field>
+            <Field label="名称">
+              <input required maxLength={80} value={name} onChange={e => setName(e.target.value)} />
+            </Field>
+          </div>
+          <Field label="一句话简述（可选）" help="简短记录其身份、功法境界或关键特征">
+            <textarea
+              rows={2}
+              maxLength={1000}
+              value={summary}
+              onChange={e => setSummary(e.target.value)}
+              placeholder="例如：云岚宗外门长老，对主角怀有敌意"
+            />
           </Field>
-          <Field label="名称">
-            <input required maxLength={80} value={name} onChange={e => setName(e.target.value)} />
-          </Field>
-        </div>
-        <Field label="一句话简述（可选）" help="简短记录其身份、功法境界或关键特征">
-          <textarea
-            rows={2}
-            maxLength={1000}
-            value={summary}
-            onChange={e => setSummary(e.target.value)}
-            placeholder="例如：云岚宗外门长老，对主角怀有敌意"
-          />
-        </Field>
+        </fieldset>
         {error && <Notice>{error}</Notice>}
         <div className="modal-actions" style={{ marginTop: '12px' }}>
-          <Button type="button" onClick={onClose}>
+          <Button type="button" disabled={busy} onClick={onClose}>
             取消
           </Button>
           <Button type="submit" variant="primary" disabled={busy || !name.trim()}>
