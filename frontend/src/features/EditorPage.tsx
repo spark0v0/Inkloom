@@ -2,20 +2,22 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
-import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowCounterClockwise, ArrowClockwise, Article, Check, CheckCircle, ClockCounterClockwise, DotsThree, List, SidebarSimple, Sparkle, TextB, TextItalic, X } from '@phosphor-icons/react'
+import { useQueryClient } from '@tanstack/react-query'
+import { Article, Check, CheckCircle, ClockCounterClockwise, DotsThree, List, SidebarSimple, Sparkle, X } from '@phosphor-icons/react'
 import { api, countChars, dateLabel, downloadText, errorText, number, uuid } from '../lib/api'
 import type { Chapter, ChapterSummary, Evidence, MemoryProposal, Novel, Provider, Roles, Selection, Version } from '../lib/api'
 import type { Navigate } from '../lib/route'
 import { useManuscript } from '../lib/useManuscript'
 import { useReadingPreferences } from '../lib/useReadingPreferences'
 import type { RecoveryDraft } from '../lib/drafts'
-import { Button, Field, Loading, Modal, Notice } from '../components/ui'
+import { Button, Field, Modal, Notice } from '../components/ui'
 import { Assistant } from './Assistant'
 import { CanonDialog } from './ChapterFinalizeDialog'
 import { ReviewImpactDialog } from './ReviewImpactDialog'
 import { ChapterList } from './ChapterList'
 import { WritingStyleDialog } from './WritingStyleDialog'
+import { ManuscriptTools } from './ManuscriptTools'
+import { VersionHistoryDialog } from './VersionHistoryDialog'
 import { rewriteActions } from '../lib/writing'
 import type { RewriteAction, SelectionRewrite } from '../lib/writing'
 import { cleanEntityName } from '../lib/entityTemplates'
@@ -27,6 +29,7 @@ export function EditorPage({ novel, chapter, chapters, workspaceId, providers, r
   const [selection, setSelection] = useState<Selection | null>(null)
   const [quickRewrite, setQuickRewrite] = useState<SelectionRewrite | null>(null)
   const [preparingSelection, setPreparingSelection] = useState(false)
+  const [composing, setComposing] = useState(false)
   const [styleOpen, setStyleOpen] = useState(false)
   const quickPrepared = useCallback((id: string) => setQuickRewrite(current => current?.id === id ? null : current), [])
   const [assistantOpen, setAssistantOpen] = useState(true)
@@ -83,9 +86,10 @@ export function EditorPage({ novel, chapter, chapters, workspaceId, providers, r
     editorProps: {
       attributes: { class: 'manuscript-content', role: 'textbox', 'aria-label': '小说正文', 'aria-multiline': 'true', spellcheck: 'false' },
       handleDOMEvents: {
-        compositionstart: () => { stateRef.current.composing.current = true; setSelection(null); return false },
+        compositionstart: () => { stateRef.current.composing.current = true; setComposing(true); setSelection(null); return false },
         compositionend: () => {
           stateRef.current.composing.current = false
+          setComposing(false)
           queueMicrotask(() => { if (editor) stateRef.current.change({ text: editor.getText({ blockSeparator: '\n\n' }), doc: editor.getJSON() }) })
           return false
         },
@@ -204,7 +208,7 @@ export function EditorPage({ novel, chapter, chapters, workspaceId, providers, r
     <div className="desktop-directory"><ChapterList novel={novel} chapters={chapters} currentId={chapter.id} navigate={navigate} beforeCreate={manuscript.flush} /></div>
     <section className={`editor-panel ${candidateView ? 'viewing-candidate' : ''}`} aria-label="章节写作">
       {!compact && <nav className="document-tabs" aria-label="稿件视图"><button aria-pressed={!candidateView} onClick={() => setCandidateView(false)}>正文</button><button aria-pressed={candidateView} disabled={!hasCandidate || !assistantOpen} onClick={() => setCandidateView(true)}>{candidateLabel}</button><span>{chapter.title}</span></nav>}
-      <div className="editor-toolbar"><div className="button-row"><button className="icon-button mobile-directory-toggle" aria-label="打开章节目录" onClick={() => setDirectoryOpen(true)}><List size={20} /></button><span className="editor-volume">{chapter.volume}</span><span className="toolbar-divider" /><button className={`icon-button ${editor?.isActive('bold') ? 'selected' : ''}`} aria-label="加粗" aria-pressed={editor?.isActive('bold')} onMouseDown={e => e.preventDefault()} onClick={() => editor?.chain().focus().toggleBold().run()}><TextB size={18} /></button><button className="icon-button" aria-label="斜体" onMouseDown={e => e.preventDefault()} onClick={() => editor?.chain().focus().toggleItalic().run()}><TextItalic size={18} /></button><button className="icon-button" aria-label="撤销" onClick={() => editor?.chain().focus().undo().run()}><ArrowCounterClockwise size={17} /></button><button className="icon-button" aria-label="重做" onClick={() => editor?.chain().focus().redo().run()}><ArrowClockwise size={17} /></button></div><div className="button-row"><button className="icon-button pane-toggle desktop-directory-toggle" aria-label={directoryVisible ? '收起章节目录' : '展开章节目录'} aria-expanded={directoryVisible} title={directoryVisible ? '收起章节目录' : '展开章节目录'} onClick={() => setDirectoryVisible(!directoryVisible)}><List size={18} /><span className="toolbar-label">目录</span></button><label className="reading-font"><span className="sr-only">正文字体</span><select aria-label="正文字体" value={fontFamily} onChange={e => setFontFamily(e.target.value === 'serif' ? 'serif' : 'sans')}><option value="sans">黑体</option><option value="serif">宋体</option></select></label><label className="font-size-label"><span className="sr-only">正文字号</span><select aria-label="正文字号" value={fontSize} onChange={e => setFontSize(Number(e.target.value))}><option value={16}>16</option><option value={18}>18</option><option value={20}>20</option><option value={22}>22</option></select></label><button className="icon-button focus-toggle" aria-label={focused ? '退出专注写作' : '专注写作'} onClick={() => setFocused(!focused)}><Article size={19} /></button><button className="icon-button pane-toggle desktop-assistant-toggle" aria-expanded={assistantOpen} title={assistantOpen ? '收起写作助手' : '展开写作助手'} aria-label={assistantOpen ? '收起写作助手' : '展开写作助手'} onClick={() => { setAssistantOpen(!assistantOpen); setCandidateView(false) }}><SidebarSimple size={19} /><span className="toolbar-label">助手</span></button><button className="icon-button mobile-assistant-toggle" aria-label="打开写作助手" onClick={() => setMobileAssistant(true)}><Sparkle size={20} /></button></div></div>
+      <div className="editor-toolbar"><div className="button-row"><button className="icon-button mobile-directory-toggle" aria-label="打开章节目录" onClick={() => setDirectoryOpen(true)}><List size={20} /></button><span className="editor-volume">{chapter.volume}</span><span className="toolbar-divider" /><ManuscriptTools editor={editor} composing={composing} /></div><div className="button-row"><button className="icon-button pane-toggle desktop-directory-toggle" aria-label={directoryVisible ? '收起章节目录' : '展开章节目录'} aria-expanded={directoryVisible} title={directoryVisible ? '收起章节目录' : '展开章节目录'} onClick={() => setDirectoryVisible(!directoryVisible)}><List size={18} /><span className="toolbar-label">目录</span></button><label className="reading-font"><span className="sr-only">正文字体</span><select aria-label="正文字体" value={fontFamily} onChange={e => setFontFamily(e.target.value === 'serif' ? 'serif' : 'sans')}><option value="sans">黑体</option><option value="serif">宋体</option></select></label><label className="font-size-label"><span className="sr-only">正文字号</span><select aria-label="正文字号" value={fontSize} onChange={e => setFontSize(Number(e.target.value))}><option value={16}>16</option><option value={18}>18</option><option value={20}>20</option><option value={22}>22</option></select></label><button className="icon-button focus-toggle" aria-label={focused ? '退出专注写作' : '专注写作'} onClick={() => setFocused(!focused)}><Article size={19} /></button><button className="icon-button pane-toggle desktop-assistant-toggle" aria-expanded={assistantOpen} title={assistantOpen ? '收起写作助手' : '展开写作助手'} aria-label={assistantOpen ? '收起写作助手' : '展开写作助手'} onClick={() => { setAssistantOpen(!assistantOpen); setCandidateView(false) }}><SidebarSimple size={19} /><span className="toolbar-label">助手</span></button><button className="icon-button mobile-assistant-toggle" aria-label="打开写作助手" onClick={() => setMobileAssistant(true)}><Sparkle size={20} /></button></div></div>
       {!candidateView && selection && (
         <div className="selection-actions" role="group" aria-label="选段快捷操作">
           <span className="selection-count">已选 {Array.from(selection.text).length} 字</span>
@@ -265,7 +269,7 @@ export function EditorPage({ novel, chapter, chapters, workspaceId, providers, r
       {metadataError && <Notice>{metadataError}<Button disabled={busy} onClick={() => void readMetadata()}>读取最新章节信息并比较</Button></Notice>}
       <div className="modal-actions"><Button disabled={busy} onClick={() => setMetadataOpen(false)}>取消</Button><Button type="submit" variant="primary" disabled={busy}>{busy ? '正在保存…' : '保存信息'}</Button></div></form></Modal>
     <Modal dismissible={false} open={!!manuscript.conflict} onOpenChange={() => undefined} title="此章已有另一个版本" description="两份文字都已保留。请比较后选择，关闭页面前可先下载当前草稿。" wide><div className="comparison"><div><h4>本页尚未保存的草稿</h4><div className="comparison-text">{manuscript.localText}</div></div><div><h4>工作区最新版本</h4><div className="comparison-text">{manuscript.conflict?.text}</div></div></div><div className="modal-actions"><Button onClick={() => downloadText(manuscript.localText, `${chapter.title}-冲突草稿.txt`)}>下载本页草稿</Button><Button onClick={() => manuscript.conflict && adopt(manuscript.conflict)}>使用工作区版本</Button><Button variant="primary" onClick={() => void manuscript.rebase().then(value => value && adopt(value)).catch(e => setError(errorText(e)))}>将本页文字另存为新版本</Button></div></Modal>
-    {historyOpen && <VersionHistory novelId={novel.id} chapter={chapter} onClose={() => setHistoryOpen(false)} flush={manuscript.flush} onAdopt={adopt} />}
+    {historyOpen && <VersionHistoryDialog novelId={novel.id} chapter={chapter} workspaceId={workspaceId} onClose={() => setHistoryOpen(false)} flush={manuscript.flush} onAdopt={adopt} />}
     {impactOpen && <ReviewImpactDialog novelId={novel.id} workspaceId={workspaceId} navigate={navigate} onClose={() => setImpactOpen(false)} />}
     {canonOpen && canonVersion && <CanonDialog workspaceId={workspaceId} novel={novel} chapter={chapter} version={canonVersion} proposed={changes?.versionId === canonVersion.id ? changes.values : []} onEvidence={onEvidence} onClose={() => setCanonOpen(false)} providers={providers} roles={roles} onNext={async () => { const next = chapters.find(c => c.position === chapter.position + 1); await navigate(next ? { page: 'write', novelId: novel.id, chapterId: next.id } : { page: 'plot', novelId: novel.id }) }} />}
     {styleOpen && <WritingStyleDialog novel={novel} onClose={() => setStyleOpen(false)} />}
@@ -367,20 +371,4 @@ function InlineQuickEntityModal({
       </form>
     </Modal>
   )
-}
-
-function VersionHistory({ novelId, chapter, onClose, flush, onAdopt }: { novelId: string; chapter: Chapter; onClose: () => void; flush: () => Promise<Version>; onAdopt: (v: Version, expected: Version) => void }) {
-  const versions = useInfiniteQuery({ queryKey: ['versions', novelId, chapter.id], initialPageParam: undefined as string | undefined,
-    queryFn: ({ pageParam }) => api.versionHistory(novelId, chapter.id, pageParam), getNextPageParam: page => page.next_before || undefined })
-  const [selected, setSelected] = useState(chapter.working_version_id)
-  const version = useQuery({ queryKey: ['version', selected], queryFn: () => api.version(novelId, chapter.id, selected) })
-  const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
-  async function restore() {
-    if (!version.data) return
-    setBusy(true)
-    try { const base = await flush(); const saved = await api.save(novelId, chapter.id, { base_version_id: base.id, operation_id: uuid(), text: version.data.text, editor_doc: version.data.editor_doc }); onAdopt(saved, base); onClose() }
-    catch (e) { setError(errorText(e)) } finally { setBusy(false) }
-  }
-  return <Modal open onOpenChange={value => !value && onClose()} title="章节版本" description="每次保存都是一个独立版本。恢复会另存新版本，已有文字不会被删除。" wide><div className="version-layout"><div className="version-list">{versions.isPending && <Loading label="正在读取版本…" />}{versions.error && <Notice action={<Button onClick={() => void versions.refetch()}>重试</Button>}>{errorText(versions.error)}</Notice>}{versions.data?.pages.flatMap(page => page.items).map(v => <button key={v.id} className={selected === v.id ? 'active' : ''} onClick={() => setSelected(v.id)}><strong>{dateLabel(v.created_at)}</strong><span>{number(v.char_count)} 字 {v.id === chapter.accepted_version_id ? '· 已确认版本' : ''}</span></button>)}{versions.hasNextPage && <Button disabled={versions.isFetchingNextPage} onClick={() => void versions.fetchNextPage()}>{versions.isFetchingNextPage ? '读取中…' : '更早的版本'}</Button>}</div><div className="version-body">{version.isPending ? <Loading /> : version.error ? <Notice>{errorText(version.error)}</Notice> : <div className="comparison-text">{version.data?.text || '此版本为空。'}</div>}</div></div>{error && <Notice>{error}</Notice>}<div className="modal-actions"><Button onClick={onClose}>关闭</Button><Button variant="primary" disabled={!version.data || busy || selected === chapter.working_version_id} onClick={() => void restore()}>恢复为新版本</Button></div></Modal>
 }

@@ -1,0 +1,71 @@
+Inkloom 编辑细节与项目现状复查（2026-11-02 开始，2026-11-03 收尾）
+
+现场：main / 1870ba7，开始时 git status --short 为空。
+浏览器测试使用新建的隔离 e2e-* SQLite 工作区；没有读取作者资料或密钥做外部测试。
+技能命令中的 <taste-skill> 表示实际本机技能目录，其余参数保留执行值。
+
+1. 修复前复现
+npm --prefix frontend run test:e2e -- editor-detail-polish.spec.ts --project=desktop --grep '正文格式|只创建一个版本' --max-failures=2
+2 failed：无历史时撤销仍可点击；恢复成功但丢失回执后没有原请求确认入口。
+达到失败上限后提前终止另有非测试错误提示，不将该次运行描述为通过。
+
+2. 首次修复与检查
+npm --prefix frontend test
+55 passed / 16 files，5.53s。
+
+npm --prefix frontend run build
+首次发现拆分后未使用的 Loading 导入（TS6133），移除后构建通过。
+
+npm --prefix frontend run test:e2e -- editor-detail-polish.spec.ts --max-failures=3
+8 passed，17.8s，桌面/手机各四项。
+
+3. 空白恢复提示与相关核心回归
+npm --prefix frontend run build
+通过，Vite 542ms；编辑路由 502.19 kB / gzip 155.82 kB，保留大于 500 kB 提示，未调大警告阈值。
+
+node <taste-skill>/scripts/lint.mjs --app frontend/src/features/ManuscriptTools.tsx frontend/src/features/VersionHistoryDialog.tsx
+2 files，0 FAIL / 0 WARN。仅为新增组件的样式模式检查。
+
+npm --prefix frontend run test:e2e -- editor-detail-polish.spec.ts workshop.spec.ts --grep '正文格式|版本恢复等待|空白历史|恢复回执丢失|手写保存、刷新|演示候选不会|两页编辑冲突|窄屏无横向|emoji 后选段|编辑器与助手的自动' --max-failures=3
+22 passed，1.5m，桌面/手机各 11 项。
+包括重复点击、保存结果不确定的重放、已有更新时拒绝旧回执、版本下载、空白恢复，
+手写保存/刷新/定稿/导出、演示候选采纳、两窗口冲突、emoji 选段与相关 axe 检查。
+
+人工查看实际 1440×900 / 390×844 历史窗口截图：正文区可读、独立滚动，当前与选中记录清楚，操作区可达。
+截图与本地完整日志在 .tmp/editor-history-*.png、.tmp/editor-detail-*.log，不含作者数据。
+
+4. 定稿状态与响应式补查
+npm --prefix frontend run test:e2e -- editor-detail-polish.spec.ts --project=desktop --grep '迟到回执'
+补充“另一窗口已将后续正文定稿”场景，1 failed：仅接收正文而未同步章节元数据，页面没有正确显示已定稿。
+回执后将服务端当前章节写入查询缓存，继续通过缓冲区基线保护接收正文。
+
+npm --prefix frontend run test:e2e -- editor-detail-polish.spec.ts --grep '恢复回执丢失|版本恢复等待|空白历史' --max-failures=2
+8 passed，18.2s，包括正文和已定稿状态一起核对。
+
+真实浏览器 inspector 首次检查 1440/768/390：2 FAIL（按钮装饰、已收起高级表单的边缘文字）与 2 WARN。
+人工截图进一步确认工具栏裁切、目录标签竖排；扩展中等宽度测试还确认隐藏侧栏仍占空列。
+修复断点、工具栏换行、目录节点显隐、专注模式和相应间距。
+
+npm --prefix frontend run test:e2e -- editor-detail-polish.spec.ts --project=desktop --grep '中等宽度'
+修复前 1 failed：390 px 的控件超过工具栏右边界。
+第一轮修复后两视口失败在 800 px：外框仍保留隐藏侧栏的 200 px 列，已统一外框断点。
+npm --prefix frontend run test:e2e -- editor-detail-polish.spec.ts --grep '中等宽度' --max-failures=2
+2 passed，12.1s；各自遍历 390/800/1024/1100/1280/1440，核对控件边界、目录与助手收起和专注模式。
+
+npm --prefix frontend run build
+最终代码构建通过，Vite 529ms，编辑路由 502.24 kB / gzip 155.87 kB，仍有体积提示。
+
+node <taste-skill>/scripts/inspect.mjs <隔离样例URL> --app --out .tmp/editor-detail-inspection-after --widths 1440,768,390 --allow blank-gap
+0 FAIL / 1 WARN。允许 blank-gap：短稿下方是继续输入的写作空间，不增加内容填满。
+保留的 font-fallback 仅定位到侧栏 mini-book 单字书标的系统宋体栈；正文和界面字体未因此改为远程加载。
+人工已查看三种宽度截图和历史窗口截图；完整测量在 .tmp/editor-detail-inspection*/report.json。
+
+5. 最终相关回归
+npm --prefix frontend run test:e2e -- editor-detail-polish.spec.ts workshop.spec.ts --grep '正文格式|中等宽度|版本恢复等待|空白历史|恢复回执丢失|手写保存、刷新|演示候选不会|两页编辑冲突|窄屏无横向|emoji 后选段|编辑器与助手的自动' --max-failures=3
+24 passed，1.6m，exit 0；桌面/手机各 12 项。覆盖最终章节状态同步与 CSS 断点修复。
+与之前检查有重叠，不将这些数量相加描述为全量浏览器套件。
+git diff --check 通过；受影响文档中的 26 个本地链接有效。
+
+6. 范围
+未运行真实收费模型、百万字性能、真实 Windows 中文输入法人工或跨浏览器验收。
+未重跑无关后端全套或全量 Playwright。局部自动无障碍检查不代表完整 WCAG 合规。
