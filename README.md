@@ -25,12 +25,12 @@ git clone https://github.com/spark0v0/Inkloom.git
 cd Inkloom
 ```
 
-- **Windows**：双击根目录的 [启动 Inkloom.cmd](启动%20Inkloom.cmd)。
-- **macOS / Linux**：在项目根目录运行 `bash "./启动 Inkloom.sh"`。
+- **Windows**：双击根目录的 [Inkloom.cmd](Inkloom.cmd)，按 Enter 启动或打开工作台，输入 `S` 停止，`R` 重新构建并启动，`Q` 退出窗口。
+- **macOS / Linux**：在项目根目录运行 `bash ./scripts/inkloom.sh`；未安装 PowerShell 时使用前台服务，按 `Ctrl+C` 停止。
 
 首次启动会下载依赖并构建界面，需要网络连接。默认地址为 **http://127.0.0.1:8765**，实际地址以启动窗口为准。
 
-停止服务可在启动窗口按 `Ctrl+C`；Windows 也可双击 [关闭 Inkloom.cmd](关闭%20Inkloom.cmd)。更新代码前请先停止服务。
+启动后保留终端窗口；Windows 可在其中按 `Q` 或 `Ctrl+C` 停止，也可再次打开同一入口选择 `S`。停止前请确认正文已保存，正在进行的生成会被中断；更新代码前先停止服务。
 
 ## 开始创作
 

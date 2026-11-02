@@ -5,7 +5,8 @@ param(
     [string]$DataDirectory,
     [switch]$NoBrowser,
     [switch]$Rebuild,
-    [switch]$Stop
+    [switch]$Stop,
+    [switch]$Menu
 )
 
 $ErrorActionPreference = 'Stop'
@@ -20,7 +21,7 @@ $isWin = $IsWindows -or ($env:OS -like '*Windows*')
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 if (-not $DataDirectory) { $DataDirectory = Join-Path $projectRoot 'data' }
 if (-not [IO.Path]::IsPathRooted($DataDirectory)) { $DataDirectory = Join-Path $projectRoot $DataDirectory }
-$workspaceRoot = [IO.Path]::GetFullPath($DataDirectory)
+$workspaceRoot = [IO.Path]::TrimEndingDirectorySeparator([IO.Path]::GetFullPath($DataDirectory))
 $runtime = Join-Path $projectRoot '.runtime'
 $python = if ($isWin) {
     Join-Path $projectRoot 'backend/.venv/Scripts/python.exe'
@@ -28,6 +29,8 @@ $python = if ($isWin) {
     Join-Path $projectRoot 'backend/.venv/bin/python'
 }
 $ports = if ($PSBoundParameters.ContainsKey('Port')) { @($Port) } else { @(8765..8774) }
+$explicitPort = $PSBoundParameters.ContainsKey('Port')
+$interactive = [Environment]::UserInteractive -and -not [Console]::IsInputRedirected
 
 function Get-WorkspaceId {
     $active = $workspaceRoot
@@ -45,6 +48,75 @@ function Get-WorkspaceId {
 function Get-Health([int]$ServerPort) {
     try { return Invoke-RestMethod -Uri "http://127.0.0.1:$ServerPort/api/v1/health" -TimeoutSec 1 -NoProxy }
     catch { return $null }
+}
+
+function Read-Receipt([string]$Path) {
+    if (Test-Path -LiteralPath $Path) {
+        try { return Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json } catch { }
+    }
+    return $null
+}
+
+function Stop-InkloomService([int]$TargetPort) {
+    $receipt = Join-Path $runtime "server-$TargetPort.json"
+    $record = Read-Receipt $receipt
+    $health = Get-Health $TargetPort
+    $expected = Get-WorkspaceId
+    if (-not (Test-Path -LiteralPath $receipt) -and -not $health) {
+        $listeners = [Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetActiveTcpListeners()
+        if (-not ($listeners | Where-Object { $_.Port -eq $TargetPort })) {
+            Write-Host "端口 $TargetPort 的 Inkloom 已停止。" -ForegroundColor Gray
+            return
+        }
+    }
+    if (-not $record -or $record.port -ne $TargetPort -or $record.pid -isnot [long] -and $record.pid -isnot [int] -or $record.pid -le 0) {
+        throw "端口 $TargetPort 缺少有效的启动记录，无法安全停止。请在原启动窗口按 Ctrl+C。"
+    }
+    $proc = Get-Process -Id $record.pid -ErrorAction SilentlyContinue
+    if (-not $proc) {
+        if ($health) { throw "端口 $TargetPort 的启动记录已过期，未停止该端口的其他服务。" }
+        Remove-Item -LiteralPath $receipt -Force
+        Write-Host "端口 $TargetPort 的 Inkloom 已停止。" -ForegroundColor Gray
+        return
+    }
+    # PID alone may have been reused. New receipts bind the executable, exact
+    # process start time and workspace root; old receipts also need a live match.
+    # A Unix virtualenv's python may be a symlink; retain the OS-reported path.
+    $launchedExecutable = if ($record.executable_path) { $record.executable_path } else { $python }
+    $sameExecutable = [string]::Equals($proc.Path, $launchedExecutable, $(if ($isWin) { [StringComparison]::OrdinalIgnoreCase } else { [StringComparison]::Ordinal }))
+    $sameWorkspace = $record.workspace_root -and [string]::Equals($record.workspace_root, $workspaceRoot, $(if ($isWin) { [StringComparison]::OrdinalIgnoreCase } else { [StringComparison]::Ordinal }))
+    $sameStart = $record.process_started_at -and $proc.StartTime.ToUniversalTime().Ticks -eq ([DateTimeOffset]$record.process_started_at).UtcDateTime.Ticks
+    $liveMatch = $expected -and $health.status -eq 'ok' -and $health.workspace_id -eq $expected
+    $verified = $sameExecutable -and $sameWorkspace -and $sameStart
+    if (-not $record.process_started_at -and -not $record.workspace_root -and $isWin -and $liveMatch -and $sameExecutable) {
+        $owner = Get-NetTCPConnection -LocalPort $TargetPort -State Listen -ErrorAction SilentlyContinue | Where-Object { $_.OwningProcess -eq $proc.Id }
+        $verified = [bool]$owner
+    }
+    if (-not $verified) { throw "端口 $TargetPort 的进程与本工作区启动记录不符，已拒绝停止。" }
+    if ($health -and -not $liveMatch) { throw "端口 $TargetPort 当前属于其他工作区，已拒绝停止。" }
+    Write-Host "正在停止 Inkloom（端口 $TargetPort）…" -ForegroundColor Cyan
+    $record | Add-Member -NotePropertyName stopping -NotePropertyValue $true -Force
+    $record | ConvertTo-Json | Set-Content -LiteralPath $receipt -Encoding utf8
+    $proc.Kill($true)
+    if (-not $proc.WaitForExit(5000)) { throw "服务尚未退出，请稍后重新检查。" }
+    $current = Read-Receipt $receipt
+    if ($current.pid -eq $record.pid -and $current.started_at -eq $record.started_at) {
+        Remove-Item -LiteralPath $receipt -Force
+    }
+    Write-Host 'Inkloom 已停止。' -ForegroundColor Green
+}
+
+function Stop-RecordedServices {
+    $found = $false
+    $expected = Get-WorkspaceId
+    foreach ($file in (Get-ChildItem -LiteralPath $runtime -Filter 'server-*.json' -File -ErrorAction SilentlyContinue)) {
+        $record = Read-Receipt $file.FullName
+        if ($record.port -ge 1 -and $record.port -le 65535 -and ($record.workspace_root -eq $workspaceRoot -or (-not $record.workspace_root -and $expected -and $record.workspace_id -eq $expected))) {
+            Stop-InkloomService ([int]$record.port)
+            $found = $true
+        }
+    }
+    if (-not $found) { Write-Host '未发现本工作区的启动记录；若使用开发模式，请在原窗口按 Ctrl+C。' -ForegroundColor Yellow }
 }
 
 function Find-InkloomService {
@@ -130,8 +202,24 @@ $serverPort = $null
 $exitCode = 0
 Push-Location $projectRoot
 try {
+    if ($Menu -and $interactive -and -not ($NoBrowser -or $Stop -or $Rebuild)) {
+        Write-Host "`nInkloom" -ForegroundColor Cyan
+        Write-Host '  [Enter] 启动 / 打开工作台'
+        Write-Host '  [S]     停止服务'
+        Write-Host '  [R]     重新构建并启动'
+        Write-Host '  [Q]     退出此窗口'
+        Write-Host '停止前请确认正文已保存；正在进行的生成会被中断。' -ForegroundColor Yellow
+        do { $choice = (Read-Host '请选择（默认 Enter）').Trim().ToUpperInvariant() } while ($choice -notin @('', 'S', 'R', 'Q'))
+        if ($choice -eq 'Q') { return }
+        $Stop = $choice -eq 'S'
+        $Rebuild = $choice -eq 'R'
+    }
+
+    New-Item -ItemType Directory -Path $runtime -Force | Out-Null
+    try { $lock = [IO.File]::Open((Join-Path $runtime 'launcher.lock'), [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None) }
+    catch [IO.IOException] { throw '另一个窗口正在启动或停止 Inkloom，请等待该窗口完成。' }
     if ($Stop) {
-        & (Join-Path $PSScriptRoot 'stop.ps1') -Port $Port
+        if ($explicitPort) { Stop-InkloomService $Port } else { Stop-RecordedServices }
         return
     }
 
@@ -141,35 +229,11 @@ try {
         Write-Host "Inkloom 当前已在运行：$url" -ForegroundColor Green
         if ($Rebuild) {
             Write-Host '检测到 -Rebuild 参数，正在停止旧服务以便重新构建...' -ForegroundColor Cyan
-            & (Join-Path $PSScriptRoot 'stop.ps1') -Port $service.Port
+            Stop-InkloomService $service.Port
         } else {
-            if (-not $NoBrowser -and [Environment]::UserInteractive -and -not [Console]::IsInputRedirected) {
-                Write-Host ""
-                Write-Host "【快捷选项】" -ForegroundColor Cyan
-                Write-Host "  [Enter] 直接打开浏览器访问"
-                Write-Host "  [Q]     关闭停止 Inkloom 服务"
-                Write-Host ""
-                $choice = Read-Host "请输入选项 (默认 Enter 打开)"
-                if ($choice -match '^[Qq]') {
-                    & (Join-Path $PSScriptRoot 'stop.ps1') -Port $service.Port
-                    return
-                }
-            }
             Open-Inkloom $url
             return
         }
-    }
-
-    New-Item -ItemType Directory -Path $runtime -Force | Out-Null
-    try { $lock = [IO.File]::Open((Join-Path $runtime 'launcher.lock'), [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None) }
-    catch [IO.IOException] { throw '另一个启动窗口正在准备 Inkloom，请等待该窗口完成后再打开。' }
-    # Another launch may have become ready between the first probe and the lock.
-    $service = Find-InkloomService
-    if ($service.Existing) {
-        $url = "http://127.0.0.1:$($service.Port)"
-        Write-Host "Inkloom 当前已在运行：$url" -ForegroundColor Green
-        Open-Inkloom $url
-        return
     }
 
     $statePath = Join-Path $runtime 'launcher-state.json'
@@ -233,7 +297,16 @@ try {
     $errLog = $logPrefix + '.err.log'
     Write-Host "正在启动 Inkloom：$url" -ForegroundColor Cyan
     $dataArgument = '"' + ($workspaceRoot -replace '(\\+)$', '$1$1') + '"'
-    $server = Start-Process -FilePath $python -ArgumentList @('-X', 'utf8', '-m', 'app', '--port', "$serverPort", '--data-dir', $dataArgument) -WorkingDirectory (Join-Path $projectRoot 'backend') -WindowStyle Hidden -PassThru -RedirectStandardOutput $outLog -RedirectStandardError $errLog
+    $startOptions = @{
+        FilePath = $python
+        ArgumentList = @('-X', 'utf8', '-m', 'app', '--port', "$serverPort", '--data-dir', $dataArgument)
+        WorkingDirectory = Join-Path $projectRoot 'backend'
+        PassThru = $true
+        RedirectStandardOutput = $outLog
+        RedirectStandardError = $errLog
+    }
+    if ($isWin) { $startOptions.WindowStyle = 'Hidden' }
+    $server = Start-Process @startOptions
     $ready = $false
     $watch = [Diagnostics.Stopwatch]::StartNew()
     while ($watch.Elapsed.TotalSeconds -lt 30) {
@@ -251,26 +324,37 @@ try {
         port = $serverPort
         pid = $server.Id
         workspace_id = $identity
+        workspace_root = $workspaceRoot
+        executable_path = $server.Path
+        process_started_at = $server.StartTime.ToUniversalTime().ToString('o')
         started_at = (Get-Date).ToString("o")
     } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $runtime "server-$serverPort.json") -Encoding utf8
     $lock.Dispose(); $lock = $null
     Write-Host "Inkloom 已启动：$url" -ForegroundColor Green
-    Write-Host '保留此窗口；按 Ctrl+C 即可停止本次启动的服务。' -ForegroundColor Yellow
-    Write-Host '若已关闭此窗口，也可随时双击运行【关闭 Inkloom.cmd】。' -ForegroundColor Gray
+    Write-Host '保留此窗口；按 Q 或 Ctrl+C 停止本次服务，按 Enter 重新打开网页。' -ForegroundColor Yellow
+    Write-Host '也可再次打开 Inkloom.cmd，选择 S 停止。' -ForegroundColor Gray
     Write-Host "运行日志：$errLog"
     Open-Inkloom $url
-    while (-not $server.WaitForExit(500)) { }
+    while (-not $server.WaitForExit(200)) {
+        if ($interactive -and [Console]::KeyAvailable) {
+            $key = [Console]::ReadKey($true)
+            if ($key.Key -eq [ConsoleKey]::Q) { break }
+            if ($key.Key -eq [ConsoleKey]::Enter) { Open-Inkloom $url }
+        }
+    }
+    if (-not $server.HasExited) { return }
     Start-Sleep -Milliseconds 100
     $receiptPath = Join-Path $runtime "server-$serverPort.json"
-    $wasStoppedExternally = (-not (Test-Path -LiteralPath $receiptPath)) -or ($server.ExitCode -eq -1)
+    $currentReceipt = Read-Receipt $receiptPath
+    $wasStoppedExternally = -not $currentReceipt -or $currentReceipt.stopping -or $currentReceipt.pid -ne $server.Id
     if ($server.ExitCode -ne 0 -and -not $wasStoppedExternally) {
         if (Test-Path -LiteralPath $errLog) { Get-Content -LiteralPath $errLog -Tail 25 | Write-Host }
         throw "服务异常退出（$($server.ExitCode)）。诊断日志：$errLog"
     } else {
-        Write-Host "Inkloom 服务已安全退出。" -ForegroundColor Gray
+        Write-Host 'Inkloom 服务已退出。' -ForegroundColor Gray
     }
 } catch {
-    Write-Host "启动失败：$($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "操作未完成：$($_.Exception.Message)" -ForegroundColor Red
     $exitCode = 1
 } finally {
     # Only this invocation's process tree is owned here. Reused services are untouched.
@@ -278,7 +362,8 @@ try {
     if ($null -ne $serverPort) {
         $receipt = Join-Path $runtime "server-$serverPort.json"
         try {
-            if (Test-Path -LiteralPath $receipt) { [IO.File]::Delete($receipt) }
+            $current = Read-Receipt $receipt
+            if ($current.pid -eq $server.Id -and $current.process_started_at -and ([DateTimeOffset]$current.process_started_at).UtcDateTime.Ticks -eq $server.StartTime.ToUniversalTime().Ticks) { [IO.File]::Delete($receipt) }
         } catch { }
     }
     if ($null -ne $lock) { $lock.Dispose() }

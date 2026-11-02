@@ -1,19 +1,29 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Inkloom 一键启动脚本 (Linux / macOS / Git Bash)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Inkloom 入口 (Linux / macOS)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$SCRIPT_DIR"
 
 if command -v pwsh >/dev/null 2>&1; then
-    exec pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$SCRIPT_DIR/scripts/launch.ps1" "$@"
+    exec pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$SCRIPT_DIR/scripts/launch.ps1" -Menu "$@"
 fi
 
 PORT="${PORT:-8765}"
 DATA_DIR="${DATA_DIR:-$SCRIPT_DIR/data}"
+if [[ "$DATA_DIR" != /* ]]; then DATA_DIR="$SCRIPT_DIR/$DATA_DIR"; fi
 VENV_PYTHON="$SCRIPT_DIR/backend/.venv/bin/python"
 
 echo "==> 启动 Inkloom (Shell 模式)..."
+if [ "$#" -gt 0 ]; then
+    echo "[错误] Shell 模式请用 PORT / DATA_DIR 设置端口与目录，按 Ctrl+C 停止；命令参数需要 PowerShell 7+。"
+    exit 1
+fi
+if ! [[ "$PORT" =~ ^[0-9]{1,5}$ ]] || ((10#$PORT < 1 || 10#$PORT > 65535)); then
+    echo "[错误] PORT 必须是 1–65535 之间的整数。"
+    exit 1
+fi
+PORT="$((10#$PORT))"
 
 if [ ! -f "$VENV_PYTHON" ]; then
     if ! command -v uv >/dev/null 2>&1; then
@@ -43,4 +53,5 @@ elif command -v xdg-open >/dev/null 2>&1; then
     (sleep 1 && xdg-open "$URL") &
 fi
 
+cd "$SCRIPT_DIR/backend"
 exec "$VENV_PYTHON" -X utf8 -m app --port "$PORT" --data-dir "$DATA_DIR"

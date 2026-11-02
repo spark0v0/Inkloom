@@ -19,5 +19,5 @@ try {
     if ($LASTEXITCODE -ne 0) { throw '接口类型生成失败。' }
     & npm --prefix frontend run build
     if ($LASTEXITCODE -ne 0) { throw '前端构建失败。' }
-    Write-Host '准备完成。运行：pwsh -File .\scripts\start.ps1' -ForegroundColor Green
+    Write-Host '准备完成。双击根目录 Inkloom.cmd，或运行 pwsh -File ./scripts/launch.ps1。' -ForegroundColor Green
 } finally { Pop-Location }

@@ -1,0 +1,44 @@
+Inkloom 统一启动入口验证
+日期：2026-11-03（Asia/Shanghai）
+环境：Windows，PowerShell 7.6.9；起始提交 abeabd1，工作区原先干净。
+
+实现范围
+- 根目录保留 Inkloom.cmd；删除独立启动/关闭包装及 scripts/start.ps1、scripts/stop.ps1。
+- scripts/launch.ps1 管理菜单、复用、重建、停止及进程身份核验。
+- Bash 入口移到 scripts/inkloom.sh，保留无 PowerShell 的前台运行方式。
+- 更新 README、试写入口、历史命令说明和 ADR 0030。
+
+自动专项检查
+命令：pwsh -NoLogo -NoProfile -File ./scripts/tests/launcher.ps1
+最终结果：退出码 0，共 22 项断言通过。
+最终临时目录：<project>/.tmp/launcher-441eaf5c31764474a9221f9eb2834d59
+使用随机空闲端口、全新中文空格路径的 SQLite 工作区和真实本地进程。
+覆盖：
+  - 启动、网页可访问、进程身份记录、CMD 参数转发。
+  - 重复打开复用已有进程，不再启动第二个服务。
+  - 跨工作区停止被拒绝；损坏记录、过期进程身份不能终止无关 Python 服务。
+  - 重建结束旧服务，网页重新构建并启动新进程；旧窗口不删除新进程记录。
+  - 默认停止可查找非默认端口；路径末尾分隔符不导致身份误判。
+  - 停止释放端口与记录；显式端口及默认方式重复停止都正常退出。
+重建路径实际调用 npm --prefix frontend run build，成功后才进入新服务就绪状态。
+原有 EditorPage 大于 500 kB 的构建警告仍存在，本次未修改前端代码。
+
+首次专项运行在重建停止时失败：ConvertFrom-Json 将 ISO 时间转换为 DateTime，
+字符串比较误拒绝本次启动的进程。探针确认类型和比较差异后改用 UTC ticks，
+后续复验通过；最终结果对应增加实际可执行文件路径记录后的代码。
+
+交互验证
+- PTY 中通过 cmd.exe 调用 Inkloom.cmd，菜单可见；输入 Q 正常退出，退出码 0。
+- 新临时工作区使用 -NoBrowser 运行，输入 q 停止，退出码 0；另行核实端口与记录均释放。
+- 未实际打开系统浏览器；复用及网页 HTTP 访问已检查。
+
+静态检查
+- scripts 下全部 PowerShell 文件通过 Parser.ParseFile 语法检查。
+- Git Bash：bash -n ./scripts/inkloom.sh，退出码 0。
+- git diff --check 无错误。
+
+边界
+- 未访问作者正文、密钥或触发任何真实模型调用；没有迁移、删除或覆盖作者数据。
+- 测试只终止本次创建的进程句柄，临时日志保留在被忽略的 .tmp/。
+- macOS / Linux 未做实机运行；Bash 语法检查不代表这些平台已验收。
+- 未重跑与脚本变更无关的完整前后端测试；停止仍可能中断生成，不声称平滑停机。

@@ -27,6 +27,8 @@
 
 ## 运行与开发入口
 
+以下命令保留为 0.1.0 历史记录。当前统一入口为根目录 `Inkloom.cmd`，命令行使用 `pwsh -File ./scripts/launch.ps1`；停止加 `-Stop`，重建加 `-Rebuild`。原 `start.ps1` / `stop.ps1` 已合并。
+
 ```powershell
 pwsh -File .\scripts\setup.ps1
 pwsh -File .\scripts\start.ps1
