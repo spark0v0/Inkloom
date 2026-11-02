@@ -3,9 +3,11 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowRight, Check, FileText, Pause, Play, Stop, ArrowCounterClockwise, PenNib, Sparkle, SlidersHorizontal, User, X } from '@phosphor-icons/react'
 import { canUseProvider, activeStates, ApiError, api, countChars, dateLabel, downloadText, errorText, jobStateNames, number, uuid } from '../lib/api'
-import type { Chapter, Context, ContextInput, Evidence, JobInput, MemoryProposal, Novel, Provider, ReviewRewritePreparation, Roles, Selection, Task, Version } from '../lib/api'
+import type { Chapter, ContextInput, Evidence, JobInput, MemoryProposal, Novel, Provider, ReviewRewritePreparation, Roles, Selection, Task, Version } from '../lib/api'
 import { Badge, Button, Field, Modal, Notice } from '../components/ui'
-import { AttemptHistory, ContextDetails, JobResult } from './JobPresentation'
+import { AttemptHistory, JobResult } from './JobPresentation'
+import { ContextPreviewDialog } from './ContextPreviewDialog'
+import type { ContextView } from './ContextPreviewDialog'
 import { useJobStream } from '../lib/useJobStream'
 import { ChapterReferencesDialog } from './ChapterReferencesDialog'
 import { QuickEntitiesDialog } from './QuickEntitiesDialog'
@@ -44,7 +46,7 @@ export function Assistant({ novel, chapter, providers, roles, flush, selection, 
   const [target, setTarget] = useState(novel.chapter_words)
   const [providerId, setProviderId] = useState(roles.writer || 'demo')
   const providerChoices = useRef<Partial<Roles>>({})
-  const [context, setContext] = useState<Context | null>(null)
+  const [context, setContext] = useState<ContextView | null>(null)
   useEffect(() => { setContext(null) }, [scene])
   const [excluded, setExcluded] = useState<string[]>([])
   const [jobId, setJobId] = useState<string | null>(null)
@@ -107,13 +109,13 @@ export function Assistant({ novel, chapter, providers, roles, flush, selection, 
       scene: task === 'continue' && mode === 'scene' ? scene : null,
       inspiration: selectedDirection?.reference || null, review_reference: preparedRevision?.reference || null }
   }
-  const preparing = useMutation({ mutationFn: async () => { const body = await input(); return api.context(novel.id, body) }, onSuccess: value => { setContext(value); setTab('context') } })
+  const preparing = useMutation({ mutationFn: async () => { const body = await input(); return { context: await api.context(novel.id, body), input: body } }, onSuccess: value => { setContext(value); setTab('context') } })
   const generating = useMutation({ mutationFn: async () => {
     const body = pendingSubmission.current || { ...await input(), idempotency_key: uuid(), max_attempts: maxAttempts, max_cost: budget ? Number(budget) : null }
     if (!pendingSubmission.current) {
       const { idempotency_key: _key, max_attempts: _attempts, max_cost: _cost, ...contextInput } = body
       const preview = await api.context(novel.id, contextInput)
-      setContext(preview)
+      setContext({ context: preview, input: contextInput })
     }
     pendingSubmission.current = body
     try {
@@ -125,7 +127,7 @@ export function Assistant({ novel, chapter, providers, roles, flush, selection, 
       throw error
     }
   }, onSuccess: value => { setJobId(value.id); setTab('assistant'); setDirection(null); setPreparedRevision(null); setPreparedSelection(null); setReturnRevisionId(null); cache.setQueryData(['job', value.id], value); void cache.invalidateQueries({ queryKey: ['jobs'] }); setError('') } })
-  const submissionLocked = generating.isPending || !!pendingSubmission.current || preparingRevision
+  const submissionLocked = generating.isPending || preparing.isPending || !!pendingSubmission.current || preparingRevision
   useEffect(() => {
     if (!quickRewrite || preparedQuickId.current === quickRewrite.id) return
     preparedQuickId.current = quickRewrite.id
@@ -213,7 +215,7 @@ export function Assistant({ novel, chapter, providers, roles, flush, selection, 
         {job.data.context.review_reference && <Button variant="ghost" disabled={!!active || submissionLocked} onClick={() => { const source = job.data?.context.review_reference; if (source) { setReturnRevisionId(job.data!.id); changeTask('review'); setJobId(source.job_id) } }}>返回审稿意见<ArrowRight size={16} /></Button>}
         {job.data.task === 'review' && returnRevisionId && <Button variant="ghost" disabled={!!active || submissionLocked} onClick={() => { const id = returnRevisionId; changeTask('rewrite'); setJobId(id); setReturnRevisionId(null) }}>返回修稿候选<ArrowRight size={16} /></Button>}
         {['continue', 'rewrite'].includes(job.data.task) && job.data.output_text && <p className="candidate-count">本次 {number(countChars(job.data.output_text))} 字<span>{job.data.context.target_chars == null ? '原任务目标未知' : `目标 ${number(job.data.context.target_chars)} 字`}</span></p>}
-        <details className="call-details"><summary>引用资料与调用记录</summary><button className="text-link" onClick={() => { setContext(job.data!.context); setTab('context') }}>查看引用资料<ArrowRight size={15} /></button><p className="small muted">{dateLabel(job.data.created_at)} · 第 {job.data.attempt_count} 次调用 · {job.data.is_demo ? '本地演示，不计费' : job.data.cost == null ? '实际费用未知' : `${job.data.cost.toFixed(4)} ${job.data.context.currency}`}</p><button className="text-link" onClick={() => downloadText(job.data!.output_text, `${chapter.title}-候选.txt`)}>下载本次结果</button><AttemptHistory attempts={job.data.attempts} currency={job.data.context.currency} /></details>
+        <details className="call-details"><summary>引用资料与调用记录</summary><button className="text-link" onClick={() => { setContext({ context: job.data!.context }); setTab('context') }}>查看引用资料<ArrowRight size={15} /></button><p className="small muted">{dateLabel(job.data.created_at)} · 第 {job.data.attempt_count} 次调用 · {job.data.is_demo ? '本地演示，不计费' : job.data.cost == null ? '实际费用未知' : `${job.data.cost.toFixed(4)} ${job.data.context.currency}`}</p><button className="text-link" onClick={() => downloadText(job.data!.output_text, `${chapter.title}-候选.txt`)}>下载本次结果</button><AttemptHistory attempts={job.data.attempts} currency={job.data.context.currency} /></details>
       </> : <div className="candidate-placeholder"><PenNib size={24} weight="light" /><p>生成的正文会显示在这里</p></div>}</section>
   return <aside className="assistant-panel" aria-label="写作助手"><div className="assistant-heading"><strong>AI 写作</strong>{provider?.kind === 'demo' && <Badge tone="amber">演示</Badge>}<select disabled={submissionLocked} aria-label="写作模型" value={providerId} onChange={e => { providerChoices.current[roleFor(task)] = e.target.value; setProviderId(e.target.value); setContext(null) }}>{providers.map(p => <option value={p.id} key={p.id}>{p.name}</option>)}</select>{onClose && <button className="icon-button mobile-only" aria-label="关闭写作助手" onClick={onClose}><X size={18} /></button>}</div>
     <div className="assistant-tabs"><button disabled={submissionLocked} className={!['review', 'inspiration'].includes(task) ? 'active' : ''} onClick={() => { changeTask('continue'); setTab('assistant') }}>写作</button><button disabled={submissionLocked} className={task === 'inspiration' ? 'active' : ''} onClick={() => { changeTask('inspiration'); setTab('assistant') }}>找灵感</button><button disabled={submissionLocked} className={task === 'review' ? 'active' : ''} onClick={() => { changeTask('review'); setTab('assistant') }}>审稿</button></div>
@@ -295,7 +297,7 @@ export function Assistant({ novel, chapter, providers, roles, flush, selection, 
           id={`generate-${chapter.id}`}
           variant="primary"
           className="full-width"
-          disabled={!!active || generating.isPending || preparingRevision || (!pendingSubmission.current && task === 'continue' && mode === 'scene' && !scene.goal.trim()) || !canUseProvider(provider) || (task === 'rewrite' && !selection && !preparedRevision && !preparedSelection)}
+          disabled={!!active || generating.isPending || preparing.isPending || preparingRevision || (!pendingSubmission.current && task === 'continue' && mode === 'scene' && !scene.goal.trim()) || !canUseProvider(provider) || (task === 'rewrite' && !selection && !preparedRevision && !preparedSelection)}
           onClick={() => generating.mutate()}
         >
           <Sparkle size={19} />
@@ -305,11 +307,11 @@ export function Assistant({ novel, chapter, providers, roles, flush, selection, 
       {(error || generating.error || preparing.error) && <Notice>{error || errorText(generating.error ?? preparing.error)}{pendingSubmission.current && <span className="block small">上次提交尚未确认，暂时锁定写作要求。点击“确认上次提交”继续处理同一次请求。</span>}</Notice>}
       {inDocument ? <div className="candidate-summary"><Badge>{job.data?.candidate_status === 'adopted' ? '已采纳' : job.data ? jobStateNames[job.data.state] : ''}</Badge><Button onClick={onShowCandidate}>{job.data?.task === 'inspiration' ? '查看剧情灵感' : job.data?.task === 'review' ? '查看审稿意见' : '查看 AI 草稿'}<ArrowRight size={16} /></Button><p className="small muted">{job.data?.task === 'inspiration' ? (job.data.result?.kind === 'inspiration' ? '三个剧情方向' : active ? '正在寻找剧情方向' : '剧情方向未完成') : job.data?.task === 'review' ? (job.data.result?.kind === 'review' ? `${job.data.result.findings.length} 条审稿意见` : '正在整理审稿意见') : `${number(countChars(job.data?.output_text || ''))} 字`} · {job.data?.is_demo ? '演示样例' : job.data?.context.model}</p></div> : candidate}
       {inDocument && createPortal(candidate, candidateHost!)}
-      <button className="text-link context-trigger" onClick={() => preparing.mutate()} disabled={preparing.isPending}>查看将引用的资料<ArrowRight size={15} /></button>
+      <button className="text-link context-trigger" onClick={() => preparing.mutate()} disabled={submissionLocked}>查看将引用的资料<ArrowRight size={15} /></button>
     </div><footer className="assistant-footer">{provider?.kind === 'demo' ? '演示模式 · 固定样例' : `发送至 ${provider?.name || '所选模型服务'}`}</footer>
     {referencesOpen && <ChapterReferencesDialog novelId={novel.id} chapter={chapter} onClose={() => setReferencesOpen(false)} onSaved={() => { setReferencesOpen(false); setContext(null); setExcluded([]); setDirection(null); setPreparedRevision(null); setError('') }} />}
     {entitiesOpen && <QuickEntitiesDialog novelId={novel.id} chapter={chapter} onClose={() => setEntitiesOpen(false)} onReferencesChanged={() => { void cache.invalidateQueries({ queryKey: ['chapters', novel.id] }); setContext(null) }} />}
-    <Modal open={tab === 'context'} onOpenChange={value => !value && setTab('assistant')} title="本次引用资料" wide>{context && <ContextDetails context={context} onEvidence={onEvidence} excluded={excluded} onToggle={id => setExcluded(previous => previous.includes(id) ? previous.filter(x => x !== id) : [...previous, id])} />}</Modal>
+    {tab === 'context' && context && <ContextPreviewDialog novelId={novel.id} initial={context} onEvidence={onEvidence} onExcludedChange={setExcluded} onClose={() => setTab('assistant')} />}
     <Modal open={showCompare} onOpenChange={setShowCompare} title="对比原稿" wide className="candidate-modal"><div className="comparison"><div><h4>当前原稿</h4><div className="comparison-text">{chapter.version.text || '空白'}</div></div><div><h4>{job.data?.task === 'rewrite' ? '替换内容' : '新增内容'}</h4><div className="comparison-text comparison-new">{job.data?.output_text}</div></div></div>{job.data && job.data.base_version_id !== chapter.working_version_id && <Notice>原稿已更新，请核对后重新生成。</Notice>}{error && <Notice>{error}</Notice>}<div className="modal-actions"><Button onClick={() => setShowCompare(false)}>返回</Button><Button variant="primary" disabled={adopting} onClick={() => void adopt()}>采纳正文</Button></div></Modal>
   </aside>
 }

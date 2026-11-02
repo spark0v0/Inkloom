@@ -775,3 +775,12 @@ input::placeholder, textarea::placeholder {
   .app-shell, .is-writing.app-shell { grid-template-columns: minmax(0, 1fr); }
   .primary-sidebar { display: none; }
 }
+.context-preview-modal { display: flex; flex-direction: column; max-height: min(860px, 92dvh); overflow: hidden; }
+.context-preview-modal > .modal-heading, .context-preview-modal > .modal-actions { flex-shrink: 0; }
+.context-preview-body { min-height: 0; overflow: auto; padding-right: 4px; }
+.context-preview-modal .modal-actions { border-top: 1px solid var(--line); padding-top: 12px; }
+.context-preview-body .context-source-title { flex-wrap: wrap; }
+.context-preview-body .context-source-title input { min-width: 24px; min-height: 24px; cursor: pointer; }
+.writing-style-scroll .notice { overflow-wrap: anywhere; }
+.style-constraint-pills { display: flex; flex-wrap: wrap; gap: 4px 8px; }
+.style-constraint-pills .btn { min-height: 44px; padding: 6px 10px; }
