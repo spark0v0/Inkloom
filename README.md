@@ -4,7 +4,7 @@
 
 **当前版本：0.2.0 · 本地测试版**
 
-![Inkloom 章节写作工作台](docs/screenshots/typography/editor-desktop.png)
+![Inkloom 章节写作工作台](docs/screenshots/closeout/editor-desktop.png)
 
 ## 主要能力
 
@@ -57,4 +57,4 @@ pwsh -File ./scripts/dev.ps1   # 开发模式
 pwsh -File ./scripts/test.ps1  # 工程检查
 ```
 
-[产品说明](docs/PRODUCT.md) · [技术架构](docs/ARCHITECTURE.md) · [路线规划](docs/ROADMAP.md) · [开发约定](AGENTS.md) · [验证记录](docs/verification/2026-11-01-frontend.txt)
+[产品说明](docs/PRODUCT.md) · [技术架构](docs/ARCHITECTURE.md) · [开发约定](AGENTS.md) · [工程收尾与使用边界](docs/PROJECT-CLOSEOUT-2026-11-08.md)

@@ -1,0 +1,110 @@
+{
+  "captures": [
+    {
+      "name": "library",
+      "device": "desktop",
+      "viewport": 1440,
+      "width": 1440,
+      "violations": []
+    },
+    {
+      "name": "editor",
+      "device": "desktop",
+      "viewport": 1440,
+      "width": 1440,
+      "violations": []
+    },
+    {
+      "name": "planning",
+      "device": "desktop",
+      "viewport": 1440,
+      "width": 1440,
+      "violations": []
+    },
+    {
+      "name": "characters",
+      "device": "desktop",
+      "viewport": 1440,
+      "width": 1440,
+      "violations": []
+    },
+    {
+      "name": "settings",
+      "device": "desktop",
+      "viewport": 1440,
+      "width": 1440,
+      "violations": []
+    },
+    {
+      "name": "library",
+      "device": "tablet",
+      "viewport": 768,
+      "width": 768,
+      "violations": []
+    },
+    {
+      "name": "editor",
+      "device": "tablet",
+      "viewport": 768,
+      "width": 768,
+      "violations": []
+    },
+    {
+      "name": "planning",
+      "device": "tablet",
+      "viewport": 768,
+      "width": 768,
+      "violations": []
+    },
+    {
+      "name": "characters",
+      "device": "tablet",
+      "viewport": 768,
+      "width": 768,
+      "violations": []
+    },
+    {
+      "name": "settings",
+      "device": "tablet",
+      "viewport": 768,
+      "width": 768,
+      "violations": []
+    },
+    {
+      "name": "library",
+      "device": "mobile",
+      "viewport": 390,
+      "width": 390,
+      "violations": []
+    },
+    {
+      "name": "editor",
+      "device": "mobile",
+      "viewport": 390,
+      "width": 390,
+      "violations": []
+    },
+    {
+      "name": "planning",
+      "device": "mobile",
+      "viewport": 390,
+      "width": 390,
+      "violations": []
+    },
+    {
+      "name": "characters",
+      "device": "mobile",
+      "viewport": 390,
+      "width": 390,
+      "violations": []
+    },
+    {
+      "name": "settings",
+      "device": "mobile",
+      "viewport": 390,
+      "width": 390,
+      "violations": []
+    }
+  ],
+  "errors": []
+}

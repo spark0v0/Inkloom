@@ -1,0 +1,56 @@
+Inkloom 0.2.0 工程收尾验证
+日期：2026-11-08（Asia/Shanghai）
+基线：72c6fc7；开始时 git status --short 为空。
+
+范围
+- 前端实际代码、页面截图与关键作者路径 review；统一工作台和书架视觉。
+- 修复书架模型显示、搜索与迟到打开；已有手写章节的规划入口。
+- 作品统计改为 SQL 聚合。没有数据库迁移、依赖调整或真实收费模型调用。
+
+后端
+1. ruff check backend/app backend/tests：最终退出 0。
+2. 修改前工程基线：
+   backend/.venv/Scripts/python.exe -X utf8 -m pytest backend/tests -q --tb=short --basetemp <temporary>
+   251 passed, 1 warning in 97.13s，退出 0。
+3. 修改统计查询后的相关检查：
+   backend/.venv/Scripts/python.exe -X utf8 -m pytest backend/tests/test_novel_summaries.py backend/tests/test_library.py backend/tests/test_api.py backend/tests/test_manuscript_export.py backend/tests/test_longform_context.py -q --tb=short --basetemp .tmp/closeout-summary-tests
+   28 passed, 1 warning in 34.46s，退出 0。
+   覆盖空书、空章、多版本工作稿、定稿、改稿失效与归档；四部作品列表确认为一次 SELECT，投影不含章节细纲与版本正文。
+   原有 StarletteDeprecationWarning：httpx 与 starlette.testclient 的弃用提示仍存在。本轮没有更改测试客户端依赖。
+   没有将 251 项基线与 28 项相关复验相加冒充最终全套结果。
+
+前端
+4. npm --prefix frontend test：最终 16 files / 55 tests passed，4.53s，退出 0。
+5. npm --prefix frontend run check:api：声明与后端 OpenAPI 一致，退出 0。
+6. npm --prefix frontend run build：最终 tsc 与 Vite 成功，Vite 562ms，退出 0。
+   编辑路由 502.04 kB / gzip 155.81 kB；大于 500 kB 的警告保留，没有更改阈值。
+
+核心浏览器回归（Chrome，独立 e2e- 临时工作区，无真实模型调用）
+7. npm --prefix frontend run test:e2e -- closeout-polish.spec.ts editor-detail-polish.spec.ts authoring-assistance.spec.ts export.spec.ts writing-flow-review.spec.ts frontend-engineering.spec.ts workshop.spec.ts --grep '书架反映|继续写作等待|已有手写章节|正文格式|中等宽度|版本恢复等待|空白历史|恢复回执丢失|选择正文与档案讨论|场景提交回执丢失|改前文后查看|按章范围预览|导出前保存|前章未定稿可起草|默认连接切换|手写保存、刷新|演示候选不会|两页编辑冲突|离线保存|窄屏无横向|emoji 后选段|编辑器与助手的自动|AI 建书、章节细纲|卡剧情找灵感' --max-failures=1
+   50 passed (3.3m)，退出 0；desktop / mobile 各 25 项。这是有范围的核心回归，不是全量 Playwright。
+   包括连续开书、规划、候选采纳、场景、讨论引用、前文改稿复核、保存冲突、离线恢复、历史回执、定稿和范围导出。
+8. 最后只微调手机人物单列、页签和长标签布局，重新构建后做相应复验：
+   npm --prefix frontend run test:e2e -- closeout-polish.spec.ts editor-detail-polish.spec.ts workshop.spec.ts --grep '书架反映|继续写作等待|已有手写章节|中等宽度|窄屏无横向' --max-failures=1
+   10 passed (28.5s)，退出 0；未再次重复整批核心回归。
+
+实际失败与处理
+- 初轮浏览器回归 46 passed / 2 failed：离开书架后，迟到的继续写作响应仍会跳转。仅判断挂载状态不足以覆盖 Suspense 过渡，补导航修订与 hash 检查后桌面、手机复验通过。
+- 新增规划检查首次选择器写成精确“章节细纲”，实际可访问名称含步骤序号“2”。读取失败快照后修正选择器；未放松实际可用状态断言。
+- 首次截图脚本使用 browser.newPage，axe 要求显式 browser.newContext。修正测试夹具后复验通过。
+
+视觉与局部无障碍检查
+9. node frontend/scripts/capture-closeout-ui.mjs：最终退出 0。
+   仅允许 closeout-preview- 工作区；15 张实际截图覆盖书架、正文、规划、人物、设置及 1440 / 768 / 390 视口。
+   docs/screenshots/closeout/checks.json：15 份页面检查，页面级横向溢出 0、pageerror 0、所选 axe 规则 violations 0。
+   另验证手机人物卡片单列、规划页签原始文字不拆行；已实际查看桌面、平板与手机截图。
+10. taste inspector --app 在编辑页面进行前后对比；短稿保留写作空间，允许 blank-gap。
+    修改前 0 FAIL / 1 WARN（mini-book 字体 fallback）；修改后 0 FAIL / 0 WARN。
+    source lint 0 FAIL / 21 WARN，包括 box-shadow:none / focus 与浮层阴影、backdrop-filter:none 的词法提示，以及既有 transition:all 等。没有声称源样式静态检查零警告。
+11. node --check frontend/scripts/capture-closeout-ui.mjs 与 git diff --check 通过。
+
+交付边界
+- 原有历史截图被测试脚本重写的部分恢复为基线；本轮实际截图统一保存在 closeout/，不覆盖旧验证证据。
+- 概念图由内置 image_gen 生成，图和实际提示词已存入 docs/design/；正式界面由组件和实际数据渲染。
+- 没有修改作者工作区，未读取作者正文或密钥做外部测试；没有推送运行数据或在公网开放服务。
+- 临时预览服务在 127.0.0.1:9877 使用独立演示资料。停止操作被自动审批拒绝，返回 blocked by policy。2026-11-11 复查时，端口 9877 已释放。
+- 真正的长期写作、真实输入法、收费模型文学效果、费用和百万字规模未验收。

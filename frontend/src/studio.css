@@ -1,9 +1,4 @@
-/* Inkloom 0.2 — layout references: ui-serial-studio-v3 / ui-chapter-studio-v3. */
-:root {
-  --paper:#fff; --surface:#f8fafc; --hover:#edf1fa; --line:#e2e8f0; --ink:#0f172a; --muted:#616b7b;
-  --accent:#0f766e; --green:var(--accent); --green-dark:#115e59; --green-soft:#f0fdfa; --sidebar:216px;
-  font-family:'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif; color:var(--ink); background:var(--surface);
-}
+/* Page components and legacy compatibility. Shared tokens live in workbench.css. */
 body { font-size:15px; }
 ::selection { background:var(--green-soft); color:#15352a; }
 h1 { font-size:29px; font-weight:650; letter-spacing:-.6px; }

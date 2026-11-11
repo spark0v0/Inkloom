@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import and_, func, or_, select, text, update
+from sqlalchemy import and_, case, func, or_, select, text, update
 from sqlalchemy.orm import Session
 
 from . import schemas as dto
@@ -75,14 +75,25 @@ def chapter_out(session: Session, chapter: Chapter, detail: bool = True):
     return dto.ChapterSummary(**values)
 
 
-def novel_out(session: Session, novel: Novel) -> dto.NovelOut:
-    chapters = session.scalars(select(Chapter).where(Chapter.novel_id == novel.id)).all()
-    total = session.scalar(select(func.coalesce(func.sum(Version.char_count), 0)).where(
-        Version.id.in_([c.working_version_id for c in chapters])))
+def chapter_totals():
+    # Count current manuscripts, never all immutable historical versions. Keep this
+    # projection separate from chapter ORM objects and their outline/reference JSON.
+    return select(Chapter.novel_id.label("novel_id"),
+        func.count(Chapter.id).label("chapter_count"),
+        func.coalesce(func.sum(case((Chapter.review_state == "confirmed", 1), else_=0)),
+                      0).label("accepted_count"),
+        func.coalesce(func.sum(Version.char_count), 0).label("total_chars")
+    ).select_from(Chapter).join(Version, Version.id == Chapter.working_version_id)
+
+
+def novel_out(session: Session, novel: Novel,
+              totals: tuple[int, int, int] | None = None) -> dto.NovelOut:
+    if totals is None:
+        row = session.execute(chapter_totals().where(Chapter.novel_id == novel.id)).one()
+        totals = (row.chapter_count, row.accepted_count, row.total_chars)
     return dto.NovelOut(**{name: getattr(novel, name) for name in dto.NovelOut.model_fields
                            if name not in {"chapter_count", "accepted_count", "total_chars"}},
-                        chapter_count=len(chapters), total_chars=total or 0,
-                        accepted_count=sum(c.review_state == "confirmed" for c in chapters))
+                        chapter_count=totals[0], accepted_count=totals[1], total_chars=totals[2])
 
 
 def new_version(session: Session, chapter: Chapter, body: str, operation_id: str,
@@ -126,8 +137,13 @@ class Library:
 
     def novels(self, archived: bool = False) -> list[dto.NovelOut]:
         with self.ws.session() as s:
-            return [novel_out(s, n) for n in s.scalars(select(Novel).where(
-                Novel.archived == archived).order_by(Novel.updated_at.desc())).all()]
+            totals = chapter_totals().group_by(Chapter.novel_id).subquery()
+            rows = s.execute(select(Novel, totals.c.chapter_count,
+                totals.c.accepted_count, totals.c.total_chars).outerjoin(
+                    totals, totals.c.novel_id == Novel.id).where(
+                        Novel.archived == archived).order_by(Novel.updated_at.desc())).all()
+            return [novel_out(s, novel, (count or 0, accepted or 0, chars or 0))
+                    for novel, count, accepted, chars in rows]
 
     def novel(self, novel_id: str) -> dto.NovelOut:
         with self.ws.session() as s:

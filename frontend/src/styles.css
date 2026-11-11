@@ -1,11 +1,7 @@
 @import 'tailwindcss';
 
 :root {
-  font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
-  color: #202b25; background: #fdfefc; font-synthesis: none; text-rendering: optimizeLegibility;
-  --paper: #fdfefc; --surface: #f4f6f2; --hover: #eaf0e9; --line: #e2e7e0;
-  --ink: #202b25; --muted: #637068; --green: #24634e; --green-dark: #194c3b; --green-soft: #e8f0e9;
-  --amber: #855a24; --amber-soft: #faf3e5; --radius: 9px; --sidebar: 192px;
+  font-synthesis: none; text-rendering: optimizeLegibility; --radius: 9px;
 }
 * { box-sizing: border-box; }
 body { margin: 0; font-size: 14px; }

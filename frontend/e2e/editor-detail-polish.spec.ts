@@ -85,7 +85,8 @@ test('写作工具在手机与中等宽度完整可达，专注模式使用整�
     if (width <= 1024) await expect(page.getByRole('button', { name: '打开章节目录', exact: true })).toBeVisible()
     if (width <= 1100) {
       const editor = (await page.locator('.editor-panel').boundingBox())!
-      expect(editor.x + editor.width).toBeCloseTo(width, 0)
+      const workspaceRight = await page.locator('#main-content').evaluate(element => element.getBoundingClientRect().right - parseFloat(getComputedStyle(element).borderRightWidth))
+      expect(editor.x + editor.width).toBeCloseTo(workspaceRight, 0)
     }
   }
   await page.getByRole('button', { name: '收起章节目录', exact: true }).click()
