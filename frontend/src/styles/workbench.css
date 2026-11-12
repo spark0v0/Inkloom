@@ -494,7 +494,15 @@ input::placeholder, textarea::placeholder {
 .toolbar-label { white-space: nowrap; font-size: 12px; }
 .reading-font { flex: 0 0 76px; }
 .font-size-label { flex: 0 0 54px; }
-.editor-toolbar .reading-font select, .editor-toolbar .font-size-label select { min-height: 44px; width: 100%; }
+.editor-toolbar .reading-font select, .editor-toolbar .font-size-label select {
+  min-height: 44px;
+  width: 100%;
+  border-color: transparent;
+  background: transparent;
+}
+.editor-toolbar .reading-font select:hover, .editor-toolbar .font-size-label select:hover {
+  background: var(--hover);
+}
 .editor-volume {
   font-size: 13px;
   font-weight: 600;
@@ -852,6 +860,7 @@ input::placeholder, textarea::placeholder {
 .chapter-item { padding: 10px 8px; border-radius: 6px; }
 .chapter-item.active { background: var(--accent-soft); }
 .chapter-item-text strong { font-size: 13px; }
+.chapter-item.active .chapter-item-text strong { color: var(--accent); }
 .chapter-item-text small { font-size: 11px; }
 .chapter-state { color: var(--muted); }
 .document-tabs { background: var(--paper); min-height: 44px; }

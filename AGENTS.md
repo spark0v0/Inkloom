@@ -6,7 +6,7 @@
 
 - 2026-11-12 目录整理见 `docs/README.md` 和决策 `0033`。前端按 `features/` 下的工作流程组织组件、局部样式与测试，路由和全局搜索位于 `app/`。实现与复查记录分别位于 `docs/implementation/` 和 `docs/reviews/`。
 
-- 2026-11-12 阅读配色采用暖灰外框、温白稿纸、暗蓝灰操作和独立状态色。颜色变量在 `frontend/src/styles/theme.css`，对比度和浏览器核查见 `docs/design/IMPLEMENTATION-PALETTE-2026-11-12.md`。
+- 2026-11-12 阅读配色采用中性浅灰外框、白稿纸和墨蓝操作。颜色变量在 `frontend/src/styles/theme.css`，对比度和浏览器核查见 `docs/design/IMPLEMENTATION-PALETTE-2026-11-12.md`。
 
 - 2026-11-12 全项目复查见 `docs/reviews/REVIEW-2026-11-12.md` 与决策 `0032`。`useWorkspaceNavigation` 统一异步打开和离页保存，资料刷新失败时保留编辑器。规划目录包含已有手稿的分卷，首章准备在事务内复用，批量细纲采纳重验占位章与续接顺序。`context_sources.py` 按定稿版本批量读取段落，保留资料排序、预算和任务快照契约。当前数据库迁移头为 `1b8c6e431fa7`，真实模型长篇效果仍待验收。
 
