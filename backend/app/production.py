@@ -3,7 +3,7 @@
 from sqlalchemy import func, select
 
 from . import schemas as dto
-from .context import validate_result
+from .context import require_outline_append_order, validate_result
 from .domain import DomainError, digest, now, uid
 from .library import new_version, require_novel
 from .models import Chapter, Entity, Job, Plan
@@ -53,6 +53,12 @@ def apply_production(session, job: Job) -> dto.ProductionApplyOut:
         parent = session.get(Plan, production["volume_plan_id"])
         if parent is None or parent.novel_id != novel.id or parent.level != "volume":
             raise DomainError("VOLUME_NOT_FOUND", "分卷已变化，未创建章节。", 409)
+        if not production.get("initial_slot"):
+            later_titles = set(session.scalars(select(Plan.title).where(Plan.novel_id == novel.id,
+                Plan.level == "volume", Plan.position > parent.position)))
+            chapter_volumes = session.scalars(select(Chapter.volume).where(Chapter.novel_id == novel.id)
+                .order_by(Chapter.position)).all()
+            require_outline_append_order(parent.title, chapter_volumes, later_titles)
         for index, outline in enumerate(result["chapters"]):
             title = f"第{outline['number']}章 {outline['title']}"
             goal = (outline["goal"] + "\n冲突：" + outline["conflict"] + "\n情节：\n"

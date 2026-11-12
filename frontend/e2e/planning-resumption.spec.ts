@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-test('恢复第二卷细纲时保持原分卷，第一卷不显示其他卷的候选', async ({ page }) => {
+test('恢复第二卷细纲时保持原分卷，第一卷不显示其他卷的候选', async ({ page }, info) => {
   await page.goto('/')
   await expect(page.getByRole('button', { name: '新建小说', exact: true })).toBeVisible()
   const ids = await page.evaluate(async () => {
@@ -28,7 +28,8 @@ test('恢复第二卷细纲时保持原分卷，第一卷不显示其他卷的�
   await expect(panel.locator('.production-title p')).toHaveText('第二卷 远航')
   await expect(panel.getByRole('button', { name: '采纳这 3 章', exact: true })).toBeVisible()
   await panel.getByRole('button', { name: '返回大纲', exact: true }).click()
-  await page.getByRole('button', { name: '第一卷 雾港', exact: false }).first().click()
+  if (info.project.name === 'mobile') await page.getByRole('combobox', { name: '选择分卷' }).selectOption({ label: '第一卷 雾港 · 1 章' })
+  else await page.getByRole('button', { name: '第一卷 雾港', exact: false }).first().click()
   await page.getByRole('button', { name: 'AI 规划后续章节', exact: true }).click()
   await expect(panel.locator('.production-title p')).toHaveText('第一卷 雾港')
   await expect(panel.getByRole('button', { name: '采纳这 3 章', exact: true })).not.toBeVisible()

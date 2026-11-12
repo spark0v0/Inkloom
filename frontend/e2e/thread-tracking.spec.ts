@@ -1,7 +1,6 @@
 import { test, expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
-import { resolve } from 'node:path'
 
 async function fixture(page: Page) {
   await page.goto('/')
@@ -59,9 +58,9 @@ test('伏笔计划、原文关联与撤销恢复，写作只看到当时有效�
   await associate(page, ids.chapters[0].id, 'planted')
   await associate(page, ids.chapters[1].id, 'advanced')
   await detail.getByRole('heading', { name: '断裂罗盘', exact: true }).scrollIntoViewIfNeeded()
-  await page.screenshot({ path: resolve(`../docs/screenshots/thread-tracking-${testInfo.project.name}.png`) })
+  await page.screenshot({ path: testInfo.outputPath('thread-tracking.png') })
   await detail.getByRole('article', { name: '推进记录：商队旧事', exact: true }).scrollIntoViewIfNeeded()
-  await page.screenshot({ path: resolve(`../docs/screenshots/thread-progress-${testInfo.project.name}.png`) })
+  await page.screenshot({ path: testInfo.outputPath('thread-progress.png') })
   const a11y = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze()
   expect(a11y.violations.map(item => ({ id: item.id, nodes: item.nodes.map(node => node.target) }))).toEqual([])
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)

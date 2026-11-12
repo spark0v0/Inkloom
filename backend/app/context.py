@@ -4,12 +4,20 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import Collection, Sequence
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from . import schemas as dto
+from .context_sources import (
+    canon_checkpoint,
+    chapter_catalog,
+    confirmed_before,
+    prior_chapters,
+    prior_reading_sources,
+)
 from .domain import DomainError, digest, entity_terms, source_for
 from .library import require_chapter, require_novel
 from .models import Chapter, Entity, EntityRelation, Fact, Job, Plan, Provider, Version
@@ -19,16 +27,21 @@ from .storage import PROJECT_DIR
 from .task_contracts import RESULT_SCHEMAS
 
 
-def chapter_catalog(session: Session, novel_id: str) -> list[dict[str, Any]]:
-    return [{"id": c.id, "title": c.title, "volume": c.volume, "goal": c.goal,
-             "position": c.position, "version": c.working_version_id} for c in session.scalars(
-        select(Chapter).where(Chapter.novel_id == novel_id).order_by(Chapter.position)).all()]
+def is_unused_outline_slot(chapter: Chapter, version: Version | None) -> bool:
+    return (version is not None and version.chapter_id == chapter.id and not version.text
+            and version.parent_id is None and version.operation_id.startswith(("planning_anchor_", "initial_"))
+            and chapter.position == 1 and chapter.title == "第1章" and chapter.volume == "第一卷"
+            and not chapter.goal and chapter.review_state == "draft" and chapter.accepted_version_id is None
+            and chapter.outline_revision == 0 and chapter.references_revision == 0)
 
 
-def canon_checkpoint(session: Session, novel_id: str, position: int) -> dict[str, str]:
-    return {c.id: c.accepted_version_id for c in session.scalars(select(Chapter).where(
-        Chapter.novel_id == novel_id, Chapter.position < position,
-        Chapter.review_state == "confirmed")).all()}
+def require_outline_append_order(title: str, chapter_volumes: Sequence[str], later_volumes: Collection[str]) -> None:
+    if title in chapter_volumes:
+        out_of_order = chapter_volumes[-1] != title
+    else:
+        out_of_order = any(name in later_volumes for name in chapter_volumes)
+    if out_of_order:
+        raise DomainError("VOLUME_ORDER", "本卷不能续接在全书末尾，请从末章所在分卷或之后的分卷继续规划。", 409)
 
 
 def context_current(session: Session, job: Job) -> bool:
@@ -50,6 +63,10 @@ def context_current(session: Session, job: Job) -> bool:
         catalog = chapter_catalog(session, novel.id)
         expected = job.context.get("catalog_signature")
         if (expected and expected != digest(catalog)) or (not expected and job.context.get("catalog") != catalog):
+            return False
+        slot_id = (job.context.get("input", {}).get("production") or {}).get("initial_slot")
+        if slot_id and (slot_id != chapter.id or len(catalog) != 1
+                        or not is_unused_outline_slot(chapter, session.get(Version, job.base_version_id))):
             return False
     if job.task == "outline_edit":
         from .chapter_outlines import current_document
@@ -94,7 +111,8 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
     initial_slot = None
     narrative_position = chapter.position
     if request.task == "outline":
-        if len(catalog) == 1 and not version.text and not any(p.structure.get("chapter_id") for p in all_plans):
+        if (len(catalog) == 1 and is_unused_outline_slot(chapter, version)
+                and not any(p.structure.get("chapter_id") for p in all_plans)):
             initial_slot = catalog[0]
         narrative_position = 1 if initial_slot else max((c["position"] for c in catalog), default=0) + 1
         reference_selection = dto.ReferenceSelection()
@@ -119,9 +137,7 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
     draft_sources = [] if request.task == "outline" else [source_for(version, chapter, p) for p in version.paragraphs]
     if any(source["source_id"] in request.excluded_source_ids for source in draft_sources):
         raise DomainError("PROTECTED_CONTEXT", "当前章基线不能从任务中移除。")
-    prior_chapters = session.scalars(select(Chapter).where(Chapter.novel_id == novel_id,
-        Chapter.position < narrative_position, Chapter.review_state == "confirmed").order_by(
-        Chapter.position.desc())).all()
+    prior = prior_chapters(session, novel_id, narrative_position)
     chapter_plans = [] if request.task == "outline" else [p for p in all_plans if p.structure.get("chapter_id") == chapter.id]
     outline_volume = next((p for p in all_plans if p.id == request.volume_plan_id and p.level == "volume"), None)
     if request.task == "outline" and outline_volume is None:
@@ -138,8 +154,10 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
     recent_text = version.text
     if request.task == "outline":
         recent_text = ""
-        if prior_chapters:
-            recent_text = session.get(Version, prior_chapters[0].accepted_version_id).text[-6000:]
+        if prior:
+            latest_text = session.scalar(select(Version.text).where(Version.id == prior[0].accepted_version_id,
+                Version.chapter_id == prior[0].id))
+            recent_text = (latest_text or "")[-6000:]
     relevance_text = (query_text + "\n" + recent_text).casefold()
     all_entities = session.scalars(select(Entity).where(Entity.novel_id == novel_id,
                     Entity.status == "author").order_by(Entity.updated_at.desc(), Entity.id)).all()
@@ -176,34 +194,6 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
     terms = weight_terms(session, novel_id, narrative_position, terms)
     ranked_ids = retrieve_source_ids(session, novel_id, narrative_position, terms, request.excluded_source_ids)
     relevant_ids = set(ranked_ids)
-    prior_sources = []
-    optional_sources = []
-    for i, prior in enumerate(prior_chapters):
-        if i >= 2 and not any(source_id.startswith(prior.accepted_version_id + ":") for source_id in relevant_ids):
-            continue
-        accepted = session.get(Version, prior.accepted_version_id)
-        if not accepted:
-            continue
-        for paragraph in accepted.paragraphs:
-            source = source_for(accepted, prior, paragraph)
-            if source["source_id"] in request.excluded_source_ids:
-                continue
-            if i < 2:
-                prior_sources.append(source)
-            elif source["source_id"] in relevant_ids:
-                optional_sources.append(source)
-    source_rank = {source_id: rank for rank, source_id in enumerate(ranked_ids)}
-    optional_sources.sort(key=lambda source: source_rank[source["source_id"]])
-    # Explicit pins and selected thread evidence are hard constraints; automatic
-    # recent prose is useful context, not an implicit pin of two entire chapters.
-    protected_ids = {source["source_id"] for source in pinned_sources + thread_sources}
-    latest_id = prior_chapters[0].id if prior_chapters else None
-    continuity_ids = {source["source_id"] for source in
-                      [source for source in prior_sources if source["chapter_id"] == latest_id][-2:]}
-    prior_by_id = {source["source_id"]: source for source in prior_sources}
-    prior_by_id.update({source["source_id"]: source for source in pinned_sources})
-    prior_by_id.update({source["source_id"]: source for source in thread_sources})
-    prior_sources = list(prior_by_id.values())
     volume_id = request.volume_plan_id if request.task == "outline" else next(
         (p.id for p in all_plans if p.level == "volume" and p.title == chapter.volume), None)
     plans = [p for p in all_plans if p.level == "book" or p.id == volume_id
@@ -225,9 +215,9 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
                       "chapter_words": novel.chapter_words}
     elif request.task == "outline":
         volume = outline_volume
-        later_volumes = [p.id for p in all_plans if p.level == "volume" and p.position > volume.position]
-        if any(p.parent_id in later_volumes and p.structure.get("chapter_id") for p in all_plans):
-            raise DomainError("VOLUME_ORDER", "后面的卷已有章节，请继续规划最后一个已有章节的分卷。", 409)
+        if not initial_slot:
+            later_volumes = {p.title for p in all_plans if p.level == "volume" and p.position > volume.position}
+            require_outline_append_order(volume.title, [item["volume"] for item in catalog], later_volumes)
         # Only the untouched initial slot may be reused; existing drafts are never overwritten.
         next_number = narrative_position
         production = {"platform": novel.platform, "target_words": novel.target_words,
@@ -236,25 +226,28 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
             "start_number": next_number, "initial_slot": initial_slot["id"] if initial_slot else None,
             "recent_chapter_plans": [{"title": c["title"], "goal_excerpt": c["goal"][:1500]} for c in catalog[-6:]]}
     fact_query = select(Fact).join(Chapter, Fact.chapter_id == Chapter.id).where(
-        Fact.novel_id == novel_id, Fact.active.is_(True), Chapter.position < narrative_position,
-        Fact.version_id == Chapter.accepted_version_id,
-        Chapter.review_state == "confirmed").order_by(Fact.created_at.desc())
+        *confirmed_before(novel_id, narrative_position), Fact.novel_id == novel_id, Fact.active.is_(True),
+        Fact.version_id == Chapter.accepted_version_id).order_by(Fact.created_at.desc())
     fact_score = match_score(Fact.subject + " " + Fact.claim, terms)
     relevant_facts = session.scalars(fact_query.order_by(None).where(fact_score > 0)
         .order_by(fact_score.desc(), Fact.created_at.desc(), Fact.id).limit(35)).all() if terms else []
     recent_facts = session.scalars(fact_query.limit(40)).all()
     seen = {f.id for f in relevant_facts}
     facts = (relevant_facts + [f for f in recent_facts if f.id not in seen])[:60]
-    facts = [fact for fact in facts if not any(e["source_id"] in request.excluded_source_ids for e in fact.evidence)]
-    fact_source_pool = {}
-    for fact in facts:
-        fact_version = session.get(Version, fact.version_id)
-        fact_chapter = session.get(Chapter, fact.chapter_id)
-        for evidence in fact.evidence:
-            if evidence["source_id"] in fact_source_pool:
-                continue
-            paragraph = next(p for p in fact_version.paragraphs if p["paragraph_id"] == evidence["paragraph_id"])
-            fact_source_pool[evidence["source_id"]] = source_for(fact_version, fact_chapter, paragraph)
+    excluded = set(request.excluded_source_ids)
+    facts = [fact for fact in facts if not any(e["source_id"] in excluded for e in fact.evidence)]
+    prior_sources, optional_sources, fact_source_pool = prior_reading_sources(
+        session, novel_id, narrative_position, prior, ranked_ids, facts, excluded)
+    # Explicit pins and selected thread evidence are hard constraints. Only the
+    # most recent chapter's ending is protected among automatic reading sources.
+    protected_ids = {source["source_id"] for source in pinned_sources + thread_sources}
+    latest_id = prior[0].id if prior else None
+    continuity_ids = {source["source_id"] for source in
+                      [source for source in prior_sources if source["chapter_id"] == latest_id][-2:]}
+    prior_by_id = {source["source_id"]: source for source in prior_sources}
+    prior_by_id.update({source["source_id"]: source for source in pinned_sources})
+    prior_by_id.update({source["source_id"]: source for source in thread_sources})
+    prior_sources = list(prior_by_id.values())
 
     def reading_sources():
         # Rebuild after every trim so retained facts never lose their evidence,
@@ -471,7 +464,7 @@ def build_context(session: Session, novel_id: str, request: dto.ContextInput) ->
     return {"preview": preview.model_dump(), "messages": messages_for(), "provider": config,
             "base_text": version.text, "target_chars": request.target_chars,
             "narrative_position": narrative_position,
-            "canon_checkpoint": canon_checkpoint(session, novel_id, narrative_position),
+            "canon_checkpoint": {row.id: row.accepted_version_id for row in prior},
             "prompt_version": "scene-v1" if request.scene is not None else "v1",
             "input": input_body, "catalog_signature": digest(catalog)}
 

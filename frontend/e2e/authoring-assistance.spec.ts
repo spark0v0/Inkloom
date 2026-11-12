@@ -1,7 +1,6 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
-import { resolve } from 'node:path'
 
 async function fixture(page: Page, confirmed = false) {
   await page.goto('/')
@@ -66,7 +65,7 @@ test('选择正文与档案讨论，引用能回看版本，刷新保留选择�
   await materials.click()
   const scan = await new AxeBuilder({ page }).include('.planning-discussions').withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze()
   expect(scan.violations.map(item => item.id)).toEqual([])
-  await page.screenshot({ path: resolve(`../docs/screenshots/authoring-discussion-${testInfo.project.name}.png`) })
+  await page.screenshot({ path: testInfo.outputPath('authoring-discussion.png') })
   await page.evaluate(async ids => {
     const response = await fetch(`/api/v1/novels/${ids.novel}/chapters/${ids.second}/versions`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ base_version_id: ids.next, operation_id: crypto.randomUUID(), text: '守塔人拒绝接过钥匙，转身锁上楼梯间。' }) })
@@ -90,7 +89,7 @@ test('场景提交回执丢失时冻结参数，重放后采纳追加正文并�
   await panel.getByText('转折与收尾（可选）', { exact: true }).click()
   await panel.getByRole('textbox', { name: '写到哪里停', exact: true }).fill('停在守塔人提出条件的时候。')
   await panel.locator('.assistant-scroll').evaluate(element => element.scrollTo(0, 0))
-  await page.screenshot({ path: resolve(`../docs/screenshots/scene-writing-${testInfo.project.name}.png`) })
+  await page.screenshot({ path: testInfo.outputPath('scene-writing.png') })
   const requests: Record<string, unknown>[] = []
   await page.route('**/novels/*/jobs', async route => {
     if (route.request().method() !== 'POST') return route.continue()
@@ -139,7 +138,7 @@ test('改前文后查看复核清单，按需比较并按顺序定位，不自�
   await expect(dialog.locator('.review-impact-comparison')).toContainText('林舟将钥匙交给守塔人。')
   await expect(dialog.locator('.review-impact-comparison')).toContainText('林舟把钥匙留在自己手里')
   expect(versionReads).toHaveLength(2)
-  await page.screenshot({ path: resolve(`../docs/screenshots/review-impact-${testInfo.project.name}.png`) })
+  await page.screenshot({ path: testInfo.outputPath('review-impact.png') })
   const scan = await new AxeBuilder({ page }).include('[role="dialog"]').withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze()
   expect(scan.violations).toEqual([])
   await dialog.getByRole('button', { name: '从最早待复核章开始', exact: true }).click()

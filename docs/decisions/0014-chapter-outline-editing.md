@@ -13,4 +13,4 @@
 
 核心验证覆盖结构保留、冲突、恢复、字段范围、迟到采纳、备份升级和两端流程；不调用真实写作模型。
 
-2026-10-28 实现与验证见 [交付记录](../IMPLEMENTATION-CHAPTER-OUTLINES.md)。
+2026-10-28 实现与验证见 [交付记录](../implementation/IMPLEMENTATION-CHAPTER-OUTLINES.md)。

@@ -1,7 +1,6 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
-import { resolve } from 'node:path'
 
 async function fixture(page: Page) {
   await page.goto('/')
@@ -80,7 +79,7 @@ test('关系编辑冲突保留本页修改并合并未改字段，键盘与手�
   expect(scan.violations).toEqual([])
   await page.evaluate(() => document.querySelector('.page-scroll')?.scrollTo(0, 0))
   if (info.project.name === 'mobile') await expect(graph.locator('.selected-character-inspector strong').first()).toBeInViewport()
-  await page.screenshot({ path: resolve(`../docs/screenshots/relations-review-${info.project.name}.png`) })
+  await page.screenshot({ path: info.outputPath('relations-review.png') })
 })
 
 test('服务预设不带入另一服务的临时密钥，免密钥本机连接可选', async ({ page }) => {

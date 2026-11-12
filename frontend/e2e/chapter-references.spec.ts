@@ -61,7 +61,7 @@ test('本章必读保存与刷新恢复，生成只采用保存的参考和任�
   await dialog.getByRole('button', { name: '前文定稿', exact: true }).click()
   await expect(dialog.getByRole('checkbox', { name: /未来的秘密/ })).toHaveCount(0)
   await dialog.getByRole('checkbox', { name: /第1章 雨夜来信/ }).check()
-  await page.screenshot({ path: resolve(`../docs/screenshots/references-${testInfo.project.name}.png`) })
+  await page.screenshot({ path: testInfo.outputPath('references.png') })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   const accessibility = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze()
   expect(accessibility.violations.map(value => ({ id: value.id, nodes: value.nodes.map(node => node.target) }))).toEqual([])

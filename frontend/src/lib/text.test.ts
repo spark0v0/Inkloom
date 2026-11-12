@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import fixtures from '../../../docs/contracts/text-fixtures.json'
 import { countChars } from './api'
-import { readRoute, routeHash } from './route'
+import { readRoute, routeHash } from '../app/route'
 
 describe('与 Python 共享的字数契约', () => {
   for (const sample of fixtures) it(sample.label, () => expect(countChars(sample.text)).toBe(sample.count))

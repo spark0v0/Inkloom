@@ -98,7 +98,7 @@ test('审稿后准备段落改写不调用模型，明确生成、往返原建�
   expect((await savedChapter(page, ids)).version.text).toBe(original)
   await panel.getByRole('combobox', { name: '写作模型', exact: true }).selectOption(ids.provider)
   await panel.getByRole('button', { name: '按建议改写', exact: true }).focus()
-  await page.screenshot({ path: resolve(`../docs/screenshots/review-rewrite-${testInfo.project.name}.png`) })
+  await page.screenshot({ path: testInfo.outputPath('review-rewrite.png') })
   const accessibility = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze()
   expect(accessibility.violations.map(value => ({ id: value.id, nodes: value.nodes.map(node => node.target) }))).toEqual([])
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
@@ -197,7 +197,7 @@ test('完整生成历史可加载150条之前的记录，分页失败保留列�
   }
   await expect(page.getByRole('button', { name: '加载更早记录', exact: true })).toHaveCount(0)
   await page.locator('.page-scroll').evaluate(element => element.scrollTo(0, 0))
-  await page.screenshot({ path: resolve(`../docs/screenshots/job-history-${testInfo.project.name}.png`) })
+  await page.screenshot({ path: testInfo.outputPath('job-history.png') })
   await page.locator('.job-row').filter({ hasText: '最早审稿记录' }).click()
   const record = page.getByRole('dialog', { name: '任务记录', exact: true })
   await expect(record.getByText('本机协议测试建议，仍需作者核实。', { exact: true })).toBeVisible()

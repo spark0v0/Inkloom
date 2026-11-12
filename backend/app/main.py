@@ -223,6 +223,10 @@ def create_app(data_dir: Path | None = None, *, worker: bool = True, port: int =
     def create_chapter(novel_id: str, data: dto.ChapterInput, request: Request):
         return request.app.state.library.create_chapter(novel_id, data)
 
+    @app.post(prefix + "/novels/{novel_id}/planning-anchor", response_model=dto.PlanningAnchorOut)
+    def planning_anchor(novel_id: str, request: Request):
+        return request.app.state.library.planning_anchor(novel_id)
+
     @app.get(prefix + "/novels/{novel_id}/chapters/{chapter_id}", response_model=dto.ChapterOut)
     def get_chapter(novel_id: str, chapter_id: str, request: Request):
         return request.app.state.library.chapter(novel_id, chapter_id)

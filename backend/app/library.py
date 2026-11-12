@@ -114,6 +114,17 @@ def new_version(session: Session, chapter: Chapter, body: str, operation_id: str
     return version
 
 
+def _new_empty_chapter(session: Session, novel: Novel, position: int, data: dto.ChapterInput,
+                       *, operation: str) -> Chapter:
+    chapter = Chapter(id=uid("chapter"), novel_id=novel.id, position=position,
+                      working_version_id="", **data.model_dump())
+    session.add(chapter)
+    session.flush()
+    new_version(session, chapter, "", uid(operation), digest(""))
+    novel.updated_at = now()
+    return chapter
+
+
 def mark_dirty(session: Session, novel: Novel, position: int) -> None:
     novel.dirty_from_order = min(novel.dirty_from_order or position, position)
     affected = session.scalars(select(Chapter).where(Chapter.novel_id == novel.id,
@@ -196,14 +207,17 @@ class Library:
             novel = require_novel(s, novel_id)
             position = (s.scalar(select(func.max(Chapter.position)).where(
                 Chapter.novel_id == novel_id)) or 0) + 1
-            chapter = Chapter(id=uid("chapter"), novel_id=novel_id, position=position,
-                              working_version_id="", **data.model_dump())
-            s.add(chapter)
-            s.flush()
-            new_version(s, chapter, "", uid("initial"), digest(""))
-            novel.updated_at = now()
-            s.flush()
+            chapter = _new_empty_chapter(s, novel, position, data, operation="manual_chapter")
             return chapter_out(s, chapter)
+
+    def planning_anchor(self, novel_id: str) -> dto.PlanningAnchorOut:
+        with self.ws.session(write=True) as s:
+            novel = require_novel(s, novel_id)
+            chapter = s.execute(select(Chapter.id, Chapter.working_version_id).where(Chapter.novel_id == novel_id)
+                                .order_by(Chapter.position).limit(1)).first()
+            if chapter is None:
+                chapter = _new_empty_chapter(s, novel, 1, dto.ChapterInput(title="第1章"), operation="planning_anchor")
+            return dto.PlanningAnchorOut(chapter_id=chapter.id, base_version_id=chapter.working_version_id)
 
     def chapter(self, novel_id: str, chapter_id: str) -> dto.ChapterOut:
         with self.ws.session() as s:

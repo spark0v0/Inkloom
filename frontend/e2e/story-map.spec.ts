@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
-import { resolve } from 'node:path'
 
 test('故事脉络区分计划与原文进展，支持改纲、深链、筛选与刷新失败恢复', async ({ page }, testInfo) => {
   const pageErrors: string[] = []
@@ -63,10 +62,10 @@ test('故事脉络区分计划与原文进展，支持改纲、深链、筛选�
   await map.getByRole('combobox', { name: '脉络章节状态', exact: true }).selectOption('')
   if (await filterToggle.isVisible()) await filterToggle.click()
   await page.locator('.page-scroll').evaluate(e => { e.scrollTop = 0 })
-  await page.screenshot({ path: resolve(`../docs/screenshots/story-map-${testInfo.project.name}.png`) })
+  await page.screenshot({ path: testInfo.outputPath('story-map.png') })
   if (testInfo.project.name === 'desktop') {
     await page.setViewportSize({ width: 768, height: 1024 })
-    await page.screenshot({ path: resolve('../docs/screenshots/story-map-tablet.png') })
+    await page.screenshot({ path: testInfo.outputPath('story-map-tablet.png') })
     await page.setViewportSize({ width: 1440, height: 900 })
   }
   const accessibility = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze()

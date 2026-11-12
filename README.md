@@ -4,7 +4,7 @@
 
 **当前版本：0.2.0 · 本地测试版**
 
-![Inkloom 章节写作工作台](docs/screenshots/closeout/editor-desktop.png)
+![Inkloom 章节写作工作台](docs/screenshots/workbench-desktop.png)
 
 ## 主要能力
 
@@ -34,9 +34,9 @@ cd Inkloom
 
 ## 开始创作
 
-1. **连接模型**：在“模型设置”配置 Chat Completions 兼容服务、模型 ID 和密钥；本机无鉴权服务可留空密钥。
-2. **新建作品**：填写故事想法、题材、目标平台与篇幅，生成并调整全书方案。
-3. **规划章节**：按卷编写细纲，补充人物与设定，再进入章节写作。
+1. **新建作品**：填写故事想法、题材、目标平台与篇幅，或导入已有手稿。
+2. **按需连接模型**：在“模型设置”配置 Chat Completions 兼容服务、模型 ID 和密钥。本机无鉴权服务可留空密钥。
+3. **规划章节**：生成或手写全书方案，按卷编写细纲，再进入章节写作。
 4. **审阅与定稿**：通读生成候选后采纳，按需修稿；完成后点击“本章定稿”，核对记忆与原文依据，再进入下一章。
 5. **导出连载**：选择章节范围，核对导出清单，下载稿件并自行上传番茄、起点等平台。
 
@@ -57,4 +57,4 @@ pwsh -File ./scripts/dev.ps1   # 开发模式
 pwsh -File ./scripts/test.ps1  # 工程检查
 ```
 
-[产品说明](docs/PRODUCT.md) · [技术架构](docs/ARCHITECTURE.md) · [开发约定](AGENTS.md) · [工程收尾与使用边界](docs/PROJECT-CLOSEOUT-2026-11-08.md)
+[文档索引](docs/README.md) · [技术架构](docs/ARCHITECTURE.md) · [开发约定](AGENTS.md) · [工程复查与使用边界](docs/reviews/REVIEW-2026-11-12.md)

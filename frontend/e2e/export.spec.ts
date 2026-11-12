@@ -2,7 +2,6 @@ import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { readFile } from 'node:fs/promises'
-import { resolve } from 'node:path'
 
 async function manuscript(page: Page) {
   await page.goto('/')
@@ -64,7 +63,7 @@ test('按章范围预览、排除原因与 ZIP 导出', async ({ page }, testInf
   await expect(dialog.getByRole('button', { name: '下载正文', exact: true })).toBeEnabled()
   await expect(dialog.getByRole('button', { name: '下载正文', exact: true })).toBeInViewport()
   await page.evaluate(() => document.fonts.ready)
-  await page.screenshot({ path: resolve(`../docs/screenshots/export-final-${testInfo.project.name}.png`) })
+  await page.screenshot({ path: testInfo.outputPath('export-final.png') })
   expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze()).violations).toEqual([])
   const download = page.waitForEvent('download')
   await dialog.getByRole('button', { name: '下载正文', exact: true }).click()

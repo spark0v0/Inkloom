@@ -4,9 +4,10 @@ import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
 import './assets/fonts/ui-font.css'
-import './styles.css'
-import './studio.css'
-import './workbench.css'
+import './styles/theme.css'
+import './styles/base.css'
+import './styles/studio.css'
+import './styles/workbench.css'
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 10000, refetchOnWindowFocus: false }, mutations: { retry: false } } })
 class Boundary extends Component<{ children: ReactNode }, { failed: boolean }> {

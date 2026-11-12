@@ -1,7 +1,6 @@
 import { test, expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
-import { resolve } from 'node:path'
 
 const prefix = '前文🙂。'
 const quote = '林舟收起地图，推开了门。'
@@ -64,7 +63,7 @@ test('本书风格保存恢复，引用资料可核对，模板和保存不调�
   const actionsBox = (await dialog.locator('.modal-actions').boundingBox())!
   expect(contentBox.y + contentBox.height).toBeLessThanOrEqual(actionsBox.y)
   expect(actionsBox.y + actionsBox.height).toBeLessThanOrEqual(page.viewportSize()!.height)
-  await page.screenshot({ path: resolve(`../docs/screenshots/writing-style-${info.project.name}.png`) })
+  await page.screenshot({ path: info.outputPath('writing-style.png') })
   const axe = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze()
   expect(axe.violations.map(v => v.id)).toEqual([])
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
@@ -119,7 +118,7 @@ test('选段快捷操作仅准备，旧版本拒绝生成，明确生成采纳�
     await route.continue()
   })
   await selectText(page)
-  await page.screenshot({ path: resolve(`../docs/screenshots/selection-actions-${info.project.name}.png`) })
+  await page.screenshot({ path: info.outputPath('selection-actions.png') })
   const axe = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze()
   expect(axe.violations.map(v => v.id)).toEqual([])
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)

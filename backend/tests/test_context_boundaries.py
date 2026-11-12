@@ -158,3 +158,27 @@ def test_directory_reads_only_summaries_and_counts_in_constant_queries(library):
     assert len(statements) <= 2
     assert not any(field in sql for sql in statements for field in
         ("versions.text", "versions.editor_doc", "versions.paragraphs"))
+
+
+def test_context_reads_prior_paragraphs_in_batches_and_keeps_evidence(library, generation):
+    novel = library.create_novel(dto.NovelInput(title="上下文证据读取"))
+    prior = [confirm(library, novel.id, f"第{i + 1}章", f"档案员抄录了第{i + 1}封来信。") for i in range(12)]
+    current = library.create_chapter(novel.id, dto.ChapterInput(title="核对来信"))
+    statements = []
+
+    def capture(conn, cursor, statement, parameters, context, executemany):
+        statements.append(statement)
+
+    event.listen(library.ws.db.engine, "before_cursor_execute", capture)
+    try:
+        preview = generation.preview(novel.id, dto.ContextInput(chapter_id=current.id,
+            base_version_id=current.working_version_id, task="continue"))
+    finally:
+        event.remove(library.ws.db.engine, "before_cursor_execute", capture)
+    sources = {source.source_id: source for source in preview.sources}
+    assert {c.id for c in prior} <= {fact.chapter_id for fact in preview.facts}
+    assert all(sources[e.source_id].text == e.quote for fact in preview.facts for e in fact.evidence)
+    version_reads = [sql for sql in statements if "versions.paragraphs" in sql]
+    assert len(version_reads) <= 3
+    assert sum("versions.editor_doc" in sql for sql in version_reads) == 1
+    assert sum("chapters.references" in sql for sql in statements) == 1

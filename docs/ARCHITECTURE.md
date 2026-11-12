@@ -1,30 +1,32 @@
 # 技术方案与关键契约
 
+2026-11-12 工作区导航统一到 `useWorkspaceNavigation`。编辑器使用工作区、作品和章节标识绑定保存流程，已有资料的后台刷新失败时保留输入缓冲。规划使用 `planning-anchor` 在写事务中准备首章，采纳时按现有章序和占位条件重验。`context_sources.py` 负责目录投影及定稿段落批量读取。[决策 0032](decisions/0032-workspace-navigation-and-planning-directory.md)
+
 2026-11-01：讨论恢复校验实际消息、不可变原文及引用身份；连接在领取和派发前核验修订，更换端点不沿用旧凭证。自动关系邻居与关系边一起让出预算；人物关系编辑/删除检查 `base_updated_at`。`ProviderOut.requires_key` 是计算字段，无数据库迁移，当前 head 为 `1b8c6e431fa7`。见 [决策 0026](decisions/0026-writing-flow-review.md)。
 
-2026-10-31 连续创作流程复查：`job_history.py` 在分页前过滤任务集合、分卷、正文版本和待处理状态，页面仅取摘要，再加载选中详情；章纲详情显式带生成时分卷 ID，旧快照从原生产输入读取。`Library.prepare_canon` 提供只读定稿准备；同一正文和记忆不增加修订，修改已确认记忆检查修订基线。`ChapterFinalizeDialog` 管理冻结提交、未确认重放、冲突比较和回执后的状态复读。无新迁移，见 [决策 0022](decisions/0022-workflow-resumption-finalization.md) 与 [流程复查](REVIEW-WORKFLOW-2026-10-31.md)。
+2026-10-31 连续创作流程复查：`job_history.py` 在分页前过滤任务集合、分卷、正文版本和待处理状态，页面仅取摘要，再加载选中详情；章纲详情显式带生成时分卷 ID，旧快照从原生产输入读取。`Library.prepare_canon` 提供只读定稿准备；同一正文和记忆不增加修订，修改已确认记忆检查修订基线。`ChapterFinalizeDialog` 管理冻结提交、未确认重放、冲突比较和回执后的状态复读。无新迁移，见 [决策 0022](decisions/0022-workflow-resumption-finalization.md) 与 [流程复查](reviews/REVIEW-WORKFLOW-2026-10-31.md)。
 
-2026-10-31 新增有范围的持续规划讨论：`discussions.py` 管理会话、参考快照、预算和字段采纳，消息沿用 `jobs`，前端复用轻量进度。迁移 `f17b6d429ea5` 增加会话、任务轮次及版本历史索引；恢复保持旧版细纲结构验证，并校验会话的同书范围与消息链。结构化任务共用结果注册表，正文历史采用元数据投影与游标分页。见 [决策 0021](decisions/0021-planning-discussions.md) 与 [实现记录](IMPLEMENTATION-PLANNING-DISCUSSIONS.md)。
+2026-10-31 新增有范围的持续规划讨论：`discussions.py` 管理会话、参考快照、预算和字段采纳，消息沿用 `jobs`，前端复用轻量进度。迁移 `f17b6d429ea5` 增加会话、任务轮次及版本历史索引；恢复保持旧版细纲结构验证，并校验会话的同书范围与消息链。结构化任务共用结果注册表，正文历史采用元数据投影与游标分页。见 [决策 0021](decisions/0021-planning-discussions.md) 与 [实现记录](implementation/IMPLEMENTATION-PLANNING-DISCUSSIONS.md)。
 
-2026-10-31 补充连载范围导出：`manuscript_export.py` 用单条关联查询绑定作品、章节范围与版本元数据，预览不加载正文，实际下载只读取纳入的正文；TXT/Markdown/ZIP 共用选择及空稿校验。前端下载携带预览指纹，变更返回 409，不自动重试。无迁移，见 [决策 0020](decisions/0020-serial-export-preview.md) 与 [结项说明](PROJECT-CLOSEOUT-2026-10-31.md)。
+2026-10-31 补充连载范围导出：`manuscript_export.py` 用单条关联查询绑定作品、章节范围与版本元数据，预览不加载正文，实际下载只读取纳入的正文；TXT/Markdown/ZIP 共用选择及空稿校验。前端下载携带预览指纹，变更返回 409，不自动重试。无迁移，见 [决策 0020](decisions/0020-serial-export-preview.md) 与 [结项说明](reviews/PROJECT-CLOSEOUT-2026-10-31.md)。
 
-2026-10-31 补充自动资料预算边界：最近两章全文和自动记忆可按优先级让出空间，保留最近章末、明确必读及伏笔依据；记忆与引文同步重新组装，预览、消息与来源指纹使用同一结果。保护层仍超限时拒绝发送，不调用模型自动压缩。见 [决策 0019](decisions/0019-continuity-context-budget.md) 与 [review 记录](REVIEW-2026-10-31.md)。
+2026-10-31 补充自动资料预算边界：最近两章全文和自动记忆可按优先级让出空间，保留最近章末、明确必读及伏笔依据；记忆与引文同步重新组装，预览、消息与来源指纹使用同一结果。保护层仍超限时拒绝发送，不调用模型自动压缩。见 [决策 0019](decisions/0019-continuity-context-budget.md) 与 [review 记录](reviews/REVIEW-2026-10-31.md)。
 
-> 当前 0.2 沿用模块化单体和 SQLite，在已有生成任务中增加全书方案、分卷章节细纲及事务采纳；该阶段迁移为 `a12c7e604bc9`，本章参考为 `b73d2f809a61`，伏笔跟进为 `c84e3a190b72`，作品文风为 `d95f4b207c83`，最新细纲历史为 `e06a5c318d94`。实际变更见 [连载工作流决策](decisions/0004-serial-production.md)、[0.2 实现记录](IMPLEMENTATION-V0.2.md)、[本章参考实现](IMPLEMENTATION-REFERENCES.md)、[伏笔跟进实现](IMPLEMENTATION-THREAD-TRACKING.md)、[写作辅助实现](IMPLEMENTATION-WRITING-ASSISTANCE.md) 与 [细纲编辑实现](IMPLEMENTATION-CHAPTER-OUTLINES.md)，以下保留最初的完整技术方案。
+> 当前 0.2 沿用模块化单体和 SQLite，在已有生成任务中增加全书方案、分卷章节细纲及事务采纳；该阶段迁移为 `a12c7e604bc9`，本章参考为 `b73d2f809a61`，伏笔跟进为 `c84e3a190b72`，作品文风为 `d95f4b207c83`，最新细纲历史为 `e06a5c318d94`。实际变更见 [连载工作流决策](decisions/0004-serial-production.md)、[0.2 实现记录](implementation/IMPLEMENTATION-V0.2.md)、[本章参考实现](implementation/IMPLEMENTATION-REFERENCES.md)、[伏笔跟进实现](implementation/IMPLEMENTATION-THREAD-TRACKING.md)、[写作辅助实现](implementation/IMPLEMENTATION-WRITING-ASSISTANCE.md) 与 [细纲编辑实现](implementation/IMPLEMENTATION-CHAPTER-OUTLINES.md)，以下保留最初的完整技术方案。
 
 2026-10-24 增加结构化 `inspiration` 任务与选中方向引用，复用任务表，无数据库迁移。方向在服务端按同作品、同章节与上下文基线校验；列表查询按章节过滤且不加载冻结上下文。前端结果展示与 SSE Hook 从写作助手拆出，供编辑器、任务记录和规划页复用。契约见 [决策 0007](decisions/0007-in-chapter-inspiration.md)。
 
 2026-10-25 完成本章参考：`references.py` 负责选择修订、同书/前文章序/定稿版本校验和恢复校验，`context.py` 冻结必读与非正史材料；HTTP 层只转交契约。`ContextInput.references_revision` 为可选兼容字段，新前端始终发送，拒绝旧窗口继续生成。参考变更和迟到任务完成均检查基线；必读不参与可选裁剪。`AttemptHistory` 由助手与任务记录复用，历史片段只读下载。恢复兼容两份旧迁移和当前迁移，校验后在新目录升级。详见 [决策 0008](decisions/0008-chapter-references.md)。
 
-同日新增审稿修稿与历史分页，无新迁移：`review_rewrite.py` 从有效审稿的指定意见解析真实版本和稳定段落 ID，准备只读；`ContextInput.review_reference` 冻结来源哈希，完成与采纳同时检查意见、作者判断、依据和整段选区。`FindingDecision` 的可选基线字段保护新客户端的并发说明。`job_history.py` 提供绑定筛选作用域的 `(created_at, id)` 游标分页，SQL 只选有限摘要；原 `/jobs` 接口保留 150 条及旧响应供兼容入口使用。`ReviewFindings` 与 `SourceButton` 供编辑器和历史详情复用。契约见 [决策 0009](decisions/0009-review-rewrite-history.md)，验证见 [实现记录](IMPLEMENTATION-REVIEW-REVISION.md)。
+同日新增审稿修稿与历史分页，无新迁移：`review_rewrite.py` 从有效审稿的指定意见解析真实版本和稳定段落 ID，准备只读；`ContextInput.review_reference` 冻结来源哈希，完成与采纳同时检查意见、作者判断、依据和整段选区。`FindingDecision` 的可选基线字段保护新客户端的并发说明。`job_history.py` 提供绑定筛选作用域的 `(created_at, id)` 游标分页，SQL 只选有限摘要；原 `/jobs` 接口保留 150 条及旧响应供兼容入口使用。`ReviewFindings` 与 `SourceButton` 供编辑器和历史详情复用。契约见 [决策 0009](decisions/0009-review-rewrite-history.md)，验证见 [实现记录](implementation/IMPLEMENTATION-REVIEW-REVISION.md)。
 
-状态：**规划基线，已有 0.1.0 本地实现**。以下细分目录和部分字段仍是可演进设计，实际结构与取舍见 [ADR 0001](adr/0001-local-workspace.md)，验证范围见 [IMPLEMENTATION.md](IMPLEMENTATION.md)。技术调整不能绕开数据安全和作者控制原则。
+状态：**规划基线，已有 0.1.0 本地实现**。以下细分目录和部分字段仍是可演进设计，实际结构与取舍见 [ADR 0001](adr/0001-local-workspace.md)，验证范围见 [IMPLEMENTATION.md](implementation/IMPLEMENTATION.md)。技术调整不能绕开数据安全和作者控制原则。
 
 2026-10-26 新增 `ThreadTrack`、`ThreadProgress`，沿用伏笔 Entity，不把计划当事实。`threads.py` 按章序、段序计算有效进展，负责跟进修订、幂等新增、撤销与恢复；`context.py` 仅冻结当前章之前的进展，并把原文列为不可静默裁剪的依据。计划和关联变更递增作品设置修订，沿用旧任务失效机制。`thread_restore.py` 独立核验备份中的归属和不可变引文；旧上下文的 `thread_guidance` 缺失时默认为空。恢复支持前三个旧迁移，先验证再在新目录升级，未提供向旧代码直接降级承诺。契约见 [决策 0010](decisions/0010-thread-tracking.md)。
 
 ## 架构选择
 
-2026-10-31 修正长篇上下文范围与检索：outline 使用独立 narrative_position 读取此前有效定稿，保留挂载章的并发基线；旧任务缺失字段时按旧章序校验。`retrieval.py` 负责有限中文片段、同书前文段落词频加权、受范围约束的原文候选和匹配分数；`context.py` 继续冻结最终资料与预算。目录仅关联查询摘要/字数。兼容传输增加冻结的整次与无有效输出时限，超时仍走不确定结果与显式重试。没有数据库迁移，见 [决策 0018](decisions/0018-context-and-generation-boundaries.md) 与 [实际验证](IMPLEMENTATION-CONTEXT-BOUNDARIES.md)。
+2026-10-31 修正长篇上下文范围与检索：outline 使用独立 narrative_position 读取此前有效定稿，保留挂载章的并发基线；旧任务缺失字段时按旧章序校验。`retrieval.py` 负责有限中文片段、同书前文段落词频加权、受范围约束的原文候选和匹配分数；`context.py` 继续冻结最终资料与预算。目录仅关联查询摘要/字数。兼容传输增加冻结的整次与无有效输出时限，超时仍走不确定结果与显式重试。没有数据库迁移，见 [决策 0018](decisions/0018-context-and-generation-boundaries.md) 与 [实际验证](implementation/IMPLEMENTATION-CONTEXT-BOUNDARIES.md)。
 
 故事脉络采用前端只读投影：`storyMap.ts` 从本书 ChapterSummary 与 Thread 关联生成章序视图，同时核对进展有效性与当前定稿版本；`StoryMap.tsx` 沿用已有 API、Query 缓存和原文查看。路由查询参数保存地图/伏笔入口，编辑继续走原细纲服务。没有新增数据库或任务类型，不复制图状态。见 [决策 0017](decisions/0017-story-map.md)。
 
@@ -32,7 +34,7 @@
 
 2026-10-28 完成章节细纲编辑，迁移为 `e06a5c318d94`：`Chapter.outline_revision` 与不可变 `OutlineRevision` 保存完整细纲快照，`chapter_outlines.py` 同步 Plan 结构和 Chapter.goal 投影，处理冲突、幂等、恢复和候选采纳；元数据与旧规划入口走同一服务。`outline_edit` 冻结修订和字段范围，在输出及采纳时校验；`outline_restore.py` 验证备份历史与当前投影。编辑器采用章节深链接、独立窗口恢复键和持久化任务，不引入新依赖。见 [决策 0014](decisions/0014-chapter-outline-editing.md)。
 
-活跃生成采用独立 `JobProgress` 投影，`job_progress.py` 显式选择必要列，不读取 `context`、`result` 和 Attempt 正文；SSE 也只查询任务状态与事件。`jobProgress.ts` 统一合并通知、单请求读取、迟到快照保护和 5 秒只读补偿；三个界面共用 `useJobStream`，终止后确认完整详情才解锁结果操作。无数据库迁移。见 [决策 0013](decisions/0013-live-job-progress.md) 与 [实现及验证](IMPLEMENTATION-LIVE-PROGRESS.md)。
+活跃生成采用独立 `JobProgress` 投影，`job_progress.py` 显式选择必要列，不读取 `context`、`result` 和 Attempt 正文；SSE 也只查询任务状态与事件。`jobProgress.ts` 统一合并通知、单请求读取、迟到快照保护和 5 秒只读补偿；三个界面共用 `useJobStream`，终止后确认完整详情才解锁结果操作。无数据库迁移。见 [决策 0013](decisions/0013-live-job-progress.md) 与 [实现及验证](implementation/IMPLEMENTATION-LIVE-PROGRESS.md)。
 
 2026-10-27 新增作品结构化文风与选段快捷准备。`writing_preferences.py` 校验设置修订，沿用 `Novel.style` 保存语言节奏；JSON 字段只存视角、避免写法及非正史表达示例。`context.py` 将偏好冻结到正文/改写/审稿输入，计入预算，不加入事实或引用来源。前端快捷操作先保存并绑定真实选段，复用 rewrite 候选和安全采纳。备份校验新字段，同时保留前四版恢复升级。契约见 [决策 0012](decisions/0012-writing-style-selection-actions.md)。
 
@@ -72,32 +74,44 @@ flowchart LR
 
 FastAPI 的 [BackgroundTasks 文档](https://fastapi.tiangolo.com/tutorial/background-tasks/)介绍的是响应后的后台任务机制，不提供本方案要求的持久化恢复契约。本项目自行持久化任务，而不是因为使用了某个框架就声称可恢复。
 
-## 建议目录与模块责任
+## 目录与模块责任
 
 ```text
-frontend/
-  src/app/                 路由、布局与本地会话
-  src/features/library/    作品与导入
-  src/features/editor/     编辑缓冲、保存与候选比较
-  src/features/bible/      档案、原文依据与事实确认
-  src/features/planning/   简报、卷章与场景目标
-  src/features/jobs/       事件、部分稿与错误恢复
-  src/features/settings/   Provider 与工作区设置
-  src/shared/              UI token、契约客户端与通用组件
+frontend/src/
+  App.tsx                  工作区会话与应用框架
+  app/                     路由、离页保存与全局搜索
+  features/library/        书架、开书和导入
+  features/writing/        正文、目录、写作助手和定稿
+  features/planning/       全书规划、细纲与规划讨论
+  features/story/          人物、设定、伏笔与复核清单
+  features/generation/     任务记录与生成结果展示
+  features/export/         连载导出
+  features/workspace/      模型设置与工作区备份
+  components/              对话框、提示、引用与通用界面
+  lib/                     API、恢复副本与共享领域逻辑
+  styles/                  主题变量、基础与工作台样式
+  generated/api.d.ts       从后端 OpenAPI 生成的契约
+frontend/scripts/visual/  开发用界面截图工具
 backend/
-  app/api/                 HTTP/SSE、鉴权与错误映射
-  app/domain/              作品、版本、正史与状态规则
-  app/application/         保存、采纳、确认、失效和备份用例
-  app/generation/          固定阶段、预算与上下文组装
-  app/providers/           transport 与能力适配
-  app/retrieval/           别名、全文索引与有效来源筛选
-  app/jobs/                领取、租约、检查点、事件与取消
-  app/storage/             ORM、数据库、迁移与安全文件路径
+  app/main.py              HTTP/SSE、工作区校验与错误映射
+  app/library.py           作品、正文版本、定稿和档案写入
+  app/production.py        全书方案与章节细纲的事务采纳
+  app/context*.py          冻结上下文、资料投影与预算
+  app/retrieval.py         中文检索及有效定稿范围
+  app/jobs.py              任务领取、租约、事件与取消
+  app/providers.py         模型连接与响应处理
+  app/models.py            ORM 实体与索引
+  app/storage.py           工作区、SQLite 与凭证存储
+  app/workspace_io.py      备份快照与恢复校验
+  alembic/                 数据库迁移
   tests/
 prompts/                   运行时模板、版本与输出 Schema
 evals/                     自创或获授权样例、标签与评测脚本
 scripts/                   启动、检查和开发辅助入口
-docs/                      已有方案、设计与后续 ADR
+docs/                      使用指南、技术架构与文档索引
+  implementation/          功能实现记录
+  reviews/                 项目复查与阶段记录
+  decisions/               工程决策
 ```
 
 工作区运行时目录使用明确配置路径，开发默认可为被忽略的 `data/`：数据库、附件和产物在内，凭证单独存储。前端不直接读写文件，Provider 不直接改领域表，API 路由不承载提示词编排。
@@ -266,23 +280,23 @@ P0 实现显著标记的 Demo Provider 和一个经过真实兼容性验证的 O
 
 记录最小观测数据：任务/调用 ID、阶段、Provider/模型配置版本、耗时、输入量估计、返回 usage、价格版本与错误类别。默认不将全文提示词、小说正文或密钥写入普通日志；需要保留的上下文快照只存在受工作区访问控制的产物中。
 
-## API 草案
+## API 入口
 
-接口以 `/api/v1` 开头，以下是待实现契约，不保证已可调用。
+接口以 `/api/v1` 开头。具体请求字段、响应类型和必填参数以 `backend/app/main.py`、`backend/app/schemas.py` 与生成的 `frontend/src/generated/api.d.ts` 为准。
 
 | 接口组 | 示例 | 约束 |
 | --- | --- | --- |
 | 作品 | `GET/POST /novels`、`GET/PATCH /novels/{id}` | 明确工作区和作品作用域 |
-| 章节 | `POST /novels/{id}/chapters`、`GET /chapters/{id}` | 排序字段独立于标题，读写均核对所属作品 |
-| 正文 | `POST /chapters/{id}/versions`、`GET /chapters/{id}/versions` | 基线与幂等键必填，不覆盖旧版本 |
-| 候选 | `POST /candidates/{id}/adopt`、`POST /candidates/{id}/reject` | 检查基线、选区、上下文依赖与状态 |
-| 正史 | `POST /chapters/{id}/canon-preview`、`POST /chapters/{id}/canon-confirm` | preview 不提交，confirm 验证固定输入版本 |
+| 章节 | `GET/POST /novels/{id}/chapters`、`POST /novels/{id}/planning-anchor` | 章序独立于标题。准备首章返回当前版本，可重复请求 |
+| 正文 | `POST /novels/{id}/chapters/{chapter_id}/versions` | 保存校验基线与操作号，产生不可变版本 |
+| 候选 | `POST /jobs/{id}/adopt`、`POST /jobs/{id}/apply-plan` | 检查基线、上下文依赖和候选状态 |
+| 定稿 | `GET/POST /novels/{id}/chapters/{chapter_id}/canon` | 读取定稿准备，确认时验证版本与修订 |
 | 档案/检索 | `/novels/{id}/entities`、`/novels/{id}/facts`、`/novels/{id}/search` | 有效修订筛选，引用可定位 |
-| 上下文 | `POST /novels/{id}/context-preview` | 返回来源清单、裁剪说明和预算状态，不包含密钥 |
-| 任务 | `POST /jobs`、`GET /jobs/{id}`、`GET /jobs/{id}/events` | Job 持久化先于执行；事件有序 |
-| 控制 | `POST /jobs/{id}/cancel`、`/pause`、`/resume`、`/retry` | 合法状态迁移，retry 为新 attempt |
-| Provider | `/providers`、`POST /providers/{id}/test` | 凭证写入后仅返回已配置标记；测试调用真实计费语义需说明 |
-| 交付 | `/novels/{id}/export`、`/workspace/backup`、`/workspace/restore-preview`、`/workspace/restore` | 导出版本策略明确，恢复先到新工作区 |
+| 上下文 | `POST /novels/{id}/context` | 返回来源清单、裁剪说明和预算状态 |
+| 任务 | `POST /novels/{id}/jobs`、`GET /jobs/page`、`GET /jobs/{id}/events` | Job 先持久化，再由 worker 领取。历史先读分页摘要 |
+| 控制 | `POST /jobs/{id}/cancel`、`/pause`、`/resume`、`/retry` | 校验任务状态，重试创建新的尝试记录 |
+| 模型连接 | `/providers`、`POST /providers/{id}/check` | 连接配置与凭证单独存储，响应返回已配置标记 |
+| 交付 | `/novels/{id}/export-preview`、`/novels/{id}/export`、`/workspace/backup`、`/workspace/restore` | 预览与导出绑定版本，恢复在新工作区校验 |
 
 统一错误至少包含 `code`、用户可理解的 `message`、`retryable`、`job_id`（如有）与脱敏诊断 ID。不要将供应商原始响应、URL 中凭证或堆栈直接展示给普通用户。
 

@@ -25,6 +25,6 @@
 - [桌面 AI 草稿](../screenshots/draft-v4-desktop.png)、[桌面正文](../screenshots/manuscript-v4-desktop.png)
 - [平板写作](../screenshots/editor-v4-tablet.png)、[手机正文](../screenshots/manuscript-v4-mobile.png)、[手机候选](../screenshots/draft-v4-mobile.png)
 
-`frontend/scripts/capture-workflow-ui.mjs` 仅允许在独立的 ui-v3-preview 工作区创建 Demo 样例，通过实际 UI 完成开书到采纳。9 个截图覆盖 1440、768、390 CSS px，未发现页面级横向溢出或页面运行错误，原始记录见 [尺寸报告](../screenshots/v4-viewport-checks.json)。截图中的 109 字是 Demo 的实际输出，不能当作真实模型整章能力。
+`frontend/scripts/visual/capture-workflow-ui.mjs` 仅允许在独立的 ui-v3-preview 工作区创建 Demo 样例，通过实际 UI 完成开书到采纳。9 个截图覆盖 1440、768、390 CSS px，未发现页面级横向溢出或页面运行错误，原始记录见 [尺寸报告](../screenshots/v4-viewport-checks.json)。截图中的 109 字是 Demo 的实际输出，不能当作真实模型整章能力。
 
-测试结果见 [本轮实现与验证](../IMPLEMENTATION-UX-V4.md)。
+测试结果见 [本轮实现与验证](../implementation/IMPLEMENTATION-UX-V4.md)。

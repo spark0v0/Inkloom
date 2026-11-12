@@ -24,4 +24,4 @@
 - [手机 AI 面板](../screenshots/assistant-v3-mobile.png)
 - [作品库](../screenshots/library-v3-desktop.png)
 
-截图由 `frontend/scripts/capture-serial-ui.mjs` 从独立本机预览工作区采集，仅使用示例内容。字数来自实际数据：Demo 样例只有短文本，不伪造整章字数。采集检查 1440、768、390 CSS px，无文档级横向溢出或页面异常，记录见 [v3-viewport-checks.json](../screenshots/v3-viewport-checks.json)。自动 axe 检查不等于完整人工无障碍认证。
+截图由 `frontend/scripts/visual/capture-serial-ui.mjs` 从独立本机预览工作区采集，仅使用示例内容。字数来自实际数据：Demo 样例只有短文本，不伪造整章字数。采集检查 1440、768、390 CSS px，无文档级横向溢出或页面异常，记录见 [v3-viewport-checks.json](../screenshots/v3-viewport-checks.json)。自动 axe 检查不等于完整人工无障碍认证。

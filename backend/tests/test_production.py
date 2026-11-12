@@ -4,6 +4,7 @@ import io
 import json
 import sqlite3
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 from alembic.config import Config
@@ -14,6 +15,7 @@ from app import schemas as dto
 from app.context import validate_result
 from app.domain import DomainError, uid
 from app.library import Library
+from app.models import Job
 from app.providers import StreamPart, demo_text
 from app.storage import BACKEND_DIR, Workspace
 from app.workspace_io import activate_restore, restore
@@ -37,7 +39,7 @@ def execute(generation, job):
 def create(library, generation):
     novel = library.create_novel(dto.NovelInput(title="连载测试", premise="归乡者收到失踪家人的信",
         platform="起点中文网", target_words=1000000, chapter_words=2500))
-    anchor = library.create_chapter(novel.id, dto.ChapterInput(title="第1章"))
+    anchor = library.chapter(novel.id, library.planning_anchor(novel.id).chapter_id)
     job = generation.create(novel.id, dto.JobInput(chapter_id=anchor.id,
         base_version_id=anchor.working_version_id, task="blueprint", idempotency_key=uid("blueprint")))
     return novel, anchor, job
@@ -63,7 +65,6 @@ def outline(library, generation, novel, anchor, volume, count=3):
 
 
 def test_outline_resume_keeps_the_requested_volume_in_new_and_old_snapshots(library, generation, workspace):
-    from app.models import Job
 
     novel, anchor, first = blueprint(library, generation)
     second = library.put_plan(novel.id, dto.PlanInput(title='第二卷', level='volume', body='新的航程。'))
@@ -131,6 +132,78 @@ def test_outline_appends_batches_without_overwriting_prose(library, generation):
     assert library.chapter(novel.id, anchor.id).version.text == "不能被后续规划覆盖的正文。"
 
 
+@pytest.mark.parametrize("chapter_title,chapter_volume,goal", [
+    ("渡口来信", "旧事", "查找寄信人"), ("第1章", "第一卷", ""),
+])
+def test_outline_keeps_an_authors_empty_first_chapter(library, generation, chapter_title, chapter_volume, goal):
+    novel = library.create_novel(dto.NovelInput(title="从旧细纲续写"))
+    first = library.create_chapter(novel.id, dto.ChapterInput(title=chapter_title, volume=chapter_volume, goal=goal))
+    volume = library.put_plan(novel.id, dto.PlanInput(title=chapter_volume, level="volume"))
+    job = outline(library, generation, novel, first, volume)
+    generation.apply_plan(novel.id, job.id)
+    chapters = library.chapters(novel.id)
+    assert [c.position for c in chapters] == [1, 2, 3, 4]
+    assert (chapters[0].id, chapters[0].title, chapters[0].goal) == (first.id, first.title, first.goal)
+
+
+def test_planning_anchor_reuses_the_first_chapter_and_its_current_version(client):
+    novel = client.post("/api/v1/novels", json={"title": "重复准备开书"}).json()
+    base = f"/api/v1/novels/{novel['id']}"
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        requests = [pool.submit(client.post, base + "/planning-anchor") for _ in range(2)]
+        first, second = [request.result() for request in requests]
+    assert first.status_code == second.status_code == 200
+    anchor = first.json()
+    assert second.json() == anchor
+    chapter = client.post(f"{base}/chapters/{anchor['chapter_id']}/versions", json={
+        "base_version_id": anchor["base_version_id"], "operation_id": uid("save"), "text": "已开始创作。",
+    })
+    assert chapter.status_code < 300
+    assert client.post(base + "/planning-anchor").json() == {**anchor, "base_version_id": chapter.json()["id"]}
+    assert len(client.get(base + "/chapters").json()) == 1
+
+
+def test_legacy_candidate_cannot_replace_an_authors_first_chapter(library, generation):
+    novel = library.create_novel(dto.NovelInput(title="旧规划候选"))
+    chapter = library.create_chapter(novel.id, dto.ChapterInput(title="作者安排的第一章", goal="追查来信"))
+    volume = library.put_plan(novel.id, dto.PlanInput(title=chapter.volume, level="volume"))
+    job = outline(library, generation, novel, chapter, volume)
+    with library.ws.session(write=True) as session:
+        saved = session.get(Job, job.id)
+        payload = saved.context["input"]
+        production = {**payload["production"], "initial_slot": chapter.id, "start_number": 1}
+        saved.context = {**saved.context, "input": {**payload, "production": production}}
+    with pytest.raises(DomainError) as error:
+        generation.apply_plan(novel.id, job.id)
+    assert error.value.code == "CONTEXT_STALE"
+    assert library.chapters(novel.id)[0].goal == chapter.goal
+
+
+def test_outline_rejects_appending_an_earlier_volume_after_manual_chapters(library, generation):
+    novel = library.create_novel(dto.NovelInput(title="分卷顺序"))
+    early = library.put_plan(novel.id, dto.PlanInput(title="离乡", level="volume"))
+    later = library.put_plan(novel.id, dto.PlanInput(title="重逢", level="volume"))
+    chapter = library.create_chapter(novel.id, dto.ChapterInput(title="见到故人", volume=later.title))
+    with pytest.raises(DomainError) as error:
+        generation.preview(novel.id, dto.ContextInput(chapter_id=chapter.id, base_version_id=chapter.working_version_id,
+            task="outline", volume_plan_id=early.id))
+    assert error.value.code == "VOLUME_ORDER"
+
+
+def test_existing_volume_order_follows_chapters_when_plans_were_added_in_reverse(library, generation):
+    novel = library.create_novel(dto.NovelInput(title="已有手稿补规划"))
+    later = library.put_plan(novel.id, dto.PlanInput(title="远航", level="volume"))
+    earlier = library.put_plan(novel.id, dto.PlanInput(title="旧渡口", level="volume"))
+    first = library.create_chapter(novel.id, dto.ChapterInput(title="来信", volume=earlier.title))
+    library.create_chapter(novel.id, dto.ChapterInput(title="离港", volume=later.title))
+    request = dto.ContextInput(chapter_id=first.id, base_version_id=first.working_version_id,
+        task="outline", volume_plan_id=earlier.id)
+    with pytest.raises(DomainError) as error:
+        generation.preview(novel.id, request)
+    assert error.value.code == "VOLUME_ORDER"
+    generation.preview(novel.id, request.model_copy(update={"volume_plan_id": later.id}))
+
+
 def test_catalog_change_prevents_late_plan_adoption(library, generation):
     novel, anchor, volume = blueprint(library, generation)
     job = outline(library, generation, novel, anchor, volume)
@@ -151,7 +224,6 @@ def test_outline_validates_volume_scope_count_and_numbering(library, generation)
     assert error.value.code == "VOLUME_NOT_FOUND"
     job = outline(library, generation, novel, anchor, volume)
     with generation.ws.session() as session:
-        from app.models import Job
         context = session.get(Job, job.id).context
     bad = job.result.model_dump()
     bad["chapters"][0]["number"] = 2

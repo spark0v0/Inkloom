@@ -21,7 +21,7 @@
 ## 实际验证
 
 - `npm.cmd --prefix frontend run build`：类型检查及生产构建通过。
-- `node frontend/scripts/capture-typography-ui.mjs`：使用单独的 `typography-*` 临时工作区与虚构示例，完成桌面、平板和手机共六张截图；页面宽度分别为 1440、768、390px，无页面横向溢出，写作工具栏的可见按钮与字体选项均未超出视口。
+- `node frontend/scripts/visual/capture-typography-ui.mjs`：使用单独的 `typography-*` 临时工作区与虚构示例，完成桌面、平板和手机共六张截图；页面宽度分别为 1440、768、390px，无页面横向溢出，写作工具栏的可见按钮与字体选项均未超出视口。
 - 字体、字号切换后刷新仍保留偏好，正文文本保持一致；四份本地字体加载成功，无外部网络请求和页面脚本错误。
 - 五个页面状态的 axe WCAG 2/2.1/2.2 A/AA 规则检查均为零违规。这属于自动检查，未证明所有状态、操作系统及完整 WCAG 合规。
 - design-taste-frontend 对 `workbench.css` 的 app lint：0 FAIL、4 WARN，提示涉及显式关闭的 blur/shadow 及编辑焦点线；浏览器 inspector：0 FAIL、1 WARN，提示近白底色偏暖。保留该底色用于与浅灰框架区分，未采用大面积米黄色面板。

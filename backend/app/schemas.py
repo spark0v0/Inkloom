@@ -131,6 +131,11 @@ class ChapterInput(Schema):
     goal: str = Field(default="", max_length=8000)
 
 
+class PlanningAnchorOut(Schema):
+    chapter_id: str
+    base_version_id: str
+
+
 class ChapterPatch(Schema):
     title: str | None = Field(default=None, min_length=1, max_length=240)
     volume: str | None = Field(default=None, max_length=160)

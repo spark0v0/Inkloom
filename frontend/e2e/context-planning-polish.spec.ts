@@ -197,6 +197,7 @@ for (const outline of [false, true]) test(`${outline ? '章节细纲' : '全书�
   const ids = await fixture(page, outline)
   await page.goto(`/#/plot/${ids.novel}`)
   if (outline) await page.getByRole('button', { name: 'AI 规划后续章节', exact: true }).click()
+  else await page.getByRole('navigation', { name: '创作步骤', exact: true }).getByRole('button', { name: /全书方案$/ }).click()
   const panel = page.getByRole('region', { name: outline ? 'AI 章节细纲' : 'AI 全书方案', exact: true })
   await panel.getByLabel('补充要求', { exact: true }).fill('让人物的选择推动情节。')
   const bodies: any[] = []
